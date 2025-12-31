@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Teacher, AppState } from './types';
 import { APIService } from './services/api';
@@ -6,7 +5,7 @@ import Layout from './components/Layout';
 import TeacherForm from './components/TeacherForm';
 import AdminRegistry from './components/AdminRegistry';
 import { ADMIN_CREDENTIALS } from './constants';
-import { ClipboardList, Users, LogIn, ShieldCheck, Zap } from 'lucide-react';
+import { ClipboardList, Users, LogIn, ShieldCheck, Zap, User } from 'lucide-react';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -19,7 +18,7 @@ const App: React.FC = () => {
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditResult, setAuditResult] = useState<string | null>(null);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
-  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [loginForm, setLoginForm] = useState({ email: '', password: '', type: 'teacher' as 'teacher' | 'admin' });
 
   const fetchData = async () => {
     setIsSyncing(true);
@@ -41,7 +40,6 @@ const App: React.FC = () => {
     const unsubscribe = APIService.onAuthChange(async (user) => {
       if (user) {
         if (user.email === ADMIN_CREDENTIALS.id) {
-          // Fix: Proper state spreading to avoid overwriting existing teachers/lessonPlans data
           setState(prev => ({ ...prev, currentUser: 'admin' }));
         } else {
           // Find teacher by email
@@ -60,7 +58,9 @@ const App: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const res = await APIService.login(loginForm.email, loginForm.password);
-    if (!res.success) alert(res.message);
+    if (!res.success) {
+      alert(`Authentication Failed: ${res.message}\n\nNote: For Faculty, ensure your email matches the registry and you have an assigned password.`);
+    }
   };
 
   const handleLogout = async () => {
@@ -87,36 +87,62 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
         <div className="max-w-md w-full glass-card p-10 rounded-[3rem] border border-white/10 shadow-2xl">
-          <div className="text-center mb-10">
+          <div className="text-center mb-8">
             <div className="inline-flex p-4 bg-indigo-600 rounded-3xl mb-6 shadow-xl shadow-indigo-500/20">
               <LogIn className="h-8 w-8 text-white" />
             </div>
             <h2 className="text-3xl font-black text-white italic tracking-tighter">SACRED HEART</h2>
-            <p className="text-xs text-indigo-400 font-bold uppercase tracking-widest mt-2">Academic Portal Authentication</p>
+            <p className="text-xs text-indigo-400 font-bold uppercase tracking-widest mt-2 text-center">Academic Hub Authentication</p>
           </div>
+
+          <div className="flex bg-white/5 p-1.5 rounded-2xl mb-8 border border-white/10">
+            <button 
+              onClick={() => setLoginForm({...loginForm, type: 'teacher'})}
+              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${loginForm.type === 'teacher' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'}`}
+            >
+              <User className="h-3.5 w-3.5" /> Faculty
+            </button>
+            <button 
+              onClick={() => setLoginForm({...loginForm, type: 'admin'})}
+              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${loginForm.type === 'admin' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'}`}
+            >
+              <ShieldCheck className="h-3.5 w-3.5" /> Admin
+            </button>
+          </div>
+
           <form onSubmit={handleLogin} className="space-y-6">
-            <div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-1">
+                {loginForm.type === 'teacher' ? 'Institutional Email (Login ID)' : 'Administrator Email'}
+              </label>
               <input 
                 type="email" 
-                placeholder="Institutional Email"
+                placeholder={loginForm.type === 'teacher' ? "teacher@sacredheart.org" : "admin@sacredheartkoderma.org"}
                 className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold"
                 value={loginForm.email}
                 onChange={e => setLoginForm({...loginForm, email: e.target.value})}
               />
             </div>
-            <div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-1">Secure Password</label>
               <input 
                 type="password" 
-                placeholder="Secure Password"
+                placeholder="••••••••"
                 className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold"
                 value={loginForm.password}
                 onChange={e => setLoginForm({...loginForm, password: e.target.value})}
               />
             </div>
             <button className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-5 rounded-2xl transition-all shadow-xl shadow-indigo-900/20 uppercase tracking-widest text-xs">
-              Establish Session
+              Establish {loginForm.type === 'teacher' ? 'Faculty' : 'Admin'} Session
             </button>
           </form>
+
+          <div className="mt-8 pt-6 border-t border-white/5 text-center">
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest italic opacity-50">
+              Authorized Institutional Access Only
+            </p>
+          </div>
         </div>
       </div>
     );
