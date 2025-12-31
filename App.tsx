@@ -6,7 +6,7 @@ import Layout from './components/Layout';
 import TeacherForm from './components/TeacherForm';
 import AdminRegistry from './components/AdminRegistry';
 import { ADMIN_CREDENTIALS, DEFAULT_TEACHER_PASSWORD } from './constants';
-import { ClipboardList, Users, LogIn, ShieldCheck, Zap, User, Key, AlertCircle } from 'lucide-react';
+import { ClipboardList, Users, LogIn, ShieldCheck, Zap, User, Key, AlertCircle, Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -16,13 +16,13 @@ const App: React.FC = () => {
   });
   const [activeTab, setActiveTab] = useState<'plans' | 'registry'>('plans');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(true); // Initial loading state
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditResult, setAuditResult] = useState<string | null>(null);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [loginForm, setLoginForm] = useState({ email: '', password: '', type: 'teacher' as 'teacher' | 'admin' });
 
   const fetchData = async () => {
-    setIsSyncing(true);
     try {
       const [teachers, lessonPlans] = await Promise.all([
         APIService.fetchTeachers(),
@@ -31,25 +31,40 @@ const App: React.FC = () => {
       setState(prev => ({ ...prev, teachers, lessonPlans }));
       setLastSynced(new Date());
     } catch (error) {
-      console.error("Fetch error:", error);
-    } finally {
-      setIsSyncing(false);
+      console.error("Fetch error during data sync:", error);
     }
   };
 
   useEffect(() => {
     const unsubscribe = APIService.onAuthChange(async (user) => {
-      if (user) {
-        if (user.email === ADMIN_CREDENTIALS.id) {
-          setState(prev => ({ ...prev, currentUser: 'admin' }));
+      setIsAuthenticating(true);
+      try {
+        if (user) {
+          if (user.email === ADMIN_CREDENTIALS.id) {
+            setState(prev => ({ ...prev, currentUser: 'admin' }));
+          } else {
+            // Attempt to link auth user with teacher profile
+            const teachers = await APIService.fetchTeachers();
+            const teacher = teachers.find(t => t.email.toLowerCase() === user.email?.toLowerCase());
+            
+            if (teacher) {
+              setState(prev => ({ ...prev, teachers, currentUser: teacher }));
+            } else {
+              // User is logged in but profile doesn't exist in Firestore
+              console.error("Auth user exists but profile not found in teachers collection.");
+              alert(`System Error: Your account exists but your Teacher Profile was not found in the School Registry. Please contact the Administrator to verify your email: ${user.email}`);
+              await APIService.logout();
+              setState(prev => ({ ...prev, currentUser: null }));
+            }
+          }
+          await fetchData();
         } else {
-          const teachers = await APIService.fetchTeachers();
-          const teacher = teachers.find(t => t.email.toLowerCase() === user.email?.toLowerCase());
-          setState(prev => ({ ...prev, teachers, currentUser: teacher || null }));
+          setState(prev => ({ ...prev, currentUser: null }));
         }
-        fetchData();
-      } else {
-        setState(prev => ({ ...prev, currentUser: null }));
+      } catch (err) {
+        console.error("Error during auth state change:", err);
+      } finally {
+        setIsAuthenticating(false);
       }
     });
     return () => unsubscribe();
@@ -61,16 +76,19 @@ const App: React.FC = () => {
     
     setIsSyncing(true);
     const res = await APIService.login(loginForm.email, loginForm.password);
-    setIsSyncing(false);
-
+    
     if (!res.success) {
+      setIsSyncing(false);
       alert(`Access Denied: ${res.message}`);
     }
+    // Note: If success, onAuthChange will handle the transition and set isSyncing/isAuthenticating false
   };
 
   const handleLogout = async () => {
+    setIsAuthenticating(true);
     await APIService.logout();
     setState(prev => ({ ...prev, currentUser: null }));
+    setIsAuthenticating(false);
   };
 
   const handleRunAudit = async () => {
@@ -81,11 +99,21 @@ const App: React.FC = () => {
       setAuditResult(result);
     } catch (e) {
       console.error(e);
-      alert("AI Audit failed. Check your API key or connection.");
+      alert("AI Audit engine failed to respond. Please check your network.");
     } finally {
       setIsAuditing(false);
     }
   };
+
+  // Show a global loading screen during initial boot or auth checks
+  if (isAuthenticating && !state.currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
+        <Loader2 className="h-12 w-12 text-indigo-600 animate-spin mb-4" />
+        <p className="text-sm font-black text-slate-400 uppercase tracking-[0.3em]">Establishing Secure Connection...</p>
+      </div>
+    );
+  }
 
   if (!state.currentUser) {
     return (
@@ -139,9 +167,13 @@ const App: React.FC = () => {
             </div>
             <button 
               disabled={isSyncing}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-2xl transition-all shadow-xl shadow-indigo-200 uppercase tracking-widest text-xs disabled:opacity-50"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-2xl transition-all shadow-xl shadow-indigo-200 uppercase tracking-widest text-xs disabled:opacity-50 flex items-center justify-center gap-3"
             >
-              {isSyncing ? 'Authenticating...' : `Enter as ${loginForm.type === 'teacher' ? 'Faculty' : 'Admin'}`}
+              {isSyncing ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Verifying Credentials...</>
+              ) : (
+                `Enter as ${loginForm.type === 'teacher' ? 'Faculty' : 'Admin'}`
+              )}
             </button>
           </form>
 
@@ -149,7 +181,7 @@ const App: React.FC = () => {
             <div className="mt-8 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex gap-3">
               <AlertCircle className="h-5 w-5 text-indigo-600 shrink-0" />
               <p className="text-[10px] text-indigo-800 font-bold leading-relaxed">
-                First-time users: Use your registered institutional email and the default password <span className="bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-900">{DEFAULT_TEACHER_PASSWORD}</span> to activate your account.
+                First-time users: Enter your registered email and password <span className="bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-900">{DEFAULT_TEACHER_PASSWORD}</span> to initiate your session.
               </p>
             </div>
           )}
@@ -210,7 +242,7 @@ const App: React.FC = () => {
                   await APIService.deleteTeacher(id);
                   setState(prev => ({...prev, teachers: prev.teachers.filter(t => t.id !== id)}));
                 } catch (e) {
-                  alert("Sync failed.");
+                  alert("Cloud sync failed.");
                 } finally {
                   setIsSyncing(false);
                 }
@@ -230,9 +262,9 @@ const App: React.FC = () => {
                 <button 
                   onClick={handleRunAudit}
                   disabled={isAuditing || state.lessonPlans.length === 0}
-                  className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 disabled:opacity-30 text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg"
+                  className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 disabled:opacity-30 text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-3"
                 >
-                  {isAuditing ? 'Processing Data...' : 'Generate AI Report'}
+                  {isAuditing ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing...</> : 'Generate AI Report'}
                 </button>
               </div>
 
@@ -250,7 +282,7 @@ const App: React.FC = () => {
                 <div className="bg-white p-24 rounded-3xl text-center border-2 border-dashed border-slate-200 flex flex-col items-center justify-center">
                   <ClipboardList className="h-12 w-12 text-slate-200 mb-6" />
                   <div className="text-slate-400 font-black uppercase tracking-[0.4em] text-xs">
-                    {state.lessonPlans.length === 0 ? 'No Data Collected' : 'Awaiting Audit Execution'}
+                    {state.lessonPlans.length === 0 ? 'Data Pool Empty' : 'Awaiting Audit Execution'}
                   </div>
                 </div>
               )}
@@ -269,7 +301,7 @@ const App: React.FC = () => {
               teacherName: (state.currentUser as Teacher).name
             }));
             await APIService.saveLessonPlans(lessonPlans);
-            alert("Report submitted to administration.");
+            alert("Weekly report submitted successfully.");
             setIsSyncing(false);
           }} 
         />

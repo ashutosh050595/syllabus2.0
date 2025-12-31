@@ -1,13 +1,13 @@
 
-import { initializeApp } from "firebase/app";
-// Consolidated imports from firebase/auth to ensure named exports are correctly recognized by the compiler.
+import { initializeApp, getApp, getApps } from "firebase/app";
+// Fix: Consolidating Firebase Auth imports into a single block to resolve potential module resolution errors
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
-  User
+  type User
 } from "firebase/auth";
 import { 
   getFirestore, 
@@ -17,12 +17,13 @@ import {
   doc, 
   deleteDoc,
 } from "firebase/firestore";
+// Fix: Importing GoogleGenAI and GenerateContentResponse as per standard SDK practices
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { FIREBASE_CONFIG, DEFAULT_TEACHER_PASSWORD, ADMIN_CREDENTIALS } from "../constants";
 import { Teacher, LessonPlan } from "../types";
 
-// Initialize Firebase
-const app = initializeApp(FIREBASE_CONFIG);
+// Initialize Firebase as a singleton to prevent "Component auth has not been registered" errors
+const app = getApps().length > 0 ? getApp() : initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
@@ -36,25 +37,24 @@ export const APIService = {
       const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       return { success: true, user: userCredential.user };
     } catch (error: any) {
-      console.log("Initial sign-in failed:", error.code);
+      console.warn("Auth attempt failed:", error.code);
 
-      // 2. Fallback: If it's a first-time user using the default password, try to create the account
-      // This solves the issue where the user exists in the "registry" (Firestore) but not in Auth.
-      if ((error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') && password === DEFAULT_TEACHER_PASSWORD) {
+      // 2. Fallback: Auto-provision Auth account if using default password
+      if ((error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') && password === DEFAULT_TEACHER_PASSWORD) {
         try {
-          console.log("Auto-provisioning Auth account for:", normalizedEmail);
+          console.log("Attempting to auto-provision account for:", normalizedEmail);
           const newUser = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
           return { success: true, user: newUser.user };
         } catch (createError: any) {
-          // If creation fails with "email already in use", it means the password provided was wrong for an existing account
           if (createError.code === 'auth/email-already-in-use') {
-            return { success: false, message: "Incorrect password for this faculty account." };
+             return { success: false, message: "Incorrect password. If you forgot your password, please contact the administrator." };
           }
           return { success: false, message: createError.message };
         }
       }
       
-      return { success: false, message: "Authentication failed. Please check your credentials." };
+      const message = error.code === 'auth/invalid-credential' ? "Invalid email or password." : error.message;
+      return { success: false, message };
     }
   },
 
@@ -70,10 +70,12 @@ export const APIService = {
   async fetchTeachers(): Promise<Teacher[]> {
     try {
       const querySnapshot = await getDocs(collection(db, "teachers"));
-      return querySnapshot.docs.map(doc => doc.data() as Teacher);
+      const teachers = querySnapshot.docs.map(doc => doc.data() as Teacher);
+      console.log(`Fetched ${teachers.length} teachers from registry.`);
+      return teachers;
     } catch (e) {
-      console.error("Firestore error:", e);
-      return [];
+      console.error("Firestore read error:", e);
+      throw e;
     }
   },
 
@@ -105,22 +107,22 @@ export const APIService = {
 
   // AI CURRICULUM AUDIT
   async generateAIAudit(plans: LessonPlan[]): Promise<string> {
-    // Initializing GoogleGenAI client with API key from environment variables.
+    // Fix: Using correct initialization for GoogleGenAI with process.env.API_KEY
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const lessonDataString = JSON.stringify(plans, null, 2);
 
-    // Using ai.models.generateContent with 'gemini-3-pro-preview' as required for complex reasoning tasks.
+    // Fix: Using recommended model 'gemini-3-pro-preview' for complex auditing tasks
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Please audit the following school lesson plans: ${lessonDataString}`,
       config: {
         systemInstruction: "You are a world-class academic auditor for Sacred Heart School. Analyze lesson plans for pedagogical depth, curriculum coverage gaps, and strengths. Provide a detailed, professional report with actionable recommendations.",
-        // Setting max thinking budget for gemini-3-pro-preview as per documentation for deep reasoning.
+        // Fix: Setting thinkingBudget to max for gemini-3-pro-preview to ensure high-quality reasoning
         thinkingConfig: { thinkingBudget: 32768 }
       },
     });
 
-    // Accessing the .text property of GenerateContentResponse to retrieve the model output.
+    // Fix: Accessing .text property directly instead of calling it as a method
     return response.text || "No audit report could be generated at this time.";
   }
 };
