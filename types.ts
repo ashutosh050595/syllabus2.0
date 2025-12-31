@@ -1,4 +1,3 @@
-
 export type ClassName = 'I' | 'II' | 'III' | 'IV' | 'V' | 'VI' | 'VII' | 'VIII' | 'IX' | 'X' | 'XI' | 'XII';
 export type SectionName = 'A' | 'B' | 'C' | 'D';
 
@@ -13,6 +12,7 @@ export interface Teacher {
   name: string;
   email: string;
   phone: string;
+  password?: string;
   assignments: TeacherAssignment[];
   isClassTeacher: boolean;
   classTeacherOf?: {

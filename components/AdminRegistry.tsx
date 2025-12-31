@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Teacher, ClassName, SectionName, TeacherAssignment } from '../types';
 import { INITIAL_TEACHERS } from '../constants';
 import { APIService } from '../services/api';
 import { 
   UserPlus, Search, Edit2, Trash2, Mail, Phone, User, Plus, X, 
-  Check, Database, RefreshCw, AlertCircle, Info, ShieldCheck 
+  Check, Database, RefreshCw, AlertCircle, Info, ShieldCheck, KeyRound, Eye, EyeOff
 } from 'lucide-react';
 
 interface AdminRegistryProps {
@@ -17,17 +16,20 @@ interface AdminRegistryProps {
 
 const CLASSES: ClassName[] = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const SECTIONS: SectionName[] = ['A', 'B', 'C', 'D'];
+const DEFAULT_PASS = 'shstelaiya@123';
 
 const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, onAddTeacher, onUpdateTeacher, onRemoveTeacher }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSeeding, setIsSeeding] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   
   const [formData, setFormData] = useState<{
     name: string;
     email: string;
     phone: string;
+    password: string;
     isClassTeacher: boolean;
     ctClass: ClassName;
     ctSection: SectionName;
@@ -36,6 +38,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, onAddTeacher, o
     name: '',
     email: '',
     phone: '',
+    password: DEFAULT_PASS,
     isClassTeacher: false,
     ctClass: 'V',
     ctSection: 'A',
@@ -43,10 +46,11 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, onAddTeacher, o
   });
 
   const handleSeed = async () => {
-    if (confirm("This will push the sample roster to your Firebase database. Continue?")) {
+    if (confirm("This will push the sample roster with default passwords (shstelaiya@123) to your Firebase database. Continue?")) {
       setIsSeeding(true);
-      await APIService.syncInitialTeachers(INITIAL_TEACHERS);
-      window.location.reload(); // Refresh to reflect new data
+      const seededTeachers = INITIAL_TEACHERS.map(t => ({...t, password: DEFAULT_PASS}));
+      await APIService.syncInitialTeachers(seededTeachers);
+      window.location.reload();
     }
   };
 
@@ -88,6 +92,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, onAddTeacher, o
       name: formData.name,
       email: formData.email,
       phone: formData.phone,
+      password: formData.password,
       isClassTeacher: formData.isClassTeacher,
       classTeacherOf: formData.isClassTeacher ? { className: formData.ctClass, section: formData.ctSection } : undefined,
       assignments: formData.assignments
@@ -109,6 +114,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, onAddTeacher, o
       name: '',
       email: '',
       phone: '',
+      password: DEFAULT_PASS,
       isClassTeacher: false,
       ctClass: 'V',
       ctSection: 'A',
@@ -122,6 +128,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, onAddTeacher, o
       name: teacher.name,
       email: teacher.email,
       phone: teacher.phone,
+      password: teacher.password || DEFAULT_PASS,
       isClassTeacher: teacher.isClassTeacher,
       ctClass: teacher.classTeacherOf?.className || 'V',
       ctSection: teacher.classTeacherOf?.section || 'A',
@@ -184,7 +191,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, onAddTeacher, o
             {editingId ? 'Modify Professional Profile' : 'Teacher Registration'}
           </h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Full Name</label>
               <input 
@@ -214,6 +221,25 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, onAddTeacher, o
                 onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                 placeholder="10-digit mobile" 
               />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Access Password</label>
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  className="w-full px-4 py-3 bg-indigo-50/50 border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold pr-12" 
+                  value={formData.password}
+                  onChange={e => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Set password" 
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -362,6 +388,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, onAddTeacher, o
               <tr className="bg-slate-50/50 border-b border-slate-200">
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Faculty Identifier</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Responsibility</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Security</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Loadout Matrix</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Protocol</th>
               </tr>
@@ -396,6 +423,15 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, onAddTeacher, o
                     ) : (
                       <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest italic opacity-60">Subject Specialist</span>
                     )}
+                  </td>
+                  <td className="px-6 py-6">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                        <KeyRound className="h-3 w-3 text-indigo-400" />
+                        {teacher.password ? '••••••••' : 'Unset'}
+                      </span>
+                      <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest opacity-60">Identity Key Provisioned</span>
+                    </div>
                   </td>
                   <td className="px-6 py-6">
                     <div className="flex flex-wrap gap-2.5 max-w-sm">
