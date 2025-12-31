@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Teacher, AppState } from './types';
 import { APIService } from './services/api';
@@ -6,7 +5,7 @@ import Layout from './components/Layout';
 import TeacherForm from './components/TeacherForm';
 import AdminRegistry from './components/AdminRegistry';
 import { ADMIN_CREDENTIALS } from './constants';
-import { ClipboardList, Users, LogIn } from 'lucide-react';
+import { ClipboardList, Users, LogIn, ShieldCheck, Zap } from 'lucide-react';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -16,6 +15,8 @@ const App: React.FC = () => {
   });
   const [activeTab, setActiveTab] = useState<'plans' | 'registry'>('plans');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [auditResult, setAuditResult] = useState<string | null>(null);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
 
@@ -63,6 +64,21 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     await APIService.logout();
     setState(prev => ({ ...prev, currentUser: null }));
+  };
+
+  // Logic to execute Gemini AI Curriculum Audit
+  const handleRunAudit = async () => {
+    if (state.lessonPlans.length === 0) return;
+    setIsAuditing(true);
+    try {
+      const result = await APIService.generateAIAudit(state.lessonPlans);
+      setAuditResult(result);
+    } catch (e) {
+      console.error(e);
+      alert("AI Audit failed to initialize. Please check network connectivity.");
+    } finally {
+      setIsAuditing(false);
+    }
   };
 
   if (!state.currentUser) {
@@ -164,10 +180,41 @@ const App: React.FC = () => {
             />
           )}
           {activeTab === 'plans' && (
-            <div className="grid grid-cols-1 gap-6">
-              <div className="text-white text-center py-20 opacity-50 font-black uppercase tracking-widest text-sm italic">
-                Select Faculty Registry to manage staff
+            <div className="space-y-8">
+              <div className="flex flex-col md:flex-row justify-between items-center bg-white/5 p-8 rounded-[2.5rem] border border-white/10 gap-6 backdrop-blur-xl">
+                <div>
+                  <h3 className="text-2xl font-black text-white italic tracking-tight flex items-center gap-3">
+                    <Zap className="h-6 w-6 text-indigo-400 animate-pulse" /> Academic Audit Engine
+                  </h3>
+                  <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.3em] mt-2 opacity-80">Generative AI Curriculum Analysis</p>
+                </div>
+                <button 
+                  onClick={handleRunAudit}
+                  disabled={isAuditing || state.lessonPlans.length === 0}
+                  className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-2xl shadow-emerald-900/20 active:scale-95 flex items-center justify-center gap-3 border border-emerald-500/20"
+                >
+                  {isAuditing ? 'Synthesizing...' : 'Execute AI Audit'}
+                </button>
               </div>
+
+              {auditResult ? (
+                <div className="glass-card p-10 rounded-[3rem] border border-white/10 text-slate-300 animate-in fade-in slide-in-from-bottom-4 duration-500 bg-white/5 backdrop-blur-2xl">
+                  <div className="flex items-center gap-4 mb-8 text-emerald-400 border-b border-white/5 pb-6">
+                    <ShieldCheck className="h-8 w-8" />
+                    <h4 className="text-xl font-black uppercase tracking-tighter italic">Cloud Intelligence Report</h4>
+                  </div>
+                  <div className="whitespace-pre-wrap font-bold leading-relaxed text-sm bg-black/20 p-8 rounded-2xl border border-white/5 shadow-inner">
+                    {auditResult}
+                  </div>
+                </div>
+              ) : (
+                <div className="glass-card p-24 rounded-[4rem] text-center border-2 border-dashed border-indigo-500/20 flex flex-col items-center justify-center">
+                  <ClipboardList className="h-12 w-12 text-indigo-500/30 mb-6" />
+                  <div className="text-slate-500 font-black uppercase tracking-[0.4em] text-xs italic opacity-40">
+                    {state.lessonPlans.length === 0 ? 'Data Pool Empty: No Records Found' : 'Awaiting Engine Initialization'}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

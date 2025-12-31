@@ -1,4 +1,3 @@
-
 import { initializeApp } from "firebase/app";
 import { 
   getAuth, 
@@ -19,6 +18,7 @@ import {
   addDoc,
   onSnapshot
 } from "firebase/firestore";
+import { GoogleGenAI } from "@google/genai";
 import { FIREBASE_CONFIG } from "../constants";
 import { Teacher, LessonPlan } from "../types";
 
@@ -76,6 +76,25 @@ export const APIService = {
       setDoc(doc(db, "lessonPlans", plan.id), plan)
     );
     await Promise.all(batchPromises);
+  },
+
+  // AI CURRICULUM AUDIT
+  async generateAIAudit(plans: LessonPlan[]): Promise<string> {
+    // Using gemini-3-pro-preview for complex reasoning tasks as per guidelines
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const prompt = `You are a senior academic auditor for Sacred Heart School. 
+    Analyze the following lesson plans and provide a comprehensive audit report.
+    Identify gaps, strengths, and provide specific recommendations for pedagogy and coverage.
+    
+    Lesson Plan Data:
+    ${JSON.stringify(plans, null, 2)}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: prompt,
+    });
+    // Accessing text property directly as per Gemini API best practices
+    return response.text || "No audit report could be generated at this time.";
   },
 
   // PDF DISPATCH
