@@ -1,14 +1,14 @@
 
 import { initializeApp } from "firebase/app";
-// Consolidated modular Firebase Auth imports and separated type imports to fix exported member errors
+// Consolidated imports from firebase/auth to ensure named exports are correctly recognized by the compiler.
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut, 
-  onAuthStateChanged
+  onAuthStateChanged,
+  User
 } from "firebase/auth";
-import type { User } from "firebase/auth";
 import { 
   getFirestore, 
   collection, 
@@ -16,10 +16,6 @@ import {
   setDoc, 
   doc, 
   deleteDoc,
-  query, 
-  where, 
-  addDoc,
-  onSnapshot
 } from "firebase/firestore";
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { FIREBASE_CONFIG, DEFAULT_TEACHER_PASSWORD, ADMIN_CREDENTIALS } from "../constants";
@@ -33,30 +29,32 @@ const db = getFirestore(app);
 export const APIService = {
   // AUTHENTICATION
   async login(email: string, password: string): Promise<any> {
+    const normalizedEmail = email.toLowerCase().trim();
+    
     try {
       // 1. Attempt standard login
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       return { success: true, user: userCredential.user };
     } catch (error: any) {
-      // 2. If login fails, check if this is a registered teacher attempting first-time access
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
-        try {
-          // Check Firestore Registry
-          const teachers = await this.fetchTeachers();
-          const registeredTeacher = teachers.find(t => t.email.toLowerCase() === email.toLowerCase());
+      console.log("Initial sign-in failed:", error.code);
 
-          // If they exist in registry and are using the correct default password, auto-provision Auth
-          if (registeredTeacher && password === DEFAULT_TEACHER_PASSWORD) {
-            console.log("Teacher found in registry. Provisioning Auth account...");
-            const newUser = await createUserWithEmailAndPassword(auth, email, password);
-            return { success: true, user: newUser.user };
+      // 2. Fallback: If it's a first-time user using the default password, try to create the account
+      // This solves the issue where the user exists in the "registry" (Firestore) but not in Auth.
+      if ((error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') && password === DEFAULT_TEACHER_PASSWORD) {
+        try {
+          console.log("Auto-provisioning Auth account for:", normalizedEmail);
+          const newUser = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+          return { success: true, user: newUser.user };
+        } catch (createError: any) {
+          // If creation fails with "email already in use", it means the password provided was wrong for an existing account
+          if (createError.code === 'auth/email-already-in-use') {
+            return { success: false, message: "Incorrect password for this faculty account." };
           }
-        } catch (provisionError: any) {
-          console.error("Auto-provisioning failed:", provisionError);
+          return { success: false, message: createError.message };
         }
       }
       
-      return { success: false, message: error.message };
+      return { success: false, message: "Authentication failed. Please check your credentials." };
     }
   },
 
@@ -70,8 +68,13 @@ export const APIService = {
 
   // TEACHERS
   async fetchTeachers(): Promise<Teacher[]> {
-    const querySnapshot = await getDocs(collection(db, "teachers"));
-    return querySnapshot.docs.map(doc => doc.data() as Teacher);
+    try {
+      const querySnapshot = await getDocs(collection(db, "teachers"));
+      return querySnapshot.docs.map(doc => doc.data() as Teacher);
+    } catch (e) {
+      console.error("Firestore error:", e);
+      return [];
+    }
   },
 
   async syncTeacher(teacher: Teacher): Promise<void> {
@@ -102,34 +105,22 @@ export const APIService = {
 
   // AI CURRICULUM AUDIT
   async generateAIAudit(plans: LessonPlan[]): Promise<string> {
+    // Initializing GoogleGenAI client with API key from environment variables.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const lessonDataString = JSON.stringify(plans, null, 2);
 
+    // Using ai.models.generateContent with 'gemini-3-pro-preview' as required for complex reasoning tasks.
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Please audit the following school lesson plans: ${lessonDataString}`,
       config: {
         systemInstruction: "You are a world-class academic auditor for Sacred Heart School. Analyze lesson plans for pedagogical depth, curriculum coverage gaps, and strengths. Provide a detailed, professional report with actionable recommendations.",
+        // Setting max thinking budget for gemini-3-pro-preview as per documentation for deep reasoning.
         thinkingConfig: { thinkingBudget: 32768 }
       },
     });
 
+    // Accessing the .text property of GenerateContentResponse to retrieve the model output.
     return response.text || "No audit report could be generated at this time.";
-  },
-
-  // PDF DISPATCH
-  async triggerDispatch(): Promise<{ success: boolean; message: string }> {
-    const legacyUrl = localStorage.getItem('sh_legacy_dispatch_url');
-    if (!legacyUrl) return { success: false, message: "Dispatch Engine not configured" };
-    
-    try {
-      await fetch(legacyUrl, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'triggerDispatch' }),
-      });
-      return { success: true, message: 'Dispatch process initiated on Cloud Server.' };
-    } catch (e) {
-      return { success: false, message: 'Failed to reach dispatch engine.' };
-    }
   }
 };

@@ -10,8 +10,8 @@
     <style>
       body {
         font-family: 'Plus Jakarta Sans', sans-serif;
-        background-color: #030712;
-        color: #f8fafc;
+        background-color: #f8fafc; /* Slate 50 - High Clarity */
+        color: #0f172a; /* Slate 900 - High Contrast */
         min-height: 100vh;
         overflow-x: hidden;
       }
@@ -24,48 +24,34 @@
         height: 100%;
         z-index: -1;
         background: 
-          radial-gradient(at 0% 0%, hsla(263,45%,15%,1) 0, transparent 50%), 
-          radial-gradient(at 50% 0%, hsla(225,50%,15%,1) 0, transparent 50%), 
-          radial-gradient(at 100% 0%, hsla(339,55%,15%,1) 0, transparent 50%),
-          radial-gradient(at 0% 100%, hsla(280,50%,15%,1) 0, transparent 50%),
-          radial-gradient(at 100% 100%, hsla(210,50%,15%,1) 0, transparent 50%);
-        opacity: 0.9;
+          radial-gradient(at 0% 0%, hsla(220, 100%, 95%, 1) 0, transparent 50%), 
+          radial-gradient(at 100% 0%, hsla(260, 100%, 95%, 1) 0, transparent 50%),
+          radial-gradient(at 50% 100%, hsla(210, 100%, 92%, 1) 0, transparent 50%);
+        opacity: 0.8;
       }
 
       .glass-card {
-        background: rgba(255, 255, 255, 0.02);
-        backdrop-filter: blur(25px) saturate(180%);
-        -webkit-backdrop-filter: blur(25px) saturate(180%);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+        background: #ffffff;
+        border: 1px solid #e2e8f0; /* Slate 200 */
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
       }
 
       .glass-card:hover {
-        border-color: rgba(255, 255, 255, 0.15);
-        background: rgba(255, 255, 255, 0.04);
+        transform: translateY(-2px);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
       }
 
       .input-glass {
-        background: rgba(255, 255, 255, 0.03) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        color: white !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        background: #ffffff !important;
+        border: 2px solid #e2e8f0 !important;
+        color: #0f172a !important;
+        transition: all 0.2s ease;
       }
 
       .input-glass:focus {
-        border-color: #6366f1 !important;
-        background: rgba(255, 255, 255, 0.06) !important;
-        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
-      }
-
-      @keyframes aurora-shift {
-        0% { filter: hue-rotate(0deg); transform: scale(1); }
-        50% { filter: hue-rotate(15deg); transform: scale(1.05); }
-        100% { filter: hue-rotate(0deg); transform: scale(1); }
-      }
-
-      .aurora-bg {
-        animation: aurora-shift 15s infinite ease-in-out;
+        border-color: #4f46e5 !important; /* Indigo 600 */
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
       }
 
       @media print {
@@ -106,7 +92,7 @@
 </script>
   </head>
   <body>
-    <div class="mesh-bg aurora-bg"></div>
+    <div class="mesh-bg"></div>
     <div id="root"></div>
     <script type="module" src="index.tsx"></script>
   </body>
