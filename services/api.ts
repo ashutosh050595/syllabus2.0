@@ -1,12 +1,14 @@
-// Use standard modular imports for Firebase v9+
+
 import { initializeApp } from "firebase/app";
+// Consolidated modular Firebase Auth imports and separated type imports to fix exported member errors
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
   signOut, 
-  onAuthStateChanged,
-  User
+  onAuthStateChanged
 } from "firebase/auth";
+import type { User } from "firebase/auth";
 import { 
   getFirestore, 
   collection, 
@@ -20,7 +22,7 @@ import {
   onSnapshot
 } from "firebase/firestore";
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { FIREBASE_CONFIG } from "../constants";
+import { FIREBASE_CONFIG, DEFAULT_TEACHER_PASSWORD, ADMIN_CREDENTIALS } from "../constants";
 import { Teacher, LessonPlan } from "../types";
 
 // Initialize Firebase
@@ -32,9 +34,28 @@ export const APIService = {
   // AUTHENTICATION
   async login(email: string, password: string): Promise<any> {
     try {
+      // 1. Attempt standard login
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       return { success: true, user: userCredential.user };
     } catch (error: any) {
+      // 2. If login fails, check if this is a registered teacher attempting first-time access
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+        try {
+          // Check Firestore Registry
+          const teachers = await this.fetchTeachers();
+          const registeredTeacher = teachers.find(t => t.email.toLowerCase() === email.toLowerCase());
+
+          // If they exist in registry and are using the correct default password, auto-provision Auth
+          if (registeredTeacher && password === DEFAULT_TEACHER_PASSWORD) {
+            console.log("Teacher found in registry. Provisioning Auth account...");
+            const newUser = await createUserWithEmailAndPassword(auth, email, password);
+            return { success: true, user: newUser.user };
+          }
+        } catch (provisionError: any) {
+          console.error("Auto-provisioning failed:", provisionError);
+        }
+      }
+      
       return { success: false, message: error.message };
     }
   },
@@ -81,22 +102,18 @@ export const APIService = {
 
   // AI CURRICULUM AUDIT
   async generateAIAudit(plans: LessonPlan[]): Promise<string> {
-    // Initializing GoogleGenAI right before use to ensure updated environment context
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
     const lessonDataString = JSON.stringify(plans, null, 2);
 
-    // Using gemini-3-pro-preview for advanced academic reasoning with thinking capabilities
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Please audit the following school lesson plans: ${lessonDataString}`,
       config: {
         systemInstruction: "You are a world-class academic auditor for Sacred Heart School. Analyze lesson plans for pedagogical depth, curriculum coverage gaps, and strengths. Provide a detailed, professional report with actionable recommendations.",
-        thinkingConfig: { thinkingBudget: 32768 } // Utilize maximum thinking budget for pro model reasoning
+        thinkingConfig: { thinkingBudget: 32768 }
       },
     });
 
-    // Directly accessing the text property as per latest GenAI SDK best practices
     return response.text || "No audit report could be generated at this time.";
   },
 

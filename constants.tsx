@@ -5,6 +5,8 @@ export const ADMIN_CREDENTIALS = {
   password: 'School@029'
 };
 
+export const DEFAULT_TEACHER_PASSWORD = 'shstelaiya@123';
+
 // FIREBASE CONFIGURATION
 export const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCw3xYRbBdDk1dzOBBU00lGP6XFzyJgJwY",
@@ -17,6 +19,7 @@ export const FIREBASE_CONFIG = {
 };
 
 export const INITIAL_TEACHERS: Teacher[] = [
+// ... existing teachers code ...
   {
     id: "t1",
     name: "Kishor Kunal",

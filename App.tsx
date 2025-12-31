@@ -1,13 +1,15 @@
+// ... existing imports ...
 import React, { useState, useEffect } from 'react';
 import { Teacher, AppState } from './types';
 import { APIService } from './services/api';
 import Layout from './components/Layout';
 import TeacherForm from './components/TeacherForm';
 import AdminRegistry from './components/AdminRegistry';
-import { ADMIN_CREDENTIALS } from './constants';
-import { ClipboardList, Users, LogIn, ShieldCheck, Zap, User } from 'lucide-react';
+import { ADMIN_CREDENTIALS, DEFAULT_TEACHER_PASSWORD } from './constants';
+import { ClipboardList, Users, LogIn, ShieldCheck, Zap, User, Key } from 'lucide-react';
 
 const App: React.FC = () => {
+  // ... existing state ...
   const [state, setState] = useState<AppState>({
     currentUser: null,
     teachers: [],
@@ -20,6 +22,7 @@ const App: React.FC = () => {
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [loginForm, setLoginForm] = useState({ email: '', password: '', type: 'teacher' as 'teacher' | 'admin' });
 
+  // ... existing fetchData, useEffect ...
   const fetchData = async () => {
     setIsSyncing(true);
     try {
@@ -42,9 +45,8 @@ const App: React.FC = () => {
         if (user.email === ADMIN_CREDENTIALS.id) {
           setState(prev => ({ ...prev, currentUser: 'admin' }));
         } else {
-          // Find teacher by email
           const teachers = await APIService.fetchTeachers();
-          const teacher = teachers.find(t => t.email === user.email);
+          const teacher = teachers.find(t => t.email.toLowerCase() === user.email?.toLowerCase());
           setState(prev => ({ ...prev, teachers, currentUser: teacher || null }));
         }
         fetchData();
@@ -59,7 +61,7 @@ const App: React.FC = () => {
     e.preventDefault();
     const res = await APIService.login(loginForm.email, loginForm.password);
     if (!res.success) {
-      alert(`Authentication Failed: ${res.message}\n\nNote: For Faculty, ensure your email matches the registry and you have an assigned password.`);
+      alert(`Authentication Failed: ${res.message}\n\nNote: For Faculty, ensure your email matches the registry and you are using the correct Institutional Password.`);
     }
   };
 
@@ -68,7 +70,7 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, currentUser: null }));
   };
 
-  // Logic to execute Gemini AI Curriculum Audit
+  // ... existing handleRunAudit ...
   const handleRunAudit = async () => {
     if (state.lessonPlans.length === 0) return;
     setIsAuditing(true);
@@ -124,7 +126,14 @@ const App: React.FC = () => {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-1">Secure Password</label>
+              <div className="flex justify-between items-center px-1">
+                <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Secure Password</label>
+                {loginForm.type === 'teacher' && (
+                  <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest opacity-60 flex items-center gap-1">
+                    <Key className="h-2 w-2" /> Default active
+                  </span>
+                )}
+              </div>
               <input 
                 type="password" 
                 placeholder="••••••••"
