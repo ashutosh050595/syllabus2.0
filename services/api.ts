@@ -1,3 +1,4 @@
+// Use standard modular imports for Firebase v9+
 import { initializeApp } from "firebase/app";
 import { 
   getAuth, 
@@ -18,7 +19,7 @@ import {
   addDoc,
   onSnapshot
 } from "firebase/firestore";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { FIREBASE_CONFIG } from "../constants";
 import { Teacher, LessonPlan } from "../types";
 
@@ -80,20 +81,22 @@ export const APIService = {
 
   // AI CURRICULUM AUDIT
   async generateAIAudit(plans: LessonPlan[]): Promise<string> {
-    // Using gemini-3-pro-preview for complex reasoning tasks as per guidelines
+    // Initializing GoogleGenAI right before use to ensure updated environment context
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `You are a senior academic auditor for Sacred Heart School. 
-    Analyze the following lesson plans and provide a comprehensive audit report.
-    Identify gaps, strengths, and provide specific recommendations for pedagogy and coverage.
     
-    Lesson Plan Data:
-    ${JSON.stringify(plans, null, 2)}`;
+    const lessonDataString = JSON.stringify(plans, null, 2);
 
-    const response = await ai.models.generateContent({
+    // Using gemini-3-pro-preview for advanced academic reasoning with thinking capabilities
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: prompt,
+      contents: `Please audit the following school lesson plans: ${lessonDataString}`,
+      config: {
+        systemInstruction: "You are a world-class academic auditor for Sacred Heart School. Analyze lesson plans for pedagogical depth, curriculum coverage gaps, and strengths. Provide a detailed, professional report with actionable recommendations.",
+        thinkingConfig: { thinkingBudget: 32768 } // Utilize maximum thinking budget for pro model reasoning
+      },
     });
-    // Accessing text property directly as per Gemini API best practices
+
+    // Directly accessing the text property as per latest GenAI SDK best practices
     return response.text || "No audit report could be generated at this time.";
   },
 

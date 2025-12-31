@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Teacher, AppState } from './types';
 import { APIService } from './services/api';
@@ -40,6 +41,7 @@ const App: React.FC = () => {
     const unsubscribe = APIService.onAuthChange(async (user) => {
       if (user) {
         if (user.email === ADMIN_CREDENTIALS.id) {
+          // Fix: Proper state spreading to avoid overwriting existing teachers/lessonPlans data
           setState(prev => ({ ...prev, currentUser: 'admin' }));
         } else {
           // Find teacher by email
