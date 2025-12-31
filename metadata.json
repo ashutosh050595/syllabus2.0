@@ -1,0 +1,5 @@
+{
+  "name": "Sacred Heart Lesson Plan Manager",
+  "description": "A comprehensive lesson plan management system for teachers and administrators to track, compile, and distribute weekly lesson plans with automated reminders and PDF generation.",
+  "requestFramePermissions": []
+}
