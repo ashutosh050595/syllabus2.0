@@ -6,7 +6,7 @@ import { APIService } from '../services/api';
 import { getUpcomingMonday } from '../utils';
 import { 
   Search, Edit2, Trash2, Plus, X, 
-  Users, CheckCircle2, AlertTriangle, Activity, Mail, Database, RefreshCw
+  Users, CheckCircle2, AlertTriangle, Activity, Database, RefreshCw
 } from 'lucide-react';
 
 interface AdminRegistryProps {
@@ -46,7 +46,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
   };
 
   const handleSeed = async () => {
-    if (!confirm("This will synchronize the default teacher registry to the cloud. Existing matches will be updated. Continue?")) return;
+    if (!confirm("This will synchronize the institutional teacher registry to the cloud. Existing matches will be updated. Continue?")) return;
     setIsSeeding(true);
     try {
       await APIService.syncInitialTeachers(INITIAL_TEACHERS);
@@ -60,7 +60,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
   };
 
   const handleSave = () => {
-    if (!formData.name || !formData.email) return alert("Required: Please provide a name and email.");
+    if (!formData.name || !formData.email) return alert("Required: Name and Institutional Email are mandatory.");
     
     const teacher: Teacher = {
       id: editingId || Math.random().toString(36).substr(2, 9),
@@ -96,36 +96,36 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
-      {/* Dashboard KPI Stats */}
+      {/* RESTORED: Admin Insights Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-5">
           <div className="bg-indigo-100 p-4 rounded-2xl text-indigo-600"><Users className="h-6 w-6" /></div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Institutional Faculty</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Faculty Registry</p>
             <p className="text-2xl font-black text-slate-900">{teachers.length}</p>
           </div>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-5">
           <div className="bg-emerald-100 p-4 rounded-2xl text-emerald-600"><CheckCircle2 className="h-6 w-6" /></div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Syllabus Received</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Plans Received</p>
             <p className="text-2xl font-black text-slate-900">{submittedTeacherIds.size} / {teachers.length}</p>
           </div>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-5">
           <div className="bg-rose-100 p-4 rounded-2xl text-rose-600"><AlertTriangle className="h-6 w-6" /></div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Defaulters</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Weekly Defaulters</p>
             <p className="text-2xl font-black text-slate-900">{defaulters.length}</p>
           </div>
         </div>
       </div>
 
-      {/* Submission Defaulters Alert */}
+      {/* RESTORED: Defaulter List Visualization */}
       {defaulters.length > 0 && (
         <div className="bg-rose-50 border border-rose-100 p-6 rounded-3xl animate-in slide-in-from-top-4">
           <h4 className="text-rose-900 font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
-            <Activity className="h-4 w-4" /> Pending Weekly Submissions
+            <Activity className="h-4 w-4" /> Pending Academic Submissions
           </h4>
           <div className="flex flex-wrap gap-2">
             {defaulters.map(t => (
@@ -141,19 +141,19 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
         </div>
       )}
 
-      {/* Control Bar: Search & Seed Tools */}
+      {/* RESTORED: Admin Control Panel */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input type="text" placeholder="Search by name or email..." className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <input type="text" placeholder="Search registry..." className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
         <div className="flex gap-2 w-full md:w-auto">
-          {/* RESTORED: Seed Registry Button */}
+          {/* CRITICAL: RESTORED SEED BUTTON */}
           <button onClick={handleSeed} disabled={isSeeding} className="flex-1 md:flex-none bg-slate-100 text-slate-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-200 transition-all active:scale-95">
             {isSeeding ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />} Seed Registry
           </button>
-          <button onClick={() => { setIsAdding(true); setEditingId(null); }} className="flex-1 md:flex-none bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-50 transition-all">
-            <Plus className="h-4 w-4" /> Add Teacher
+          <button onClick={() => { setIsAdding(true); setEditingId(null); }} className="flex-1 md:flex-none bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg transition-all">
+            <Plus className="h-4 w-4" /> Register Teacher
           </button>
         </div>
       </div>
@@ -161,26 +161,26 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
       {(isAdding || editingId) && (
         <div className="bg-white p-8 rounded-3xl border border-indigo-100 shadow-2xl animate-in slide-in-from-top-6 duration-300">
           <div className="flex justify-between items-center mb-8">
-            <h3 className="text-xl font-black italic text-indigo-900">Teacher Profile & Assignment Suite</h3>
+            <h3 className="text-xl font-black italic text-indigo-900">Faculty Profile & Assignment Manager</h3>
             <button onClick={resetForm} className="p-2 text-slate-400 hover:text-slate-900 transition-colors"><X className="h-6 w-6" /></button>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Faculty Name</label>
-              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Full Name</label>
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Auth Email</label>
-              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="Institutional Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Institutional Email</label>
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Phone</label>
-              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="Contact No" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Portal Password</label>
-              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="Password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Security Password</label>
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
             </div>
           </div>
 
@@ -206,7 +206,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
             {formData.assignments.map((asgn, i) => (
               <div key={i} className="flex flex-wrap gap-4 items-end p-5 bg-white border border-slate-200 rounded-2xl shadow-sm">
                  <div className="space-y-1 flex-none w-32">
-                    <label className="text-[9px] font-black uppercase text-slate-400">Class</label>
+                    <label className="text-[9px] font-black uppercase text-slate-400">Class Level</label>
                     <select className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-lg font-bold" value={asgn.className} onChange={e => {
                       const upd = [...formData.assignments]; upd[i].className = e.target.value as ClassName; setFormData({...formData, assignments: upd});
                     }}>
@@ -214,40 +214,40 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
                     </select>
                  </div>
                  <div className="space-y-1 flex-1 min-w-[220px]">
-                    <label className="text-[9px] font-black uppercase text-slate-400">Assigned Sections</label>
+                    <label className="text-[9px] font-black uppercase text-slate-400">Sections</label>
                     <div className="flex gap-1.5">
                       {SECTIONS.map(s => (
-                        <button key={s} onClick={() => toggleSection(i, s)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all border ${asgn.sections.includes(s) ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-indigo-200 hover:text-indigo-400'}`}>{s}</button>
+                        <button key={s} onClick={() => toggleSection(i, s)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black border ${asgn.sections.includes(s) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-indigo-400'}`}>{s}</button>
                       ))}
                     </div>
                  </div>
                  <div className="space-y-1 flex-1 min-w-[200px]">
-                    <label className="text-[9px] font-black uppercase text-slate-400">Subject Specialist</label>
-                    <input className="w-full px-4 py-2 bg-slate-50 border border-slate-100 rounded-lg font-bold" placeholder="e.g. Maths" value={asgn.subject} onChange={e => {
+                    <label className="text-[9px] font-black uppercase text-slate-400">Subject Taught</label>
+                    <input className="w-full px-4 py-2 bg-slate-50 border border-slate-100 rounded-lg font-bold" placeholder="Subject Name" value={asgn.subject} onChange={e => {
                       const upd = [...formData.assignments]; upd[i].subject = e.target.value; setFormData({...formData, assignments: upd});
                     }} />
                  </div>
                  <button onClick={() => removeAssignment(i)} className="p-2.5 text-slate-300 hover:text-rose-600 transition-colors bg-slate-50 rounded-xl"><Trash2 className="h-5 w-5" /></button>
               </div>
             ))}
-            <button onClick={addAssignment} className="text-xs font-black text-indigo-600 flex items-center gap-2 hover:translate-x-2 transition-transform uppercase tracking-widest pt-2"><Plus className="h-4 w-4" /> Add Row</button>
+            <button onClick={addAssignment} className="text-xs font-black text-indigo-600 flex items-center gap-2 hover:translate-x-2 transition-transform uppercase tracking-widest pt-2"><Plus className="h-4 w-4" /> Add Assignment Entry</button>
           </div>
 
           <div className="mt-12 flex justify-end gap-3 border-t pt-10">
-             <button onClick={resetForm} className="px-10 py-4 font-black text-slate-400 uppercase tracking-widest text-[10px]">Discard Entry</button>
-             <button onClick={handleSave} className="bg-indigo-900 text-white px-14 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:shadow-indigo-100 transition-all active:scale-95">Commit Registry Update</button>
+             <button onClick={resetForm} className="px-10 py-4 font-black text-slate-400 uppercase tracking-widest text-[10px]">Discard</button>
+             <button onClick={handleSave} className="bg-indigo-900 text-white px-14 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl active:scale-95 transition-all">Commit Registry Change</button>
           </div>
         </div>
       )}
 
-      {/* Main Registry Table */}
+      {/* Main Registry View */}
       <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-slate-50 border-b">
             <tr>
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Faculty Details</th>
               <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Assignments</th>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Week Status</th>
+              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
@@ -273,14 +273,12 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
                     ))}
                   </div>
                 </td>
-                <td className="px-6 py-6">
-                  <div className="flex justify-center">
-                    {submittedTeacherIds.has(t.id) ? (
-                      <div className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-full font-black text-[9px] uppercase tracking-widest border border-emerald-100 shadow-sm"><CheckCircle2 className="h-3 w-3" /> Submitted</div>
-                    ) : (
-                      <div className="flex items-center gap-2 bg-rose-50 text-rose-400 px-4 py-1.5 rounded-full font-black text-[9px] uppercase tracking-widest border border-rose-100"><AlertTriangle className="h-3 w-3" /> Pending</div>
-                    )}
-                  </div>
+                <td className="px-6 py-6 text-center">
+                  {submittedTeacherIds.has(t.id) ? (
+                    <span className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[9px] font-black uppercase border border-emerald-100 shadow-sm"><CheckCircle2 className="h-3 w-3" /> Submitted</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-2 bg-rose-50 text-rose-400 px-3 py-1 rounded-full text-[9px] font-black uppercase border border-rose-100"><AlertTriangle className="h-3 w-3" /> Defaulter</span>
+                  )}
                 </td>
                 <td className="px-8 py-6 text-right">
                   <div className="flex justify-end gap-2">
@@ -295,15 +293,15 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
                       });
                       setIsAdding(false);
                       window.scrollTo({ top: 400, behavior: 'smooth' });
-                    }} className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><Edit2 className="h-4.5 w-4.5" /></button>
-                    <button onClick={() => onRemoveTeacher(t.id)} className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><Trash2 className="h-4.5 w-4.5" /></button>
+                    }} className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><Edit2 className="h-4 w-4" /></button>
+                    <button onClick={() => onRemoveTeacher(t.id)} className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {teachers.length === 0 && <div className="p-24 text-center"><p className="text-slate-400 italic font-black uppercase tracking-[0.2em]">Registry is Empty • Use Seed Button Above</p></div>}
+        {teachers.length === 0 && <div className="p-24 text-center"><p className="text-slate-400 italic font-black uppercase tracking-[0.2em]">Registry is Empty • Use Seed Tool Above</p></div>}
       </div>
     </div>
   );

@@ -43,8 +43,8 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, plans, tea
           <div className="absolute left-0 top-0 w-20 h-20">
              <img src="https://sacredheartkoderma.org/wp-content/uploads/2021/07/logo-150x150.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-3xl font-black uppercase tracking-tight">Sacred Heart School, Koderma</h1>
-          <p className="text-sm font-bold">(Affiliated to CBSE, New Delhi, upto +2 Level)</p>
+          <h1 className="text-3xl font-black uppercase tracking-tight">Sacred Heart School, Telaiya Dam</h1>
+          <p className="text-sm font-bold">(Affiliated to CBSE, New Delhi)</p>
           <div className="mt-6 border-b-4 border-black inline-block px-16 pb-2">
             <h2 className="text-2xl font-black uppercase tracking-[0.2em]">Weekly Syllabus Breakdown</h2>
           </div>
@@ -64,7 +64,7 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, plans, tea
             <tr>
               <th className="border-[2px] border-black p-3 text-left w-28 uppercase font-black">Subject</th>
               <th className="border-[2px] border-black p-3 text-left w-36 uppercase font-black">Subject Expert</th>
-              <th className="border-[2px] border-black p-3 text-left w-36 uppercase font-black">Chapter / Module</th>
+              <th className="border-[2px] border-black p-3 text-left w-36 uppercase font-black">Chapter</th>
               <th className="border-[2px] border-black p-3 text-left uppercase font-black">Topics & Objectives</th>
               <th className="border-[2px] border-black p-3 text-left w-52 uppercase font-black">Home Assignments</th>
             </tr>
@@ -83,17 +83,17 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, plans, tea
                 <tr key={idx} className="align-top">
                   <td className="border-[2px] border-black p-3 font-black bg-slate-50/50">
                     {asgn.subject}
-                    <div className="text-[9px] font-bold text-slate-500 mt-1 uppercase">Sec: {asgn.sections}</div>
+                    <div className="text-[9px] font-bold text-slate-500 mt-1 uppercase">Sections: {asgn.sections}</div>
                   </td>
                   <td className="border-[2px] border-black p-3 font-bold uppercase">{asgn.teacher.name}</td>
-                  <td className={`border-[2px] border-black p-3 uppercase font-black ${!plan ? 'text-red-600 animate-pulse' : ''}`}>
+                  <td className={`border-[2px] border-black p-3 uppercase font-black ${!plan ? 'text-red-600' : ''}`}>
                     {plan ? plan.chapter : 'LESSON PLAN PENDING'}
                   </td>
                   <td className={`border-[2px] border-black p-3 whitespace-pre-wrap leading-tight font-semibold ${!plan ? 'text-red-600 italic' : ''}`}>
-                    {plan ? plan.topics : 'Data not submitted for the upcoming week.'}
+                    {plan ? plan.topics : 'No academic data submitted for the upcoming week.'}
                   </td>
-                  <td className={`border-[2px] border-black p-3 whitespace-pre-wrap leading-tight font-medium ${!plan ? 'text-red-600' : ''}`}>
-                    {plan ? plan.homework : 'PENDING'}
+                  <td className={`border-[2px] border-black p-3 whitespace-pre-wrap leading-tight font-medium ${!plan ? 'text-red-600 font-black' : ''}`}>
+                    {plan ? plan.homework : 'PLAN PENDING'}
                   </td>
                 </tr>
               );
@@ -116,7 +116,7 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, plans, tea
       </div>
       
       <div className="mt-4 text-[9px] text-slate-400 font-bold uppercase text-center tracking-[0.5em] print:hidden">
-        Automated Academic Record • Sacred Heart Cloud Infrastructure
+        Institutional Record • Sacred Heart Cloud Hub • Validated Digitally
       </div>
     </div>
   );
