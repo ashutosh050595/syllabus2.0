@@ -16,7 +16,7 @@ const App: React.FC = () => {
     lessonPlans: []
   });
   
-  // ✅ PATCH STEP 1 — ADD ONE STATE (AUTH INITIALIZATION GUARD)
+  // Auth Initialization Guard - STAYS
   const [authInitialized, setAuthInitialized] = useState(false);
   
   const [activeTab, setActiveTab] = useState<'plans' | 'registry' | 'compile'>('plans');
@@ -53,7 +53,7 @@ const App: React.FC = () => {
     }
   };
 
-  // ✅ PATCH STEP 2 — REPLACE THE useEffect AUTH BLOCK ENTIRELY
+  // ✅ PATCH 1 — Fix the useEffect dependency (CRITICAL)
   useEffect(() => {
     const unsubscribe = APIService.onAuthChange(async (user) => {
       try {
@@ -118,20 +118,17 @@ const App: React.FC = () => {
         console.error("Critical Auth Error:", err);
         setState(prev => ({ ...prev, currentUser: null }));
       } finally {
-        // ✅ AUTH LIFECYCLE CONTROL (THE REAL FIX)
-        if (!authInitialized) {
-          setAuthInitialized(true);     // first auth resolution
-        } else {
-          setIsAuthenticating(false);   // real auth completion
-        }
+        // ✅ PATCH 2 — Simplify the finally block (stable version)
+        setAuthInitialized(true);
+        setIsAuthenticating(false);
         setIsSyncing(false);
       }
     });
 
     return () => unsubscribe();
-  }, [authInitialized]);
+  }, []); // ✅ CRITICAL FIX: Empty dependency array - listener registered ONCE
 
-  // ✅ PATCH STEP 4 — KEEP handleLogin SIMPLE (NO TIMEOUTS)
+  // ✅ PATCH 4 — KEEP handleLogin SIMPLE (NO TIMEOUTS)
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSyncing(true);
@@ -172,7 +169,7 @@ const App: React.FC = () => {
     console.log('Auth debug - isAuthenticating:', isAuthenticating, 'currentUser:', state.currentUser, 'authInitialized:', authInitialized);
   }, [isAuthenticating, state.currentUser, authInitialized]);
 
-  // ✅ PATCH STEP 3 — FIX THE LOADER CONDITION (ONE LINE)
+  // ✅ PATCH 3 — KEEP loader condition (NO CHANGE)
   if (!authInitialized || (isAuthenticating && !state.currentUser)) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
