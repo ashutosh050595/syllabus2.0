@@ -2,17 +2,18 @@
 import React, { useState, useEffect } from 'react';
 import { Teacher, LessonPlan, ClassName, SectionName } from '../types';
 import { getUpcomingMonday, getNextSaturday, formatDate, getWeekLabel } from '../utils';
-import { Send, History, RefreshCcw, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Send, History, RefreshCcw, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { APIService } from '../services/api';
 
 interface TeacherFormProps {
   teacher: Teacher;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: any) => Promise<void>;
 }
 
 const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
   const [activeView, setActiveView] = useState<'submit' | 'history'>('submit');
   const [history, setHistory] = useState<LessonPlan[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRequesting, setIsRequesting] = useState<string | null>(null);
 
   const upcomingMonday = getUpcomingMonday();
@@ -37,110 +38,110 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
     groupKeys.reduce((acc, key) => ({ ...acc, [key]: { chapter: '', topics: '', homework: '' } }), {})
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const submission = groupKeys.map(key => ({
-      ...uniqueGroups[key],
-      ...formData[key],
-      teacherId: teacher.email, // using email as ID for easier cross-ref
-      teacherName: teacher.name,
-      id: `${teacher.id}-${key}-${Date.now()}`,
-      dateFrom: formatDate(upcomingMonday),
-      dateTo: formatDate(nextSaturday),
-      weekStarting: upcomingMonday.toISOString(),
-      submittedAt: new Date().toISOString(),
-      weekLabel: currentWeekLabel
-    }));
-    onSubmit(submission);
-  };
-
-  const handleResubmitRequest = async (plan: LessonPlan) => {
-    setIsRequesting(plan.id);
-    await APIService.requestResubmission(plan, teacher.email);
-    const updated = await APIService.fetchLessonPlans(teacher.id);
-    setHistory(updated);
-    setIsRequesting(null);
-    alert("Resubmission request sent to admin. You will be notified via email upon approval.");
+    setIsSubmitting(true);
+    try {
+      const submission = groupKeys.map(key => ({
+        ...uniqueGroups[key],
+        ...formData[key],
+        teacherId: teacher.id,
+        teacherName: teacher.name,
+        id: `${teacher.id}-${key}-${Date.now()}`,
+        dateFrom: formatDate(upcomingMonday),
+        dateTo: formatDate(nextSaturday),
+        weekStarting: upcomingMonday.toISOString(),
+        submittedAt: new Date().toISOString(),
+        weekLabel: currentWeekLabel
+      }));
+      await onSubmit(submission);
+      alert("Weekly Syllabus Dispatch Successful!");
+      // Reset form
+      setFormData(groupKeys.reduce((acc, key) => ({ ...acc, [key]: { chapter: '', topics: '', homework: '' } }), {}));
+    } catch (error) {
+      alert("Submission error. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
-      <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm w-fit mx-auto">
-        <button onClick={() => setActiveView('submit')} className={`px-8 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeView === 'submit' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Weekly Submission</button>
-        <button onClick={() => setActiveView('history')} className={`px-8 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeView === 'history' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Submission History</button>
+      <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm w-fit mx-auto">
+        <button onClick={() => setActiveView('submit')} className={`px-6 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all ${activeView === 'submit' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}>New Submission</button>
+        <button onClick={() => setActiveView('history')} className={`px-6 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all ${activeView === 'history' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}>Submission History</button>
       </div>
 
       {activeView === 'submit' ? (
-        <form onSubmit={handleSubmit} className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-          <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-3xl text-center">
-            <h2 className="text-indigo-900 font-black text-lg uppercase italic">Syllabus for Upcoming Week</h2>
-            <p className="text-indigo-600 font-bold text-xs mt-1">{currentWeekLabel}</p>
+        <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+          <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl text-center">
+            <h2 className="text-indigo-900 font-black text-sm uppercase italic">Syllabus Coverage Plan</h2>
+            <p className="text-indigo-600 font-bold text-[10px] mt-1 tracking-widest uppercase">{currentWeekLabel}</p>
           </div>
 
           {groupKeys.map((key) => {
             const group = uniqueGroups[key];
             return (
-              <div key={key} className="border border-slate-200 rounded-3xl overflow-hidden shadow-sm bg-white hover:border-indigo-200 transition-colors">
-                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                  <h3 className="text-sm font-black uppercase text-slate-700">Class {group.className} • {group.subject}</h3>
+              <div key={key} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:border-indigo-200 transition-colors">
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center">
+                  <h3 className="text-xs font-black uppercase text-slate-700 italic">Class {group.className} • {group.subject}</h3>
                   <div className="flex gap-1">
-                    {group.sections.map(s => <span key={s} className="bg-white border border-slate-200 px-2 py-0.5 rounded text-[10px] font-black">{s}</span>)}
+                    {group.sections.map(s => <span key={s} className="bg-white border border-slate-200 px-2 py-0.5 rounded text-[8px] font-black">{s}</span>)}
                   </div>
                 </div>
-                <div className="p-6 space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Unit / Chapter Name</label>
-                    <input required className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold focus:border-indigo-500 outline-none transition-all" placeholder="Enter chapter title..." value={formData[key].chapter} onChange={e => setFormData({...formData, [key]: {...formData[key], chapter: e.target.value}})} />
+                <div className="p-6 space-y-5">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest px-1">Unit / Chapter Title</label>
+                    <input required className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm focus:border-indigo-500 outline-none transition-all" placeholder="E.g. Chapter 4: Photosynthesis" value={formData[key].chapter} onChange={e => setFormData({...formData, [key]: {...formData[key], chapter: e.target.value}})} />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Topics & Objectives</label>
-                    <textarea required rows={3} className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold focus:border-indigo-500 outline-none transition-all" placeholder="Detailed topics to be covered..." value={formData[key].topics} onChange={e => setFormData({...formData, [key]: {...formData[key], topics: e.target.value}})} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Weekly Home Assignment</label>
-                    <textarea required rows={2} className="w-full px-5 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold focus:border-indigo-500 outline-none transition-all" placeholder="Rigorous tasks for students..." value={formData[key].homework} onChange={e => setFormData({...formData, [key]: {...formData[key], homework: e.target.value}})} />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest px-1">Topics & Learning Objectives</label>
+                      <textarea required rows={3} className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm focus:border-indigo-500 outline-none transition-all resize-none" placeholder="Details of topics to cover..." value={formData[key].topics} onChange={e => setFormData({...formData, [key]: {...formData[key], topics: e.target.value}})} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest px-1">Weekly Home Assignment</label>
+                      <textarea required rows={3} className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm focus:border-indigo-500 outline-none transition-all resize-none" placeholder="Homework for students..." value={formData[key].homework} onChange={e => setFormData({...formData, [key]: {...formData[key], homework: e.target.value}})} />
+                    </div>
                   </div>
                 </div>
               </div>
             );
           })}
-          <button type="submit" className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-indigo-100 uppercase tracking-[0.2em] text-xs hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3">
-            <Send className="h-4 w-4" /> Finalize & Dispatch Plans
+          
+          <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-indigo-100 uppercase tracking-widest text-[11px] hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50">
+            {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-4 w-4" />}
+            {isSubmitting ? 'Dispatching Syllabus...' : 'Finalize & Dispatch Weekly Plans'}
           </button>
         </form>
       ) : (
-        <div className="space-y-4 animate-in fade-in">
+        <div className="space-y-3 animate-in fade-in">
           {history.length > 0 ? history.map(plan => (
-            <div key={plan.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 hover:border-indigo-100 transition-all">
-              <div className="text-center md:text-left">
-                <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
-                  <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded uppercase">{plan.className} • {plan.subject}</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{plan.weekLabel}</span>
+            <div key={plan.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[8px] font-black bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded uppercase">{plan.className} • {plan.subject}</span>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase">{plan.weekLabel}</span>
                 </div>
-                <h4 className="text-lg font-black text-slate-800 leading-tight italic">{plan.chapter}</h4>
-                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">LOGGED: {new Date(plan.submittedAt).toLocaleString()}</p>
+                <h4 className="text-sm font-black text-slate-800 italic">{plan.chapter}</h4>
               </div>
-              <div className="flex items-center gap-4">
-                {plan.resubmissionStatus === 'pending' ? (
-                  <span className="flex items-center gap-2 text-amber-500 font-black text-[10px] uppercase border-2 border-amber-100 bg-amber-50 px-4 py-2 rounded-xl"><Clock className="h-3.5 w-3.5" /> Approval Awaited</span>
-                ) : plan.resubmissionStatus === 'declined' ? (
-                  <span className="flex items-center gap-2 text-rose-500 font-black text-[10px] uppercase border-2 border-rose-100 bg-rose-50 px-4 py-2 rounded-xl"><AlertCircle className="h-3.5 w-3.5" /> Request Rejected</span>
-                ) : (
-                  <button 
-                    disabled={isRequesting === plan.id}
-                    onClick={() => handleResubmitRequest(plan)} 
-                    className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-600 border-2 border-indigo-100 hover:bg-indigo-50 px-6 py-2.5 rounded-2xl transition-all active:scale-95"
-                  >
-                    <RefreshCcw className={`h-4 w-4 ${isRequesting === plan.id ? 'animate-spin' : ''}`} /> 
-                    Resubmit Request
-                  </button>
-                )}
-              </div>
+              <button 
+                disabled={isRequesting === plan.id}
+                onClick={async () => {
+                   setIsRequesting(plan.id);
+                   await APIService.requestResubmission(plan, teacher.email);
+                   alert("Request sent to Admin.");
+                   setIsRequesting(null);
+                }} 
+                className="text-[9px] font-black uppercase text-indigo-600 border border-indigo-100 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-2"
+              >
+                {isRequesting === plan.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
+                Resubmit
+              </button>
             </div>
           )) : (
-            <div className="bg-white p-20 rounded-3xl border border-dashed border-slate-200 text-center">
-               <History className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-               <p className="text-slate-400 font-black uppercase tracking-widest text-xs italic">No submission logs recorded yet.</p>
+            <div className="bg-white p-20 rounded-[2rem] border border-dashed border-slate-200 text-center">
+               <p className="text-slate-400 font-black uppercase tracking-widest text-[10px] italic">No submission history found.</p>
             </div>
           )}
         </div>
