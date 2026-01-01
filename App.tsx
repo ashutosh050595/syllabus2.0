@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Teacher, AppState, ClassName, SectionName, LessonPlan } from './types';
 import { APIService } from './services/api';
@@ -26,6 +25,12 @@ const App: React.FC = () => {
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [loginForm, setLoginForm] = useState({ email: '', password: '', type: 'teacher' as 'teacher' | 'admin' });
 
+  // Helper function to normalize emails consistently
+  const normalizeEmail = (email: string | undefined | null): string => {
+    if (!email) return '';
+    return email.toLowerCase().trim().replace(/\s+/g, '');
+  };
+
   const fetchData = async () => {
     try {
       setIsSyncing(true);
@@ -46,44 +51,84 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = APIService.onAuthChange(async (user) => {
-      setIsAuthenticating(true);
       try {
         if (user) {
-          const normalizedUserEmail = user.email?.toLowerCase().trim();
-          const adminEmail = ADMIN_CREDENTIALS.id.toLowerCase().trim();
+          const userEmail = user.email;
+          const normalizedUserEmail = normalizeEmail(userEmail);
+          const adminEmail = normalizeEmail(ADMIN_CREDENTIALS.id);
           
           if (normalizedUserEmail === adminEmail) {
             setState(prev => ({ ...prev, currentUser: 'admin' }));
             await fetchData();
-          } else {
-            // DEEP ANALYSIS FIX: Robust Teacher Lookup with Registry Fallback
-            const { teachers } = await fetchData();
-            let teacher = teachers.find(t => t.email.toLowerCase().trim() === normalizedUserEmail);
+            setIsAuthenticating(false);
+            return;
+          }
+
+          // Fetch teachers to find matching email
+          let cloudTeachers = await APIService.fetchTeachers();
+          
+          // Find teacher with case-insensitive email match
+          let teacher = cloudTeachers.find(t => {
+            const teacherEmail = normalizeEmail(t.email);
+            return teacherEmail === normalizedUserEmail;
+          });
+          
+          // Self-healing: check local registry if not in cloud
+          if (!teacher) {
+            const fallbackTeacher = INITIAL_TEACHERS.find(t => {
+              const teacherEmail = normalizeEmail(t.email);
+              return teacherEmail === normalizedUserEmail;
+            });
             
-            if (!teacher) {
-              // Check the Master Institutional Registry (INITIAL_TEACHERS)
-              const fallbackTeacher = INITIAL_TEACHERS.find(t => t.email.toLowerCase().trim() === normalizedUserEmail);
-              if (fallbackTeacher) {
-                // First-time Sync: Teacher exists in Registry but not yet in Cloud
-                await APIService.syncTeacher(fallbackTeacher);
+            if (fallbackTeacher) {
+              console.log(`Found teacher in fallback: ${fallbackTeacher.name}, syncing to cloud...`);
+              await APIService.syncTeacher(fallbackTeacher);
+              
+              // Wait a brief moment for Firestore to update
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              // ✅ FIX: re-fetch after sync to avoid stale snapshot
+              cloudTeachers = await APIService.fetchTeachers();
+              teacher = cloudTeachers.find(
+                t => normalizeEmail(t.email) === normalizedUserEmail
+              );
+              
+              if (!teacher) {
+                console.warn('Teacher still not found after sync, using fallback');
                 teacher = fallbackTeacher;
               }
             }
+          }
 
-            if (teacher) {
-              setState(prev => ({ ...prev, currentUser: teacher }));
-            } else {
-              // This is the error the user was seeing; fixed by fallback above
-              alert(`Profile Error: ${user.email} not found in School Registry. Please contact Administration.`);
-              await APIService.logout();
-              setState(prev => ({ ...prev, currentUser: null }));
-            }
+          if (teacher) {
+            const lessonPlans = await APIService.fetchLessonPlans();
+            setState(prev => ({ 
+              ...prev, 
+              currentUser: teacher as Teacher, 
+              teachers: cloudTeachers.length > 0 ? cloudTeachers : [teacher as Teacher],
+              lessonPlans 
+            }));
+            setLastSynced(new Date());
+            console.log(`Teacher login successful: ${teacher.name} (${teacher.email})`);
+          } else {
+            // Log debugging information
+            console.warn(`Login attempt failed for: ${userEmail} (normalized: ${normalizedUserEmail})`);
+            console.warn('Available teachers in cloud:', cloudTeachers.map(t => `${t.name}: ${normalizeEmail(t.email)}`));
+            console.warn('Available teachers in INITIAL_TEACHERS:', INITIAL_TEACHERS.map(t => `${t.name}: ${normalizeEmail(t.email)}`));
+            
+            // User-friendly error message
+            alert(`Profile Error: ${userEmail} not found in School Registry.\n\nPlease contact the administrator to ensure:\n1. Your email is correctly registered in the Faculty Registry\n2. The email matches your login email exactly`);
+            
+            await APIService.logout();
+            setState(prev => ({ ...prev, currentUser: null }));
           }
         } else {
           setState(prev => ({ ...prev, currentUser: null }));
         }
       } catch (err) {
-        console.error("Auth state error:", err);
+        console.error("Critical Auth Error:", err);
+        // Don't show technical errors to users during auth
+        setState(prev => ({ ...prev, currentUser: null }));
       } finally {
         setIsAuthenticating(false);
       }
@@ -97,8 +142,9 @@ const App: React.FC = () => {
     const res = await APIService.login(loginForm.email, loginForm.password);
     if (!res.success) {
       setIsSyncing(false);
-      alert(`Login Failed: ${res.message}`);
+      alert(`Login Failed: ${res.message}\n\nPlease check:\n1. Email and password are correct\n2. You're using your institutional email\n3. You have an active internet connection`);
     }
+    // Auth observer will handle navigation/loading state
   };
 
   const handleLogout = async () => {
@@ -109,13 +155,13 @@ const App: React.FC = () => {
   };
 
   const handleSendAll = async () => {
-    if (!confirm(`Are you sure you want to send all compiled Class ${selectedClass} reports to respective Class Teachers?`)) return;
+    if (!confirm(`Confirm batch dispatch for Class ${selectedClass}?`)) return;
     setIsSendingAll(true);
     try {
       const result = await APIService.triggerBatchDispatch(selectedClass);
-      alert(`Success: ${result.message}`);
+      alert(result.message);
     } catch (e) {
-      alert("Error during dispatch. Please check cloud connection.");
+      alert("Cloud dispatch failure.");
     } finally {
       setIsSendingAll(false);
     }
@@ -125,7 +171,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="h-10 w-10 text-indigo-600 animate-spin mb-4" />
-        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Validating School Registry...</p>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Establishing Secure Connection...</p>
       </div>
     );
   }
@@ -146,9 +192,28 @@ const App: React.FC = () => {
             <button onClick={() => setLoginForm({...loginForm, type: 'admin'})} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${loginForm.type === 'admin' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}><ShieldCheck className="h-4 w-4" /> Admin</button>
           </div>
           <form onSubmit={handleLogin} className="space-y-6">
-            <input type="email" required placeholder="email@sacredheartkoderma.org" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 transition-colors outline-none" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} />
-            <input type="password" required placeholder="Security Password" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 transition-colors outline-none" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
-            <button disabled={isSyncing} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs hover:bg-indigo-700 active:scale-95 transition-all">{isSyncing ? 'Verifying...' : 'Sign In'}</button>
+            <input 
+              type="email" 
+              required 
+              placeholder="Institutional Email" 
+              className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 transition-colors outline-none" 
+              value={loginForm.email} 
+              onChange={e => setLoginForm({...loginForm, email: e.target.value})} 
+            />
+            <input 
+              type="password" 
+              required 
+              placeholder="Security Password" 
+              className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 transition-colors outline-none" 
+              value={loginForm.password} 
+              onChange={e => setLoginForm({...loginForm, password: e.target.value})} 
+            />
+            <button 
+              disabled={isSyncing} 
+              className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs hover:bg-indigo-700 active:scale-95 transition-all"
+            >
+              {isSyncing ? 'Authenticating...' : 'Enter Faculty Hub'}
+            </button>
           </form>
         </div>
       </div>
@@ -162,17 +227,16 @@ const App: React.FC = () => {
           <div className="flex flex-wrap justify-center gap-2">
             <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm flex gap-1">
               <button onClick={() => setActiveTab('plans')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'plans' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600'}`}><ClipboardList className="h-4 w-4" /> Pedagogical Audit</button>
-              <button onClick={() => setActiveTab('registry')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'registry' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600'}`}><Users className="h-4 w-4" /> Registry</button>
+              <button onClick={() => setActiveTab('registry')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'registry' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600'}`}><Users className="h-4 w-4" /> Faculty Registry</button>
               <button onClick={() => setActiveTab('compile')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'compile' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600'}`}><FileText className="h-4 w-4" /> Compilation</button>
             </div>
           </div>
 
           {activeTab === 'compile' && (
             <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {/* MASTER COMPILE & SEND BUTTONS */}
               <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-center gap-8 print:hidden">
                 <div className="text-center lg:text-left">
-                  <h3 className="text-2xl font-black text-slate-900 italic tracking-tight uppercase">Syllabus Compilation Hub</h3>
+                  <h3 className="text-2xl font-black text-slate-900 italic tracking-tight uppercase">Academic Compilation</h3>
                   <div className="flex bg-slate-100 p-1 rounded-xl mt-3 inline-flex">
                     {(['V', 'VI', 'VII'] as ClassName[]).map(cls => (
                       <button key={cls} onClick={() => setSelectedClass(cls)} className={`px-5 py-2 rounded-lg font-black text-xs transition-all ${selectedClass === cls ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500'}`}>{cls}</button>
@@ -204,9 +268,9 @@ const App: React.FC = () => {
                       <div className="bg-slate-50 border border-slate-200 p-5 rounded-3xl flex justify-between items-center print:hidden">
                          <div className="flex items-center gap-4">
                             <div className="bg-indigo-600 text-white w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl italic">{selectedClass}-{section}</div>
-                            <p className="text-lg font-black text-slate-800">Weekly Syllabus: Section {section}</p>
+                            <p className="text-lg font-black text-slate-800">Section {section} Syllabus</p>
                          </div>
-                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Digital Audit Active</p>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Audit Engine Connected</p>
                       </div>
                       
                       <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm print:p-0 print:border-0 print:shadow-none overflow-x-auto">
