@@ -13,7 +13,6 @@ import { getUpcomingMonday, getNextSaturday, getWeekLabel } from './utils';
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({ currentUser: null, teachers: [], lessonPlans: [], loginLogs: [] });
   const [activeTab, setActiveTab] = useState<'plans' | 'registry' | 'compile' | 'history' | 'logins'>('plans');
-  const [selectedClass, setSelectedClass] = useState<ClassName>('V');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [isAuditing, setIsAuditing] = useState(false);
@@ -56,14 +55,14 @@ const App: React.FC = () => {
         setState(prev => ({ ...prev, currentUser: 'admin' }));
         fetchData(); 
       } else {
-        const localMatch = INITIAL_TEACHERS.find(t => t.email.toLowerCase().trim() === email);
+        const localMatch = state.teachers.find(t => t.email.toLowerCase().trim() === email) || INITIAL_TEACHERS.find(t => t.email.toLowerCase().trim() === email);
         setState(prev => ({ ...prev, currentUser: localMatch || null }));
         fetchData();
       }
       setIsAuthenticating(false);
     });
     return () => { unsubscribe(); clearTimeout(timer); };
-  }, [fetchData]);
+  }, [fetchData, state.teachers]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,16 +83,55 @@ const App: React.FC = () => {
   const upcomingMonday = getUpcomingMonday();
   const weekLabel = getWeekLabel(upcomingMonday);
   
-  // Real-time Defaulter Check
   const currentWeekPlans = state.lessonPlans.filter(p => p.weekStarting === upcomingMonday.toISOString());
   const submittedTeacherIds = new Set(currentWeekPlans.map(p => p.teacherId));
   const defaulters = state.teachers.filter(t => !submittedTeacherIds.has(t.email));
+
+  const handleEmailDefaulters = async () => {
+    if (defaulters.length === 0) return alert("No defaulters found!");
+    if (!confirm(`Send automated reminders to ${defaulters.length} pending teachers?`)) return;
+    setIsSyncing(true);
+    try {
+      await APIService.emailDefaulters(defaulters, weekLabel);
+      alert("Defaulter reminders dispatched successfully.");
+    } catch (e) {
+      alert("Failed to connect to automation engine.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleWhatsApp = (teacher: Teacher, className: string, section: string) => {
+    const msg = encodeURIComponent(`Hi ${teacher.name}, the Weekly Syllabus for Class ${className}-${section} is ready. Please review it on the portal.`);
+    window.open(`https://wa.me/${teacher.phone}?text=${msg}`, '_blank');
+  };
+
+  const handleEmailToCT = async (teacher: Teacher, className: string, section: string) => {
+    if (!confirm(`Send official Syllabus Email to ${teacher.name}?`)) return;
+    setIsSyncing(true);
+    await APIService.sendCompiledToCT(teacher, className, section, weekLabel);
+    alert("Email request queued for processing.");
+    setIsSyncing(false);
+  };
+
+  const handleSendAllToCTs = async () => {
+    if (!confirm("This will email ALL Class Teachers their respective section syllabus. Proceed?")) return;
+    setIsSyncing(true);
+    const ctList = state.teachers.filter(t => t.isClassTeacher);
+    for (const ct of ctList) {
+      if (ct.classTeacherOf) {
+        await APIService.sendCompiledToCT(ct, ct.classTeacherOf.className, ct.classTeacherOf.section, weekLabel);
+      }
+    }
+    alert(`Bulk dispatch complete for ${ctList.length} Class Teachers.`);
+    setIsSyncing(false);
+  };
 
   if (isAuthenticating) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center">
         <Loader2 className="h-10 w-10 text-indigo-600 animate-spin mb-4" />
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Verifying Institutional Access...</p>
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Institutional Hub Security Check...</p>
       </div>
     );
   }
@@ -104,7 +142,7 @@ const App: React.FC = () => {
         <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-2xl border border-slate-200">
           <div className="text-center mb-8">
             <div className="inline-flex p-4 bg-indigo-600 rounded-2xl mb-6"><ShieldCheck className="h-8 w-8 text-white" /></div>
-            <h2 className="text-2xl font-black text-slate-900 uppercase italic">Sacred Heart Hub</h2>
+            <h2 className="text-2xl font-black text-slate-900 uppercase italic">Institutional Access</h2>
           </div>
           <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
             <button onClick={() => setLoginForm({...loginForm, type: 'teacher'})} className={`flex-1 py-3 rounded-lg text-[10px] font-black uppercase ${loginForm.type === 'teacher' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Faculty</button>
@@ -137,8 +175,8 @@ const App: React.FC = () => {
               <div className="bg-rose-50 p-3 rounded-xl"><AlertCircle className="h-5 w-5 text-rose-600" /></div>
               <div><p className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">Defaulters</p><p className="text-xl font-black text-slate-900">{defaulters.length}</p></div>
             </div>
-            <button onClick={async () => { if(confirm("Send reminder emails to all pending teachers?")) await APIService.emailDefaulters(defaulters, weekLabel); }} className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl flex flex-col justify-center items-center gap-1 hover:bg-black transition-all">
-              <Mail className="h-5 w-5 mb-1" />
+            <button onClick={handleEmailDefaulters} disabled={isSyncing} className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl flex flex-col justify-center items-center gap-1 hover:bg-black transition-all">
+              {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mail className="h-5 w-5 mb-1" />}
               <span className="text-[9px] font-black uppercase tracking-widest">Email Defaulters</span>
             </button>
           </div>
@@ -148,8 +186,8 @@ const App: React.FC = () => {
               { id: 'plans', label: 'Audit', icon: Zap },
               { id: 'registry', label: 'Faculty', icon: Users },
               { id: 'compile', label: 'Compile PDF', icon: Printer },
-              { id: 'history', label: 'Syllabus Logs', icon: History },
-              { id: 'logins', label: 'Login History', icon: Key }
+              { id: 'history', label: 'Logs', icon: History },
+              { id: 'logins', label: 'Logins', icon: Key }
             ].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-6 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200 hover:text-indigo-600'}`}>
                 <tab.icon className="h-3.5 w-3.5" /> {tab.label}
@@ -157,60 +195,45 @@ const App: React.FC = () => {
             ))}
           </div>
 
-          {activeTab === 'logins' && (
-            <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-lg font-black uppercase italic tracking-tight">Institutional Access Logs</h3>
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                {state.loginLogs.map(log => (
-                  <div key={log.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
-                    <div>
-                      <p className="font-black text-slate-800 text-sm">{log.email}</p>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">{log.device}</p>
-                    </div>
-                    <p className="text-[10px] font-black text-indigo-600 uppercase">{new Date(log.timestamp).toLocaleString()}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {activeTab === 'compile' && (
             <div className="space-y-10">
               <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                   <div>
-                    <h3 className="text-xl font-black uppercase italic tracking-tight">Master Syllabus Compilation</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Target Period: {weekLabel}</p>
+                    <h3 className="text-xl font-black uppercase italic tracking-tight">Syllabus Master Deck</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Next Week: {weekLabel}</p>
                   </div>
                   <div className="flex gap-4">
-                    <button className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-indigo-700 transition-all"><Printer className="h-4 w-4" /> Compile All Classes</button>
-                    <button className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-emerald-700 transition-all"><Mail className="h-4 w-4" /> Send All to CTs</button>
+                    <button onClick={() => window.print()} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-indigo-700 transition-all"><Printer className="h-4 w-4" /> Compile All Classes</button>
+                    <button onClick={handleSendAllToCTs} disabled={isSyncing} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-emerald-700 transition-all">{isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} Send All to CTs</button>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {Object.entries(CLASS_CONFIG).map(([className, config]) => 
-                    config.sections.map(section => (
-                      <div key={`${className}-${section}`} className="p-6 bg-slate-50 rounded-[2.5rem] border border-slate-200 group hover:border-indigo-200 transition-all">
-                        <div className="flex justify-between items-start mb-6">
-                          <div className="w-14 h-14 bg-white rounded-2xl border border-slate-200 flex items-center justify-center font-black text-indigo-600 text-xl italic shadow-sm">{className}{section}</div>
-                          <div className="text-right">
-                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Status</p>
-                             <span className="text-[9px] font-black text-emerald-600 uppercase">Ready for Export</span>
+                    config.sections.map(section => {
+                      const ct = state.teachers.find(t => t.isClassTeacher && t.classTeacherOf?.className === className && t.classTeacherOf?.section === section);
+                      return (
+                        <div key={`${className}-${section}`} className="p-6 bg-slate-50 rounded-[2.5rem] border border-slate-200 group hover:border-indigo-200 transition-all">
+                          <div className="flex justify-between items-start mb-6">
+                            <div className="w-14 h-14 bg-white rounded-2xl border border-slate-200 flex items-center justify-center font-black text-indigo-600 text-xl italic shadow-sm">{className}{section}</div>
+                            <div className="text-right">
+                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Teacher</p>
+                               <span className="text-[9px] font-black text-slate-700 uppercase">{ct?.name || 'Vacant'}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                             <button onClick={() => window.print()} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 flex items-center justify-center transition-all" title="Download PDF"><Download className="h-4 w-4" /></button>
+                             <button onClick={() => ct && handleEmailToCT(ct, className, section)} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-emerald-600 flex items-center justify-center transition-all" title="Send Email"><Mail className="h-4 w-4" /></button>
+                             <button onClick={() => ct && handleWhatsApp(ct, className, section)} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-green-600 flex items-center justify-center transition-all" title="Send WhatsApp"><MessageSquare className="h-4 w-4" /></button>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                           <button onClick={() => { setSelectedClass(className as ClassName); window.print(); }} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 flex items-center justify-center gap-2 transition-all" title="Download"><Download className="h-4 w-4" /></button>
-                           <button className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-emerald-600 flex items-center justify-center gap-2 transition-all" title="Email to CT"><Mail className="h-4 w-4" /></button>
-                           <button className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-green-600 flex items-center justify-center gap-2 transition-all" title="WhatsApp"><MessageSquare className="h-4 w-4" /></button>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
               
-              {/* Actual Printable Area - Displayed one by one for print view */}
               <div className="hidden print:block space-y-20">
                 {Object.entries(CLASS_CONFIG).map(([className, config]) => 
                   config.sections.map(section => (
@@ -228,35 +251,34 @@ const App: React.FC = () => {
               <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm flex justify-between items-center">
                 <div>
                   <h3 className="text-xl font-black text-slate-900 italic tracking-tight uppercase flex items-center gap-3"><Zap className="h-6 w-6 text-indigo-600" /> Academic Auditor</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">AI-Powered Pedagogical Audit of Weekly Submissions</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Audit pedagogical clarity across submissions</p>
                 </div>
                 <button onClick={async () => { setIsAuditing(true); const res = await APIService.generateAIAudit(state.lessonPlans); setAuditResult(res); setIsAuditing(false); }} disabled={isAuditing || state.lessonPlans.length === 0} className="bg-emerald-600 text-white px-8 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg">Run AI Audit</button>
               </div>
-              {auditResult && <div className="bg-white p-10 rounded-[2rem] border-2 border-slate-100 shadow-sm font-bold text-sm text-slate-700 whitespace-pre-wrap leading-relaxed italic animate-in fade-in">{auditResult}</div>}
+              {auditResult && <div className="bg-white p-10 rounded-[2rem] border-2 border-slate-100 shadow-sm font-bold text-sm text-slate-700 whitespace-pre-wrap italic">{auditResult}</div>}
             </div>
           )}
 
-          {activeTab === 'registry' && <AdminRegistry teachers={state.teachers} lessonPlans={state.lessonPlans} onAddTeacher={async t => { await APIService.syncTeacher(t); fetchData(); }} onUpdateTeacher={async (id, upd) => { const t = state.teachers.find(x => x.id === id); if (t) { await APIService.syncTeacher({...t, ...upd}); fetchData(); } }} onRemoveTeacher={async id => { if(confirm("Remove faculty?")) { await APIService.deleteTeacher(id); fetchData(); } }} />}
+          {activeTab === 'registry' && <AdminRegistry teachers={state.teachers} lessonPlans={state.lessonPlans} onAddTeacher={async t => { await APIService.syncTeacher(t); fetchData(); }} onUpdateTeacher={async (id, upd) => { const t = state.teachers.find(x => x.id === id); if (t) { await APIService.syncTeacher({...t, ...upd}); fetchData(); } }} onRemoveTeacher={async id => { if(confirm("Permanently remove faculty member?")) { await APIService.deleteTeacher(id); fetchData(); } }} />}
           
-          {activeTab === 'history' && (
+          {(activeTab === 'history' || activeTab === 'logins') && (
             <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-lg font-black uppercase italic tracking-tight">Full Academic History</h3>
-              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                {state.lessonPlans.map(plan => (
-                  <div key={plan.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center hover:border-indigo-100 transition-all">
-                    <div className="flex gap-4 items-center">
-                      <div className="w-10 h-10 bg-white rounded-xl border border-slate-200 flex items-center justify-center font-black text-indigo-600 text-xs italic">{plan.className}</div>
-                      <div>
-                         <p className="font-black text-slate-800 text-sm leading-tight">{plan.teacherName}</p>
-                         <p className="text-[9px] font-black text-indigo-500 uppercase">{plan.subject} • {plan.weekLabel}</p>
-                      </div>
+               <h3 className="text-lg font-black uppercase italic tracking-tight">{activeTab === 'logins' ? 'Institutional Access Logs' : 'Academic Logs'}</h3>
+               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                  {activeTab === 'logins' ? state.loginLogs.map(log => (
+                    <div key={log.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
+                      <div><p className="font-black text-slate-800 text-sm">{log.email}</p><p className="text-[9px] font-bold text-slate-400 uppercase">{log.device}</p></div>
+                      <p className="text-[10px] font-black text-indigo-600 uppercase">{new Date(log.timestamp).toLocaleString()}</p>
                     </div>
-                    <div className="text-right">
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">LOGGED {new Date(plan.submittedAt).toLocaleDateString()}</p>
+                  )) : state.lessonPlans.map(plan => (
+                    <div key={plan.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center hover:border-indigo-100 transition-all">
+                       <div className="flex gap-4 items-center">
+                          <div className="w-10 h-10 bg-white rounded-xl border border-slate-200 flex items-center justify-center font-black text-indigo-600 text-xs italic">{plan.className}</div>
+                          <div><p className="font-black text-slate-800 text-sm leading-tight">{plan.teacherName}</p><p className="text-[9px] font-black text-indigo-500 uppercase">{plan.subject} • {plan.weekLabel}</p></div>
+                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+               </div>
             </div>
           )}
         </div>

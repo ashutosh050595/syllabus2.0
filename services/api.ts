@@ -10,21 +10,19 @@ const app = getApps().length > 0 ? getApp() : initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const GAS_WORKER_URL = "https://script.google.com/macros/s/AKfycby-YOUR-GAS-URL/exec";
+// UPDATED GAS URL PROVIDED BY USER
+const GAS_WORKER_URL = "https://script.google.com/macros/s/AKfycbySZzxF_gOP2MRMp3jYJ9SgQypkgCpxb1EPKt88HfTV1ggrzxVQ_J96IP6LpTMedF-unQ/exec";
 
 export const APIService = {
   async login(email: string, password: string): Promise<any> {
     const normalizedEmail = email.toLowerCase().trim();
     try {
       const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
-      
-      // Log login event
       await addDoc(collection(db, "loginLogs"), {
         email: normalizedEmail,
         timestamp: new Date().toISOString(),
         device: navigator.userAgent.substring(0, 50)
       });
-
       return { success: true, user: userCredential.user };
     } catch (error: any) {
       if (password === DEFAULT_TEACHER_PASSWORD && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
@@ -53,7 +51,6 @@ export const APIService = {
     try {
       const q = query(collection(db, "loginLogs"), orderBy("timestamp", "desc"), limit(100));
       const querySnapshot = await getDocs(q);
-      // Fixed: Spread types may only be created from object types by casting doc.data() to any
       return querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) } as LoginLog));
     } catch (e) { return []; }
   },
@@ -87,17 +84,39 @@ export const APIService = {
   },
 
   async emailDefaulters(defaulters: Teacher[], weekRange: string): Promise<void> {
-    if (GAS_WORKER_URL.includes("macros")) {
-      await fetch(GAS_WORKER_URL, {
+    try {
+      const response = await fetch(GAS_WORKER_URL, {
         method: 'POST',
         mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'bulk_defaulter_alert',
           teachers: defaulters.map(d => ({ email: d.email, name: d.name })),
           weekRange
         })
       });
+      console.log("Defaulter email request sent.");
+    } catch (e) {
+      console.error("GAS Error:", e);
+      throw e;
     }
+  },
+
+  async sendCompiledToCT(teacher: Teacher, className: string, section: string, weekLabel: string): Promise<void> {
+    try {
+      await fetch(GAS_WORKER_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_to_ct',
+          email: teacher.email,
+          className,
+          section,
+          weekLabel
+        })
+      });
+    } catch (e) { console.error(e); }
   },
 
   async requestResubmission(plan: LessonPlan, teacherEmail: string): Promise<void> {

@@ -13,16 +13,16 @@ interface PrintableReportProps {
 const PrintableReport: React.FC<PrintableReportProps> = ({ className, sectionName, plans, teachers, weekStarting }) => {
   const startDate = new Date(weekStarting);
   const endDate = new Date(startDate);
-  endDate.setDate(startDate.getDate() + 5); // Monday to Saturday
+  endDate.setDate(startDate.getDate() + 5); // Saturday
 
-  // Find class teacher for the section header
+  const dateStr = `${startDate.getDate()}-${startDate.toLocaleString('default', { month: 'short' })}-${startDate.getFullYear()} to ${endDate.getDate()}-${endDate.toLocaleString('default', { month: 'short' })}-${endDate.getFullYear()}`;
+
   const sectionTeacher = teachers.find(t => 
     t.isClassTeacher && 
     t.classTeacherOf?.className === className && 
     t.classTeacherOf?.section === sectionName
   );
 
-  // Get all assignments for this specific Class and Section
   const targetAssignments: Array<{ teacher: Teacher, subject: string }> = [];
   teachers.forEach(t => {
     t.assignments.forEach(asgn => {
@@ -32,38 +32,39 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, sectionNam
     });
   });
 
-  // Sort by subject name
   targetAssignments.sort((a, b) => a.subject.localeCompare(b.subject));
 
   return (
-    <div className="bg-white text-black p-0 w-full font-serif" style={{ minHeight: '180mm' }}>
-      <div className="border-2 border-black p-6">
-        {/* Screenshot Style Header */}
-        <div className="flex justify-center items-center gap-6 mb-4">
-           <img src="https://sacredheartkoderma.org/wp-content/uploads/2021/07/logo-150x150.png" alt="Logo" className="w-20 h-20 object-contain" />
-           <div className="text-center">
-             <h1 className="text-2xl font-black uppercase">Sacred Heart School</h1>
-             <p className="text-xs font-bold">(Affiliated to CBSE, New Delhi, upto +2 Level)</p>
-             <h2 className="text-xl font-black uppercase mt-2 tracking-[0.2em] border-b-2 border-black inline-block px-8 pb-1">Weekly Syllabus</h2>
+    <div className="bg-white text-black p-0 w-full font-serif print:m-0" style={{ minHeight: '297mm', width: '210mm', padding: '15mm' }}>
+      <div className="border border-black p-8 h-full relative">
+        {/* Header Block as per Screenshot */}
+        <div className="text-center mb-10">
+           <div className="flex justify-center items-center gap-4 mb-4">
+              <img src="https://sacredheartkoderma.org/wp-content/uploads/2021/07/logo-150x150.png" alt="Logo" className="w-20 h-20 object-contain" />
+              <div>
+                <h1 className="text-3xl font-bold uppercase tracking-tight" style={{ fontFamily: 'serif' }}>SACRED HEART SCHOOL</h1>
+                <p className="text-[12px] font-semibold italic">(Affiliated to CBSE, New Delhi, upto +2 Level)</p>
+              </div>
            </div>
+           <h2 className="text-xl font-bold uppercase underline tracking-widest mt-2">WEEKLY SYLLABUS</h2>
         </div>
 
-        {/* Metadata Grid */}
-        <div className="grid grid-cols-1 gap-1 mb-6 text-[13px] font-bold">
-          <div className="flex"><span className="w-52">Date</span>: {startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} to {endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-          <div className="flex"><span className="w-52">Class & Sec</span>: {className} {sectionName}</div>
-          <div className="flex"><span className="w-52">Name of Class Teacher</span>: {sectionTeacher?.name || '-----------------'}</div>
+        {/* Metadata section with bold labels */}
+        <div className="space-y-1.5 mb-8 text-[14px]">
+          <div className="flex items-baseline"><span className="w-48 font-bold">Date</span><span className="font-bold">: {dateStr}</span></div>
+          <div className="flex items-baseline"><span className="w-48 font-bold">Class & Sec</span><span className="font-bold">: {className} {sectionName}</span></div>
+          <div className="flex items-baseline"><span className="w-48 font-bold">Name of Class Teacher</span><span className="font-bold">: {sectionTeacher?.name || '-----------------'}</span></div>
         </div>
 
-        {/* The Exact Table from Screenshot */}
+        {/* Table as per exact columns in screenshot */}
         <table className="w-full border-collapse border border-black text-[12px]">
           <thead>
-            <tr>
-              <th className="border border-black p-2 text-left w-32 bg-slate-50 font-black">Subject</th>
-              <th className="border border-black p-2 text-left w-40 bg-slate-50 font-black">Subject Teacher</th>
-              <th className="border border-black p-2 text-left w-44 bg-slate-50 font-black">Chapter Name</th>
-              <th className="border border-black p-2 text-left bg-slate-50 font-black">Topics/Sub-Topics</th>
-              <th className="border border-black p-2 text-left w-56 bg-slate-50 font-black">Home Assignments</th>
+            <tr className="bg-slate-50">
+              <th className="border border-black p-2.5 text-left w-32 font-bold uppercase">Subject</th>
+              <th className="border border-black p-2.5 text-left w-44 font-bold uppercase">Subject Teacher</th>
+              <th className="border border-black p-2.5 text-left w-48 font-bold uppercase">Chapter Name</th>
+              <th className="border border-black p-2.5 text-left font-bold uppercase">Topics/Sub-Topics</th>
+              <th className="border border-black p-2.5 text-left w-64 font-bold uppercase">Home Assignments</th>
             </tr>
           </thead>
           <tbody>
@@ -76,16 +77,16 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, sectionNam
               );
 
               return (
-                <tr key={idx} className="align-top min-h-[80px]">
-                  <td className="border border-black p-2 font-bold">{asgn.subject}</td>
-                  <td className="border border-black p-2">{asgn.teacher.name}</td>
-                  <td className={`border border-black p-2 font-black ${!plan ? 'text-red-600' : ''}`}>
+                <tr key={idx} className="align-top min-h-[100px]">
+                  <td className="border border-black p-2.5 font-semibold">{asgn.subject}</td>
+                  <td className="border border-black p-2.5">{asgn.teacher.name}</td>
+                  <td className={`border border-black p-2.5 ${!plan ? 'text-red-600 font-black bg-red-50' : 'font-medium'}`}>
                     {plan ? plan.chapter : 'LESSON PLAN PENDING'}
                   </td>
-                  <td className={`border border-black p-2 whitespace-pre-wrap italic ${!plan ? 'text-red-500 font-bold' : ''}`}>
-                    {plan ? plan.topics : 'Weekly topics not submitted by faculty.'}
+                  <td className={`border border-black p-2.5 whitespace-pre-wrap leading-tight ${!plan ? 'text-red-500 italic' : ''}`}>
+                    {plan ? plan.topics : 'Teachers have not submitted the syllabus for this period yet.'}
                   </td>
-                  <td className={`border border-black p-2 whitespace-pre-wrap ${!plan ? 'text-red-500 font-black' : ''}`}>
+                  <td className={`border border-black p-2.5 whitespace-pre-wrap leading-tight ${!plan ? 'text-red-500 font-bold' : ''}`}>
                     {plan ? plan.homework : 'NOT ASSIGNED'}
                   </td>
                 </tr>
@@ -94,15 +95,11 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, sectionNam
           </tbody>
         </table>
 
-        {/* Signature Area */}
-        <div className="mt-16 flex justify-between px-10 italic">
-           <div className="text-center border-t border-black pt-1 w-40 font-bold text-[10px]">Class Teacher</div>
-           <div className="text-center border-t border-black pt-1 w-40 font-bold text-[10px]">Principal</div>
+        {/* Signatures at bottom */}
+        <div className="absolute bottom-10 left-10 right-10 flex justify-between font-bold italic">
+           <div className="border-t border-black pt-1 px-8">Class Teacher</div>
+           <div className="border-t border-black pt-1 px-8">Principal</div>
         </div>
-      </div>
-      
-      <div className="mt-4 text-[9px] text-slate-400 font-bold text-center uppercase tracking-widest print:hidden">
-        Institutional Record • Sacred Heart Cloud System
       </div>
     </div>
   );
