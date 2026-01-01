@@ -50,7 +50,11 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    let isSubscribed = true; // To prevent state updates on unmounted component
+    
     const unsubscribe = APIService.onAuthChange(async (user) => {
+      if (!isSubscribed) return; // Don't proceed if component unmounted
+      
       try {
         if (user) {
           const userEmail = user.email;
@@ -58,8 +62,10 @@ const App: React.FC = () => {
           const adminEmail = normalizeEmail(ADMIN_CREDENTIALS.id);
           
           if (normalizedUserEmail === adminEmail) {
+            if (!isSubscribed) return;
             setState(prev => ({ ...prev, currentUser: 'admin' }));
             await fetchData();
+            if (!isSubscribed) return;
             setIsAuthenticating(false);
             return;
           }
@@ -102,6 +108,7 @@ const App: React.FC = () => {
 
           if (teacher) {
             const lessonPlans = await APIService.fetchLessonPlans();
+            if (!isSubscribed) return;
             setState(prev => ({ 
               ...prev, 
               currentUser: teacher as Teacher, 
@@ -109,8 +116,8 @@ const App: React.FC = () => {
               lessonPlans 
             }));
             setLastSynced(new Date());
-            setIsAuthenticating(false);
             console.log(`Teacher login successful: ${teacher.name} (${teacher.email})`);
+            setIsAuthenticating(false); // ✅ MOVE HERE: Set auth complete only after successful login
           } else {
             // Log debugging information
             console.warn(`Login attempt failed for: ${userEmail} (normalized: ${normalizedUserEmail})`);
@@ -121,31 +128,45 @@ const App: React.FC = () => {
             alert(`Profile Error: ${userEmail} not found in School Registry.\n\nPlease contact the administrator to ensure:\n1. Your email is correctly registered in the Faculty Registry\n2. The email matches your login email exactly`);
             
             await APIService.logout();
+            if (!isSubscribed) return;
             setState(prev => ({ ...prev, currentUser: null }));
+            setIsAuthenticating(false); // ✅ Set auth complete even on error
           }
         } else {
+          // No user (logged out)
+          if (!isSubscribed) return;
           setState(prev => ({ ...prev, currentUser: null }));
+          setIsAuthenticating(false); // ✅ Set auth complete
         }
       } catch (err) {
         console.error("Critical Auth Error:", err);
+        if (!isSubscribed) return;
         // Don't show technical errors to users during auth
         setState(prev => ({ ...prev, currentUser: null }));
-      } finally {
-        setIsAuthenticating(false);
+        setIsAuthenticating(false); // ✅ Set auth complete even on error
       }
+      // REMOVED: Don't have a finally block that always sets isAuthenticating to false
     });
-    return () => unsubscribe();
+    
+    return () => {
+      isSubscribed = false;
+      unsubscribe();
+    };
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSyncing(true);
+    // Reset authentication state when starting new login
+    setIsAuthenticating(true);
+    
     const res = await APIService.login(loginForm.email, loginForm.password);
     if (!res.success) {
       setIsSyncing(false);
+      setIsAuthenticating(false); // Stop authenticating on login failure
       alert(`Login Failed: ${res.message}\n\nPlease check:\n1. Email and password are correct\n2. You're using your institutional email\n3. You have an active internet connection`);
     }
-    // Auth observer will handle navigation/loading state
+    // Auth observer will handle successful login
   };
 
   const handleLogout = async () => {
@@ -210,8 +231,8 @@ const App: React.FC = () => {
               onChange={e => setLoginForm({...loginForm, password: e.target.value})} 
             />
             <button 
-              disabled={isSyncing} 
-              className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs hover:bg-indigo-700 active:scale-95 transition-all"
+              disabled={isSyncing || isAuthenticating}
+              className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
             >
               {isSyncing ? 'Authenticating...' : 'Enter Faculty Hub'}
             </button>
