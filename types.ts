@@ -20,6 +20,15 @@ export interface Teacher {
     className: ClassName;
     section: SectionName;
   };
+  lastLogin?: string;
+}
+
+export interface LoginLog {
+  id: string;
+  email: string;
+  name: string;
+  timestamp: string;
+  device: string;
 }
 
 export interface LessonPlan {
@@ -44,4 +53,5 @@ export interface AppState {
   currentUser: Teacher | 'admin' | null;
   teachers: Teacher[];
   lessonPlans: LessonPlan[];
+  loginLogs: LoginLog[];
 }

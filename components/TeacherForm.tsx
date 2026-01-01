@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Teacher, LessonPlan, ClassName, SectionName } from '../types';
 import { getUpcomingMonday, getNextSaturday, formatDate, getWeekLabel } from '../utils';
-import { Send, History, RefreshCcw, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import { Send, History, RefreshCcw, Loader2 } from 'lucide-react';
 import { APIService } from '../services/api';
 
 interface TeacherFormProps {
@@ -26,6 +26,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
     }
   }, [activeView, teacher.id]);
 
+  // Group assignments by Class-Subject to show one card for multiple sections
   const uniqueGroups = teacher.assignments.reduce((acc, curr) => {
     const key = `${curr.className}-${curr.subject}`;
     if (!acc[key]) acc[key] = { className: curr.className, subject: curr.subject, sections: [] };
@@ -42,7 +43,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const submission = groupKeys.map(key => ({
+      const submissions = groupKeys.map(key => ({
         ...uniqueGroups[key],
         ...formData[key],
         teacherId: teacher.id,
@@ -54,12 +55,11 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
         submittedAt: new Date().toISOString(),
         weekLabel: currentWeekLabel
       }));
-      await onSubmit(submission);
+      await onSubmit(submissions);
       alert("Weekly Syllabus Dispatch Successful!");
-      // Reset form
       setFormData(groupKeys.reduce((acc, key) => ({ ...acc, [key]: { chapter: '', topics: '', homework: '' } }), {}));
     } catch (error) {
-      alert("Submission error. Please try again.");
+      alert("Submission error. Please check your connection.");
     } finally {
       setIsSubmitting(false);
     }
@@ -68,12 +68,12 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
       <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm w-fit mx-auto">
-        <button onClick={() => setActiveView('submit')} className={`px-6 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all ${activeView === 'submit' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}>New Submission</button>
-        <button onClick={() => setActiveView('history')} className={`px-6 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all ${activeView === 'history' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}>Submission History</button>
+        <button onClick={() => setActiveView('submit')} className={`px-8 py-2.5 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all ${activeView === 'submit' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}>New Dispatch</button>
+        <button onClick={() => setActiveView('history')} className={`px-8 py-2.5 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all ${activeView === 'history' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}>My Records</button>
       </div>
 
       {activeView === 'submit' ? (
-        <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl text-center">
             <h2 className="text-indigo-900 font-black text-sm uppercase italic">Syllabus Coverage Plan</h2>
             <p className="text-indigo-600 font-bold text-[10px] mt-1 tracking-widest uppercase">{currentWeekLabel}</p>
@@ -82,26 +82,26 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
           {groupKeys.map((key) => {
             const group = uniqueGroups[key];
             return (
-              <div key={key} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:border-indigo-200 transition-colors">
-                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center">
+              <div key={key} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                   <h3 className="text-xs font-black uppercase text-slate-700 italic">Class {group.className} • {group.subject}</h3>
                   <div className="flex gap-1">
                     {group.sections.map(s => <span key={s} className="bg-white border border-slate-200 px-2 py-0.5 rounded text-[8px] font-black">{s}</span>)}
                   </div>
                 </div>
                 <div className="p-6 space-y-5">
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest px-1">Unit / Chapter Title</label>
-                    <input required className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm focus:border-indigo-500 outline-none transition-all" placeholder="E.g. Chapter 4: Photosynthesis" value={formData[key].chapter} onChange={e => setFormData({...formData, [key]: {...formData[key], chapter: e.target.value}})} />
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest px-1">Chapter / Unit Title</label>
+                    <input required className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm focus:border-indigo-500 outline-none" placeholder="Enter Chapter Name..." value={formData[key].chapter} onChange={e => setFormData({...formData, [key]: {...formData[key], chapter: e.target.value}})} />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest px-1">Topics & Learning Objectives</label>
-                      <textarea required rows={3} className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm focus:border-indigo-500 outline-none transition-all resize-none" placeholder="Details of topics to cover..." value={formData[key].topics} onChange={e => setFormData({...formData, [key]: {...formData[key], topics: e.target.value}})} />
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest px-1">Topics to Cover</label>
+                      <textarea required rows={3} className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm focus:border-indigo-500 outline-none resize-none" placeholder="List specific topics..." value={formData[key].topics} onChange={e => setFormData({...formData, [key]: {...formData[key], topics: e.target.value}})} />
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest px-1">Weekly Home Assignment</label>
-                      <textarea required rows={3} className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm focus:border-indigo-500 outline-none transition-all resize-none" placeholder="Homework for students..." value={formData[key].homework} onChange={e => setFormData({...formData, [key]: {...formData[key], homework: e.target.value}})} />
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest px-1">Home Assignment</label>
+                      <textarea required rows={3} className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold text-sm focus:border-indigo-500 outline-none resize-none" placeholder="Homework for students..." value={formData[key].homework} onChange={e => setFormData({...formData, [key]: {...formData[key], homework: e.target.value}})} />
                     </div>
                   </div>
                 </div>
@@ -109,9 +109,9 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
             );
           })}
           
-          <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-indigo-100 uppercase tracking-widest text-[11px] hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50">
+          <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-[11px] flex items-center justify-center gap-3">
             {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-4 w-4" />}
-            {isSubmitting ? 'Dispatching Syllabus...' : 'Finalize & Dispatch Weekly Plans'}
+            {isSubmitting ? 'Dispatching...' : 'Dispatch Weekly Plans'}
           </button>
         </form>
       ) : (
@@ -130,18 +130,18 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
                 onClick={async () => {
                    setIsRequesting(plan.id);
                    await APIService.requestResubmission(plan, teacher.email);
-                   alert("Request sent to Admin.");
+                   alert("Resubmit request sent to Admin.");
                    setIsRequesting(null);
                 }} 
                 className="text-[9px] font-black uppercase text-indigo-600 border border-indigo-100 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-2"
               >
                 {isRequesting === plan.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
-                Resubmit
+                Request Edit
               </button>
             </div>
           )) : (
             <div className="bg-white p-20 rounded-[2rem] border border-dashed border-slate-200 text-center">
-               <p className="text-slate-400 font-black uppercase tracking-widest text-[10px] italic">No submission history found.</p>
+               <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">No records found.</p>
             </div>
           )}
         </div>
