@@ -7,7 +7,7 @@ import TeacherForm from './components/TeacherForm';
 import AdminRegistry from './components/AdminRegistry';
 import PrintableReport from './components/PrintableReport';
 import { ADMIN_CREDENTIALS, CLASS_CONFIG } from './constants';
-import { ClipboardList, Users, LogIn, ShieldCheck, Zap, User, Loader2, FileText, Printer, MessageCircle, Mail, Download, ChevronRight } from 'lucide-react';
+import { ClipboardList, Users, LogIn, ShieldCheck, Zap, User, Loader2, FileText, Printer, MessageCircle, Mail, Download, Send, CheckCircle } from 'lucide-react';
 import { getUpcomingMonday } from './utils';
 
 const App: React.FC = () => {
@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [isAuditing, setIsAuditing] = useState(false);
+  const [isSendingAll, setIsSendingAll] = useState(false);
   const [auditResult, setAuditResult] = useState<string | null>(null);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [loginForm, setLoginForm] = useState({ email: '', password: '', type: 'teacher' as 'teacher' | 'admin' });
@@ -111,11 +112,26 @@ const App: React.FC = () => {
     window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
+  const handleSendAll = async () => {
+    if (!confirm(`Are you sure you want to dispatch all compiled syllabi for Class ${selectedClass} to the respective Class Teachers?`)) return;
+    
+    setIsSendingAll(true);
+    try {
+      // In a real institutional setup, this would trigger the Apps Script dispatch
+      const result = await APIService.triggerBatchDispatch(selectedClass);
+      alert(`Success: ${result.message}`);
+    } catch (e) {
+      alert("Error during batch dispatch. Please ensure Cloud Scripts are connected.");
+    } finally {
+      setIsSendingAll(false);
+    }
+  };
+
   if (isAuthenticating && !state.currentUser) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="h-10 w-10 text-indigo-600 animate-spin mb-4" />
-        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Validating Registry...</p>
+        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Validating institutional hub...</p>
       </div>
     );
   }
@@ -128,8 +144,8 @@ const App: React.FC = () => {
             <div className="inline-flex p-4 bg-indigo-600 rounded-2xl mb-6 shadow-xl shadow-indigo-100">
               <LogIn className="h-8 w-8 text-white" />
             </div>
-            <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Sacred Heart</h2>
-            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2">Faculty Hub Login</p>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic text-center">Sacred Heart</h2>
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2 text-center">Faculty Login</p>
           </div>
           <div className="flex bg-slate-100 p-1.5 rounded-xl mb-8 border border-slate-200">
             <button onClick={() => setLoginForm({...loginForm, type: 'teacher'})} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${loginForm.type === 'teacher' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}><User className="h-4 w-4" /> Faculty</button>
@@ -137,7 +153,7 @@ const App: React.FC = () => {
           </div>
           <form onSubmit={handleLogin} className="space-y-6">
             <input type="email" required placeholder="email@sacredheartkoderma.org" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 outline-none" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} />
-            <input type="password" required placeholder="Security Password" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 outline-none" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
+            <input type="password" required placeholder="Password" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 outline-none" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
             <button disabled={isSyncing} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs hover:bg-indigo-700 active:scale-95 transition-all">{isSyncing ? 'Verifying...' : 'Sign In'}</button>
           </form>
         </div>
@@ -158,38 +174,53 @@ const App: React.FC = () => {
           </div>
 
           {activeTab === 'compile' && (
-            <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 print:hidden">
-                <div className="text-center md:text-left">
-                  <h3 className="text-2xl font-black text-slate-900 italic tracking-tight uppercase">Syllabus Compilation Hub</h3>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Audit and distribute weekly reports by Class & Section</p>
+            <div className="space-y-8 animate-in fade-in duration-500">
+              {/* GLOBAL ACTION BAR */}
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-center gap-6 print:hidden">
+                <div className="flex items-center gap-6">
+                   <div className="flex bg-slate-100 p-1 rounded-xl">
+                      {(['V', 'VI', 'VII'] as ClassName[]).map(cls => (
+                        <button key={cls} onClick={() => setSelectedClass(cls)} className={`px-6 py-2 rounded-lg font-black text-xs transition-all ${selectedClass === cls ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>{cls}</button>
+                      ))}
+                    </div>
                 </div>
-                <div className="flex bg-slate-100 p-1 rounded-xl">
-                  {(['V', 'VI', 'VII'] as ClassName[]).map(cls => (
-                    <button key={cls} onClick={() => setSelectedClass(cls)} className={`px-6 py-2 rounded-lg font-black text-xs transition-all ${selectedClass === cls ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>{cls}</button>
-                  ))}
+                
+                <div className="flex flex-wrap gap-3">
+                   <button 
+                     onClick={() => window.print()} 
+                     className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-50"
+                   >
+                     <Printer className="h-5 w-5" /> Compile All Sections
+                   </button>
+                   <button 
+                     onClick={handleSendAll}
+                     disabled={isSendingAll}
+                     className="bg-emerald-600 text-white px-8 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-50 disabled:opacity-50"
+                   >
+                     {isSendingAll ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />} 
+                     Send All to Class Teachers
+                   </button>
                 </div>
               </div>
               
-              <div className="space-y-20">
+              <div className="space-y-16">
                  {CLASS_CONFIG[selectedClass]?.sections.map(section => (
                    <div key={section} className="space-y-6 print:break-after-page">
-                      <div className="bg-slate-900 text-white p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-center gap-4 shadow-xl print:hidden">
+                      <div className="bg-slate-50 border border-slate-200 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden">
                         <div className="flex items-center gap-4">
-                          <div className="bg-indigo-600 p-3 rounded-xl font-black text-xl italic">{selectedClass}-{section}</div>
+                          <div className="bg-slate-900 text-white p-3 rounded-xl font-black text-xl italic">{selectedClass}-{section}</div>
                           <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Distribution Package</p>
-                            <p className="font-bold text-lg">Weekly Syllabus for Section {section}</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Section Sub-Report</p>
+                            <p className="font-bold text-lg text-slate-800">Class {selectedClass} Section {section}</p>
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <button onClick={() => window.print()} className="bg-white text-slate-900 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-100 transition-all"><Download className="h-4 w-4" /> Download</button>
-                          <button onClick={() => shareViaEmail(section)} className="bg-slate-800 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-slate-700 hover:bg-slate-700 transition-all"><Mail className="h-4 w-4" /> Email</button>
-                          <button onClick={() => shareViaWhatsApp(section)} className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-700 transition-all"><MessageCircle className="h-4 w-4" /> WhatsApp</button>
+                          <button onClick={() => shareViaEmail(section)} className="bg-white border-2 border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:border-indigo-600 hover:text-indigo-600 transition-all"><Mail className="h-4 w-4" /> Email</button>
+                          <button onClick={() => shareViaWhatsApp(section)} className="bg-emerald-50 text-emerald-600 border border-emerald-100 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-100 transition-all"><MessageCircle className="h-4 w-4" /> WhatsApp</button>
                         </div>
                       </div>
                       
-                      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm print:p-0 print:border-0 print:shadow-none">
+                      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm print:p-0 print:border-0 print:shadow-none overflow-x-auto">
                          <PrintableReport 
                            className={selectedClass} 
                            sectionName={section}

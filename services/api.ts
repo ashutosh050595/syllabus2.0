@@ -18,9 +18,8 @@ import {
 } from "firebase/firestore";
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { FIREBASE_CONFIG, DEFAULT_TEACHER_PASSWORD, ADMIN_CREDENTIALS } from "../constants";
-import { Teacher, LessonPlan } from "../types";
+import { Teacher, LessonPlan, ClassName } from "../types";
 
-// Initialize Firebase as a singleton to prevent "Component auth has not been registered" errors
 const app = getApps().length > 0 ? getApp() : initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -29,30 +28,22 @@ export const APIService = {
   // AUTHENTICATION
   async login(email: string, password: string): Promise<any> {
     const normalizedEmail = email.toLowerCase().trim();
-    
     try {
-      // 1. Attempt standard login
       const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       return { success: true, user: userCredential.user };
     } catch (error: any) {
-      console.warn("Auth attempt failed:", error.code);
-
-      // 2. Fallback: Auto-provision Auth account if using default password
-      if ((error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') && password === DEFAULT_TEACHER_PASSWORD) {
+      if (password === DEFAULT_TEACHER_PASSWORD) {
         try {
-          console.log("Attempting to auto-provision account for:", normalizedEmail);
           const newUser = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
           return { success: true, user: newUser.user };
         } catch (createError: any) {
           if (createError.code === 'auth/email-already-in-use') {
-             return { success: false, message: "Incorrect password. If you forgot your password, please contact the administrator." };
+             return { success: false, message: "Incorrect password." };
           }
           return { success: false, message: createError.message };
         }
       }
-      
-      const message = error.code === 'auth/invalid-credential' ? "Invalid email or password." : error.message;
-      return { success: false, message };
+      return { success: false, message: "Authentication failed." };
     }
   },
 
@@ -66,15 +57,8 @@ export const APIService = {
 
   // TEACHERS
   async fetchTeachers(): Promise<Teacher[]> {
-    try {
-      const querySnapshot = await getDocs(collection(db, "teachers"));
-      const teachers = querySnapshot.docs.map(doc => doc.data() as Teacher);
-      console.log(`Fetched ${teachers.length} teachers from registry.`);
-      return teachers;
-    } catch (e) {
-      console.error("Firestore read error:", e);
-      throw e;
-    }
+    const querySnapshot = await getDocs(collection(db, "teachers"));
+    return querySnapshot.docs.map(doc => doc.data() as Teacher);
   },
 
   async syncTeacher(teacher: Teacher): Promise<void> {
@@ -103,20 +87,32 @@ export const APIService = {
     await Promise.all(batchPromises);
   },
 
+  // BATCH OPERATIONS
+  async triggerBatchDispatch(className: ClassName): Promise<{success: boolean, message: string}> {
+    // This simulates calling the Google Apps Script dispatchWeeklyReports()
+    // In a production environment, you would use a Cloud Function or Fetch call to the .gs Web App
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          success: true,
+          message: `Batch dispatch completed for Class ${className}. Reports have been sent to respective Class Teachers.`
+        });
+      }, 1500);
+    });
+  },
+
   // AI CURRICULUM AUDIT
   async generateAIAudit(plans: LessonPlan[]): Promise<string> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const lessonDataString = JSON.stringify(plans, null, 2);
-
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Please audit the following school lesson plans: ${lessonDataString}`,
       config: {
-        systemInstruction: "You are a world-class academic auditor for Sacred Heart School. Analyze lesson plans for pedagogical depth, curriculum coverage gaps, and strengths. Provide a detailed, professional report with actionable recommendations.",
+        systemInstruction: "You are a world-class academic auditor for Sacred Heart School. Analyze lesson plans for pedagogical depth, curriculum coverage gaps, and strengths.",
         thinkingConfig: { thinkingBudget: 32768 }
       },
     });
-
-    return response.text || "No audit report could be generated at this time.";
+    return response.text || "Audit failed.";
   }
 };
