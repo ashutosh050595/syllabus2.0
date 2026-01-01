@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Teacher, ClassName, SectionName, TeacherAssignment } from '../types';
-import { INITIAL_TEACHERS } from '../constants';
-import { APIService } from '../services/api';
+
+import React, { useState } from 'react';
+import { Teacher, LessonPlan, ClassName, SectionName, TeacherAssignment } from '../types';
+import { getUpcomingMonday } from '../utils';
 import { 
-  UserPlus, Search, Edit2, Trash2, Mail, Phone, User, Plus, X, 
-  Check, Database, RefreshCw, AlertCircle, Info, ShieldCheck, KeyRound, Eye, EyeOff
+  Search, Edit2, Trash2, Plus, X, 
+  Users, CheckCircle2, AlertTriangle, Activity, Mail
 } from 'lucide-react';
 
 interface AdminRegistryProps {
   teachers: Teacher[];
+  lessonPlans: LessonPlan[];
   onAddTeacher: (teacher: Teacher) => void;
   onUpdateTeacher: (id: string, updates: Partial<Teacher>) => void;
   onRemoveTeacher: (id: string) => void;
@@ -18,459 +19,262 @@ const CLASSES: ClassName[] = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 
 const SECTIONS: SectionName[] = ['A', 'B', 'C', 'D'];
 const DEFAULT_PASS = 'shstelaiya@123';
 
-const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, onAddTeacher, onUpdateTeacher, onRemoveTeacher }) => {
+const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, onAddTeacher, onUpdateTeacher, onRemoveTeacher }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isSeeding, setIsSeeding] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  
-  const [formData, setFormData] = useState<{
-    name: string;
-    email: string;
-    phone: string;
-    password: string;
-    isClassTeacher: boolean;
-    ctClass: ClassName;
-    ctSection: SectionName;
-    assignments: TeacherAssignment[];
-  }>({
-    name: '',
-    email: '',
-    phone: '',
-    password: DEFAULT_PASS,
-    isClassTeacher: false,
-    ctClass: 'V',
-    ctSection: 'A',
-    assignments: [{ className: 'V', sections: [], subject: '' }]
+
+  const upcomingMonday = getUpcomingMonday().toISOString();
+  const currentWeekPlans = lessonPlans.filter(p => p.weekStarting === upcomingMonday);
+  const submittedTeacherIds = new Set(currentWeekPlans.map(p => p.teacherId));
+  const defaulters = teachers.filter(t => !submittedTeacherIds.has(t.id));
+
+  const [formData, setFormData] = useState({
+    name: '', email: '', phone: '', password: DEFAULT_PASS, isClassTeacher: false, ctClass: 'V' as ClassName, ctSection: 'A' as SectionName,
+    assignments: [{ className: 'V' as ClassName, sections: [] as SectionName[], subject: '' }] as TeacherAssignment[]
   });
 
-  const handleSeed = async () => {
-    if (confirm("This will push the sample roster with default passwords (shstelaiya@123) to your Firebase database. Continue?")) {
-      setIsSeeding(true);
-      const seededTeachers = INITIAL_TEACHERS.map(t => ({...t, password: DEFAULT_PASS}));
-      await APIService.syncInitialTeachers(seededTeachers);
-      window.location.reload();
-    }
-  };
-
-  const handleAddAssignment = () => {
-    setFormData(prev => ({
-      ...prev,
-      assignments: [...prev.assignments, { className: 'V', sections: [], subject: '' }]
-    }));
-  };
-
-  const handleRemoveAssignment = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      assignments: prev.assignments.filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateAssignment = (index: number, field: keyof TeacherAssignment, value: any) => {
-    const newAssignments = [...formData.assignments];
-    newAssignments[index] = { ...newAssignments[index], [field]: value };
-    setFormData(prev => ({ ...prev, assignments: newAssignments }));
-  };
-
-  const toggleSection = (index: number, section: SectionName) => {
-    const currentSections = formData.assignments[index].sections;
-    const newSections = currentSections.includes(section)
-      ? currentSections.filter(s => s !== section)
-      : [...currentSections, section];
-    updateAssignment(index, 'sections', newSections);
-  };
-
-  const selectAllSections = (index: number) => {
-    updateAssignment(index, 'sections', [...SECTIONS]);
+  const resetForm = () => {
+    setFormData({
+      name: '', email: '', phone: '', password: DEFAULT_PASS, isClassTeacher: false, ctClass: 'V' as ClassName, ctSection: 'A' as SectionName,
+      assignments: [{ className: 'V' as ClassName, sections: [] as SectionName[], subject: '' }]
+    });
+    setEditingId(null);
+    setIsAdding(false);
   };
 
   const handleSave = () => {
+    if (!formData.name || !formData.email) return alert("Name and Email are required.");
+    
     const teacher: Teacher = {
       id: editingId || Math.random().toString(36).substr(2, 9),
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      password: formData.password,
+      name: formData.name, email: formData.email, phone: formData.phone, password: formData.password,
       isClassTeacher: formData.isClassTeacher,
       classTeacherOf: formData.isClassTeacher ? { className: formData.ctClass, section: formData.ctSection } : undefined,
       assignments: formData.assignments
     };
-
-    if (editingId) {
-      onUpdateTeacher(editingId, teacher);
-      setEditingId(null);
-    } else {
-      onAddTeacher(teacher);
-    }
     
-    setIsAdding(false);
+    if (editingId) onUpdateTeacher(editingId, teacher);
+    else onAddTeacher(teacher);
     resetForm();
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      password: DEFAULT_PASS,
-      isClassTeacher: false,
-      ctClass: 'V',
-      ctSection: 'A',
-      assignments: [{ className: 'V', sections: [], subject: '' }]
-    });
+  const addAssignment = () => {
+    setFormData({...formData, assignments: [...formData.assignments, { className: 'V', sections: [], subject: '' }]});
   };
 
-  const startEdit = (teacher: Teacher) => {
-    setEditingId(teacher.id);
-    setFormData({
-      name: teacher.name,
-      email: teacher.email,
-      phone: teacher.phone,
-      password: teacher.password || DEFAULT_PASS,
-      isClassTeacher: teacher.isClassTeacher,
-      ctClass: teacher.classTeacherOf?.className || 'V',
-      ctSection: teacher.classTeacherOf?.section || 'A',
-      assignments: teacher.assignments
-    });
-    setIsAdding(true);
+  const removeAssignment = (idx: number) => {
+    setFormData({...formData, assignments: formData.assignments.filter((_, i) => i !== idx)});
   };
 
-  const filteredTeachers = teachers.filter(t => 
-    t.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    t.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const toggleSection = (assignmentIdx: number, section: SectionName) => {
+    const updated = [...formData.assignments];
+    const currentSections = updated[assignmentIdx].sections;
+    if (currentSections.includes(section)) {
+      updated[assignmentIdx].sections = currentSections.filter(s => s !== section);
+    } else {
+      updated[assignmentIdx].sections = [...currentSections, section];
+    }
+    setFormData({...formData, assignments: updated});
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search teachers by name or email..."
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold text-slate-800"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+    <div className="space-y-10 animate-in fade-in duration-500">
+      {/* Admin Quick Insights */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-5">
+          <div className="bg-indigo-100 p-4 rounded-2xl text-indigo-600"><Users className="h-6 w-6" /></div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Faculty</p>
+            <p className="text-2xl font-black text-slate-900">{teachers.length}</p>
+          </div>
         </div>
-        
-        <div className="flex gap-4 w-full md:w-auto">
-          {teachers.length === 0 && (
-            <button
-              onClick={handleSeed}
-              disabled={isSeeding}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl transition-all font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-900/20"
-            >
-              {isSeeding ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
-              Seed Sample Roster
-            </button>
-          )}
-          <button
-            onClick={() => {
-              if (isAdding) {
-                setIsAdding(false);
-                setEditingId(null);
-                resetForm();
-              } else {
-                setIsAdding(true);
-              }
-            }}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl transition-all font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-900/20"
-          >
-            {isAdding ? 'Cancel' : <><UserPlus className="h-4 w-4" /> Add Teacher</>}
-          </button>
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-5">
+          <div className="bg-emerald-100 p-4 rounded-2xl text-emerald-600"><CheckCircle2 className="h-6 w-6" /></div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Submissions This Week</p>
+            <p className="text-2xl font-black text-slate-900">{submittedTeacherIds.size}</p>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-5">
+          <div className="bg-rose-100 p-4 rounded-2xl text-rose-600"><AlertTriangle className="h-6 w-6" /></div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Defaulters</p>
+            <p className="text-2xl font-black text-slate-900">{defaulters.length}</p>
+          </div>
         </div>
       </div>
 
-      {isAdding && (
-        <div className="bg-white p-8 rounded-3xl border border-indigo-100 shadow-xl animate-in fade-in slide-in-from-top-4 duration-300">
-          <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
-            <User className="h-6 w-6 text-indigo-600" />
-            {editingId ? 'Modify Professional Profile' : 'Teacher Registration'}
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Full Name</label>
-              <input 
-                type="text" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold" 
-                value={formData.name}
-                onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Teacher Name" 
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Institutional Email</label>
-              <input 
-                type="email" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold" 
-                value={formData.email}
-                onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="email@sacredheart.org" 
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Phone / WhatsApp</label>
-              <input 
-                type="tel" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold" 
-                value={formData.phone}
-                onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="10-digit mobile" 
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Access Password</label>
-              <div className="relative">
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  className="w-full px-4 py-3 bg-indigo-50/50 border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold pr-12" 
-                  value={formData.password}
-                  onChange={e => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                  placeholder="Set password" 
-                />
-                <button 
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-indigo-50/50 p-6 rounded-2xl mb-8 border border-indigo-100">
-            <div className="flex items-center gap-6">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <input 
-                  type="checkbox" 
-                  className="w-6 h-6 rounded-lg border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  checked={formData.isClassTeacher}
-                  onChange={e => setFormData(prev => ({ ...prev, isClassTeacher: e.target.checked }))}
-                />
-                <span className="font-black text-slate-700 uppercase text-xs tracking-widest">Assign Class Teacher Role</span>
-              </label>
-              
-              {formData.isClassTeacher && (
-                <div className="flex gap-3 animate-in fade-in zoom-in duration-200">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black text-indigo-400">CLASS:</span>
-                    <select 
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm font-bold"
-                      value={formData.ctClass}
-                      onChange={e => setFormData(prev => ({ ...prev, ctClass: e.target.value as ClassName }))}
-                    >
-                      {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black text-indigo-400">SEC:</span>
-                    <select 
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm font-bold"
-                      value={formData.ctSection}
-                      onChange={e => setFormData(prev => ({ ...prev, ctSection: e.target.value as SectionName }))}
-                    >
-                      {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] border-b border-slate-100 pb-3">Teaching Assignments Matrix</h4>
-            {formData.assignments.map((assignment, index) => (
-              <div key={index} className="p-6 bg-slate-50 border border-slate-200 rounded-2xl relative shadow-sm hover:shadow-md transition-shadow">
-                {formData.assignments.length > 1 && (
-                  <button 
-                    onClick={() => handleRemoveAssignment(index)}
-                    className="absolute -top-3 -right-3 bg-rose-500 text-white p-2 rounded-xl hover:bg-rose-600 transition-colors shadow-lg"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-                
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-end">
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Class & Subject Configuration</label>
-                    <div className="flex gap-3">
-                      <select 
-                        className="w-28 px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold"
-                        value={assignment.className}
-                        onChange={e => updateAssignment(index, 'className', e.target.value)}
-                      >
-                        {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                      <input 
-                        type="text" 
-                        placeholder="Subject (e.g. Maths)"
-                        className="flex-grow px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold uppercase placeholder:capitalize"
-                        value={assignment.subject}
-                        onChange={e => updateAssignment(index, 'subject', e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Sections</label>
-                      <button 
-                        onClick={() => selectAllSections(index)}
-                        className="text-[9px] font-black text-indigo-600 hover:text-indigo-500 uppercase tracking-widest px-2 py-1 bg-indigo-50 rounded-lg"
-                      >
-                        Select All
-                      </button>
-                    </div>
-                    <div className="flex gap-2">
-                      {SECTIONS.map(s => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => toggleSection(index, s)}
-                          className={`flex-1 py-3 rounded-xl border font-black text-xs transition-all ${
-                            assignment.sections.includes(s)
-                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl'
-                              : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-300'
-                          }`}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+      {/* Defaulters Alert */}
+      {defaulters.length > 0 && (
+        <div className="bg-rose-50 border border-rose-100 p-6 rounded-3xl">
+          <h4 className="text-rose-900 font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Activity className="h-4 w-4" /> Pending Weekly Submissions
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {defaulters.map(t => (
+              <div key={t.id} className="bg-white border border-rose-200 p-3 rounded-2xl flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600"><Mail className="h-4 w-4" /></div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-900">{t.name}</p>
+                  <p className="text-[9px] text-rose-500 font-bold">{t.email}</p>
                 </div>
               </div>
             ))}
-            
-            <button 
-              onClick={handleAddAssignment}
-              className="w-full py-5 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-black text-xs uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center justify-center gap-3 bg-white hover:bg-indigo-50/20"
-            >
-              <Plus className="h-5 w-5" /> Expand Teaching Load
-            </button>
-          </div>
-
-          <div className="mt-12 flex justify-end gap-4 pt-8 border-t border-slate-100">
-             <button 
-               onClick={() => { setIsAdding(false); setEditingId(null); resetForm(); }}
-               className="px-8 py-4 text-slate-500 font-black text-xs uppercase tracking-widest hover:bg-slate-50 rounded-2xl transition-all"
-             >
-               Discard Changes
-             </button>
-             <button 
-               onClick={handleSave}
-               className="bg-indigo-600 text-white px-12 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-2xl shadow-indigo-200"
-             >
-               {editingId ? 'Sync Updates' : 'Authorize Faculty'}
-             </button>
           </div>
         </div>
       )}
 
-      {teachers.length === 0 ? (
-        <div className="glass-card p-20 rounded-[4rem] text-center border-dashed border-indigo-500/30">
-           <div className="bg-indigo-500/10 h-24 w-24 rounded-full flex items-center justify-center mx-auto mb-8">
-              <Info className="h-10 w-10 text-indigo-500" />
-           </div>
-           <h3 className="text-3xl font-black text-white italic tracking-tighter mb-4">Database Empty</h3>
-           <p className="text-slate-400 font-bold max-w-lg mx-auto mb-10">Your Cloud instance is active but no faculty members have been registered. Use the manual registration or push the sample roster to begin.</p>
-           <button onClick={handleSeed} className="bg-indigo-600 text-white px-12 py-5 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-indigo-500 transition-all shadow-3xl">Seed Initial Database</button>
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input type="text" placeholder="Search faculty by name or email..." className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold focus:ring-2 focus:ring-indigo-500 outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
-      ) : (
-        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-200">
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Faculty Identifier</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Responsibility</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Security</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Loadout Matrix</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Protocol</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredTeachers.map(teacher => (
-                <tr key={teacher.id} className="hover:bg-slate-50/80 transition-colors group">
-                  <td className="px-6 py-6">
-                    <div className="flex items-center gap-5">
-                      <div className="bg-indigo-50 p-4 rounded-2xl text-indigo-600 shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                        <User className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <p className="font-black text-slate-900 leading-none text-lg tracking-tight italic">{teacher.name}</p>
-                        <div className="flex items-center gap-4 mt-2">
-                          <span className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase"><Mail className="h-3 w-3" /> {teacher.email}</span>
-                          <span className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase"><Phone className="h-3 w-3" /> {teacher.phone}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-6">
-                    {teacher.isClassTeacher ? (
-                      <div className="flex flex-col">
-                        <span className="text-indigo-600 text-[9px] font-black uppercase tracking-widest mb-2 flex items-center gap-2">
-                          <ShieldCheck className="h-3 w-3" /> Class Teacher
-                        </span>
-                        <span className="bg-indigo-600 text-white px-4 py-1.5 rounded-xl text-xs font-black border border-indigo-700 w-fit shadow-lg shadow-indigo-900/10">
-                          {teacher.classTeacherOf?.className} — {teacher.classTeacherOf?.section}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest italic opacity-60">Subject Specialist</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-6">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                        <KeyRound className="h-3 w-3 text-indigo-400" />
-                        {teacher.password ? '••••••••' : 'Unset'}
-                      </span>
-                      <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest opacity-60">Identity Key Provisioned</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-6">
-                    <div className="flex flex-wrap gap-2.5 max-w-sm">
-                      {teacher.assignments.map((a, idx) => (
-                        <div key={idx} className="bg-white border border-slate-200 px-3 py-2 rounded-xl shadow-sm group-hover:border-indigo-200 transition-colors">
-                          <span className="text-[11px] font-black text-slate-900 tracking-tighter">{a.className} ({a.sections.join(',')})</span>
-                          <span className="block text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-0.5">{a.subject}</span>
-                        </div>
+        <button onClick={() => { setIsAdding(true); setEditingId(null); }} className="w-full md:w-auto bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors">
+          <Plus className="h-4 w-4" /> Add New Teacher
+        </button>
+      </div>
+
+      {(isAdding || editingId) && (
+        <div className="bg-white p-8 rounded-3xl border border-indigo-100 shadow-xl animate-in slide-in-from-top-4">
+          <div className="flex justify-between items-center mb-8">
+            <h3 className="text-xl font-black italic">Teacher Registry - {editingId ? 'Edit Profile' : 'New Entry'}</h3>
+            <button onClick={resetForm} className="p-2 text-slate-400 hover:text-slate-900"><X className="h-6 w-6" /></button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Full Name</label>
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="Teacher's Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Email (Auth Key)</label>
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="Email Address" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Phone</label>
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="Phone Number" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Password</label>
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="Password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+            </div>
+          </div>
+
+          <div className="mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-200">
+             <div className="flex items-center gap-4 mb-4">
+                <input type="checkbox" id="ct-check" checked={formData.isClassTeacher} onChange={e => setFormData({...formData, isClassTeacher: e.target.checked})} className="w-5 h-5 rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                <label htmlFor="ct-check" className="font-black text-sm text-slate-900 uppercase tracking-tight">Appoint as Class Teacher</label>
+             </div>
+             {formData.isClassTeacher && (
+               <div className="flex gap-4">
+                  <select className="px-4 py-2 bg-white border rounded-xl font-bold" value={formData.ctClass} onChange={e => setFormData({...formData, ctClass: e.target.value as ClassName})}>
+                    {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
+                  </select>
+                  <select className="px-4 py-2 bg-white border rounded-xl font-bold" value={formData.ctSection} onChange={e => setFormData({...formData, ctSection: e.target.value as SectionName})}>
+                    {SECTIONS.map(s => <option key={s} value={s}>Section {s}</option>)}
+                  </select>
+               </div>
+             )}
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="text-xs font-black uppercase text-slate-400 tracking-widest">Subject Assignments</h4>
+            {formData.assignments.map((asgn, i) => (
+              <div key={i} className="flex flex-wrap gap-4 items-end p-4 bg-white border border-slate-200 rounded-2xl">
+                 <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-slate-400">Class</label>
+                    <select className="w-full px-3 py-2 bg-slate-50 border rounded-lg font-bold" value={asgn.className} onChange={e => {
+                      const upd = [...formData.assignments]; upd[i].className = e.target.value as ClassName; setFormData({...formData, assignments: upd});
+                    }}>
+                      {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                 </div>
+                 <div className="space-y-1 flex-1 min-w-[200px]">
+                    <label className="text-[9px] font-black uppercase text-slate-400">Sections</label>
+                    <div className="flex gap-2">
+                      {SECTIONS.map(s => (
+                        <button key={s} onClick={() => toggleSection(i, s)} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${asgn.sections.includes(s) ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>{s}</button>
                       ))}
                     </div>
-                  </td>
-                  <td className="px-6 py-6">
-                    <div className="flex items-center justify-center gap-3">
-                      <button 
-                        onClick={() => startEdit(teacher)}
-                        className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-transparent hover:border-indigo-100"
-                        title="Edit Record"
-                      >
-                        <Edit2 className="h-4.5 w-4.5" />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          if (confirm(`CRITICAL: Are you sure you want to delete ${teacher.name}'s entire profile? This cannot be undone.`)) {
-                            onRemoveTeacher(teacher.id);
-                          }
-                        }}
-                        className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-transparent hover:border-rose-100"
-                        title="Purge Record"
-                      >
-                        <Trash2 className="h-4.5 w-4.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                 </div>
+                 <div className="space-y-1 flex-1">
+                    <label className="text-[9px] font-black uppercase text-slate-400">Subject</label>
+                    <input className="w-full px-3 py-2 bg-slate-50 border rounded-lg font-bold" placeholder="e.g. Maths" value={asgn.subject} onChange={e => {
+                      const upd = [...formData.assignments]; upd[i].subject = e.target.value; setFormData({...formData, assignments: upd});
+                    }} />
+                 </div>
+                 <button onClick={() => removeAssignment(i)} className="p-2 text-slate-300 hover:text-rose-600 transition-colors"><Trash2 className="h-5 w-5" /></button>
+              </div>
+            ))}
+            <button onClick={addAssignment} className="text-xs font-black text-indigo-600 flex items-center gap-2 hover:translate-x-1 transition-transform uppercase tracking-widest"><Plus className="h-4 w-4" /> Add Assignment Row</button>
+          </div>
+
+          <div className="mt-10 flex justify-end gap-3 border-t pt-8">
+             <button onClick={resetForm} className="px-8 py-3 font-bold text-slate-400 uppercase tracking-widest text-[10px]">Discard Changes</button>
+             <button onClick={handleSave} className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:shadow-indigo-200 transition-all active:scale-95">Sync with Registry</button>
+          </div>
         </div>
       )}
+
+      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+        <table className="w-full text-left">
+          <thead className="bg-slate-50 border-b">
+            <tr>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Faculty Name & Registry ID</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Institutional Role</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Submission Status</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Admin Controls</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.email.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
+              <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                <td className="px-6 py-5">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400">{t.name[0]}</div>
+                    <div>
+                      <p className="font-black text-slate-900">{t.name}</p>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{t.email}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-5">
+                  <div className="flex flex-wrap gap-1">
+                    {t.isClassTeacher && <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase">CT: {t.classTeacherOf?.className}-{t.classTeacherOf?.section}</span>}
+                    {t.assignments.map((a, i) => <span key={i} className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg text-[9px] font-bold">{a.className}: {a.subject}</span>)}
+                  </div>
+                </td>
+                <td className="px-6 py-5">
+                  {submittedTeacherIds.has(t.id) ? (
+                    <span className="flex items-center gap-1.5 text-emerald-600 font-black text-[10px] uppercase tracking-widest"><CheckCircle2 className="h-3 w-3" /> Submitted</span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-rose-400 font-black text-[10px] uppercase tracking-widest"><AlertTriangle className="h-3 w-3" /> Pending</span>
+                  )}
+                </td>
+                <td className="px-6 py-5">
+                  <div className="flex justify-center gap-3">
+                    <button onClick={() => { 
+                      setEditingId(t.id); 
+                      setFormData({
+                        name: t.name, email: t.email, phone: t.phone, password: t.password || DEFAULT_PASS,
+                        isClassTeacher: t.isClassTeacher,
+                        ctClass: t.classTeacherOf?.className || 'V',
+                        ctSection: t.classTeacherOf?.section || 'A',
+                        assignments: t.assignments
+                      });
+                      setIsAdding(false);
+                      window.scrollTo({ top: 200, behavior: 'smooth' });
+                    }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><Edit2 className="h-4 w-4" /></button>
+                    <button onClick={() => onRemoveTeacher(t.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {teachers.length === 0 && <div className="p-20 text-center"><p className="text-slate-400 italic font-bold">No faculty records found in the registry.</p></div>}
+      </div>
     </div>
   );
 };
