@@ -49,137 +49,94 @@ const App: React.FC = () => {
     }
   };
 
+  // ✅ PATCH 2 — FINAL CORRECT useEffect AUTH BLOCK
   useEffect(() => {
-    // Set a timeout to handle cases where auth state doesn't change
-    const authTimeout = setTimeout(() => {
-      if (isAuthenticating) {
-        console.log('Auth timeout - resetting auth state');
-        setIsAuthenticating(false);
-      }
-    }, 10000); // 10 second timeout
-
     const unsubscribe = APIService.onAuthChange(async (user) => {
-      console.log('Auth state changed:', user ? `User ${user.email}` : 'No user');
-      
       try {
         if (user) {
           const userEmail = user.email;
           const normalizedUserEmail = normalizeEmail(userEmail);
           const adminEmail = normalizeEmail(ADMIN_CREDENTIALS.id);
-          
-          console.log('Processing login for:', normalizedUserEmail);
-          
+
+          // ✅ ADMIN LOGIN
           if (normalizedUserEmail === adminEmail) {
-            console.log('Admin login detected');
             setState(prev => ({ ...prev, currentUser: 'admin' }));
             await fetchData();
             setIsAuthenticating(false);
-            clearTimeout(authTimeout);
+            setIsSyncing(false);
             return;
           }
 
-          // Fetch teachers to find matching email
+          // ✅ TEACHER LOGIN FLOW
           let cloudTeachers = await APIService.fetchTeachers();
-          console.log('Cloud teachers fetched:', cloudTeachers.length);
-          
-          // Find teacher with case-insensitive email match
-          let teacher = cloudTeachers.find(t => {
-            const teacherEmail = normalizeEmail(t.email);
-            return teacherEmail === normalizedUserEmail;
-          });
-          
-          console.log('Teacher found in cloud:', teacher ? teacher.name : 'None');
-          
-          // Self-healing: check local registry if not in cloud
+
+          let teacher = cloudTeachers.find(
+            t => normalizeEmail(t.email) === normalizedUserEmail
+          );
+
+          // 🔁 SELF-HEALING REGISTRY
           if (!teacher) {
-            console.log('Checking fallback teachers...');
-            const fallbackTeacher = INITIAL_TEACHERS.find(t => {
-              const teacherEmail = normalizeEmail(t.email);
-              return teacherEmail === normalizedUserEmail;
-            });
-            
+            const fallbackTeacher = INITIAL_TEACHERS.find(
+              t => normalizeEmail(t.email) === normalizedUserEmail
+            );
+
             if (fallbackTeacher) {
-              console.log(`Found teacher in fallback: ${fallbackTeacher.name}, syncing to cloud...`);
               await APIService.syncTeacher(fallbackTeacher);
-              
-              // Wait a brief moment for Firestore to update
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              
-              // ✅ FIX: re-fetch after sync to avoid stale snapshot
+
+              // 🔑 CRITICAL: re-fetch after sync
               cloudTeachers = await APIService.fetchTeachers();
               teacher = cloudTeachers.find(
                 t => normalizeEmail(t.email) === normalizedUserEmail
               );
-              
-              if (!teacher) {
-                console.warn('Teacher still not found after sync, using fallback');
-                teacher = fallbackTeacher;
-              }
             }
           }
 
           if (teacher) {
-            console.log(`Setting teacher as current user: ${teacher.name}`);
             const lessonPlans = await APIService.fetchLessonPlans();
-            setState(prev => ({ 
-              ...prev, 
-              currentUser: teacher as Teacher, 
-              teachers: cloudTeachers.length > 0 ? cloudTeachers : [teacher as Teacher],
-              lessonPlans 
+            setState(prev => ({
+              ...prev,
+              currentUser: teacher,
+              teachers: cloudTeachers.length > 0 ? cloudTeachers : [teacher],
+              lessonPlans
             }));
             setLastSynced(new Date());
-            console.log(`Teacher login successful: ${teacher.name} (${teacher.email})`);
-            setIsAuthenticating(false);
-            clearTimeout(authTimeout);
           } else {
-            // Log debugging information
-            console.warn(`Login attempt failed for: ${userEmail} (normalized: ${normalizedUserEmail})`);
-            console.warn('Available teachers in cloud:', cloudTeachers.map(t => `${t.name}: ${normalizeEmail(t.email)}`));
-            console.warn('Available teachers in INITIAL_TEACHERS:', INITIAL_TEACHERS.map(t => `${t.name}: ${normalizeEmail(t.email)}`));
-            
-            // User-friendly error message
-            alert(`Profile Error: ${userEmail} not found in School Registry.\n\nPlease contact the administrator to ensure:\n1. Your email is correctly registered in the Faculty Registry\n2. The email matches your login email exactly`);
-            
+            alert(
+              `Profile Error: ${userEmail} not found in School Registry.\n\nPlease contact Administration.`
+            );
             await APIService.logout();
             setState(prev => ({ ...prev, currentUser: null }));
-            setIsAuthenticating(false);
-            clearTimeout(authTimeout);
           }
         } else {
-          console.log('No user, setting currentUser to null');
           setState(prev => ({ ...prev, currentUser: null }));
-          setIsAuthenticating(false);
-          clearTimeout(authTimeout);
         }
       } catch (err) {
         console.error("Critical Auth Error:", err);
         setState(prev => ({ ...prev, currentUser: null }));
+      } finally {
+        // ✅ SINGLE, AUTHORITATIVE EXIT POINT
         setIsAuthenticating(false);
-        clearTimeout(authTimeout);
+        setIsSyncing(false);
       }
     });
-    
-    return () => {
-      clearTimeout(authTimeout);
-      unsubscribe();
-    };
+
+    return () => unsubscribe();
   }, []);
 
+  // ✅ PATCH 3 — FIX STUCK "Authenticating..." BUTTON
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login attempt for:', loginForm.email);
     setIsSyncing(true);
-    
+
     const res = await APIService.login(loginForm.email, loginForm.password);
-    console.log('Login response:', res);
-    
+
     if (!res.success) {
       setIsSyncing(false);
-      alert(`Login Failed: ${res.message}\n\nPlease check:\n1. Email and password are correct\n2. You're using your institutional email\n3. You have an active internet connection`);
-    } else {
-      // Login successful - keep syncing state until auth state changes
-      console.log('Login successful, waiting for auth state change...');
+      alert(
+        `Login Failed: ${res.message}\n\nPlease check:\n1. Email and password are correct\n2. Institutional email is used`
+      );
     }
+    // ✅ SUCCESS handled ONLY by onAuthChange
   };
 
   const handleLogout = async () => {
