@@ -12,69 +12,111 @@ interface PrintableReportProps {
 const PrintableReport: React.FC<PrintableReportProps> = ({ className, plans, teachers, weekStarting }) => {
   const startDate = new Date(weekStarting);
   const endDate = new Date(startDate);
-  endDate.setDate(startDate.getDate() + 12); // Matches "29-Dec to 10-Jan" style (approx 2 weeks)
+  endDate.setDate(startDate.getDate() + 5); // Monday to Saturday (5 days after Monday)
 
-  const classPlans = plans.filter(p => p.className === className && p.weekStarting === weekStarting);
+  // 1. Identify all required rows by mapping teacher assignments to this class
+  const classAssignments: Array<{ teacher: Teacher, subject: string, sections: string }> = [];
   
-  // Find class teacher
+  teachers.forEach(t => {
+    t.assignments.forEach(asgn => {
+      if (asgn.className === className) {
+        classAssignments.push({
+          teacher: t,
+          subject: asgn.subject,
+          sections: asgn.sections.join(', ')
+        });
+      }
+    });
+  });
+
+  // Sort assignments by subject for consistent report layout
+  classAssignments.sort((a, b) => a.subject.localeCompare(b.subject));
+
+  // Find class teacher for the header
   const classTeacherProfile = teachers.find(t => t.isClassTeacher && t.classTeacherOf?.className === className);
 
   return (
     <div className="bg-white text-black p-0 w-full" style={{ minHeight: '210mm' }}>
-      <div className="border-2 border-black p-4">
-        {/* Header */}
-        <div className="text-center mb-6 relative">
-          <div className="absolute left-0 top-0 w-16 h-16">
+      <div className="border-[3px] border-black p-6">
+        {/* Institutional Header */}
+        <div className="text-center mb-8 relative">
+          <div className="absolute left-0 top-0 w-20 h-20">
              <img src="https://sacredheartkoderma.org/wp-content/uploads/2021/07/logo-150x150.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-2xl font-bold uppercase">Sacred Heart School</h1>
-          <p className="text-sm">(Affiliated to CBSE, New Delhi, upto +2 Level)</p>
-          <div className="mt-4 border-b-2 border-black inline-block px-12 pb-1">
-            <h2 className="text-xl font-bold uppercase tracking-widest">Weekly Syllabus</h2>
+          <h1 className="text-3xl font-black uppercase tracking-tight">Sacred Heart School, Koderma</h1>
+          <p className="text-sm font-bold">(Affiliated to CBSE, New Delhi, upto +2 Level)</p>
+          <div className="mt-6 border-b-4 border-black inline-block px-16 pb-2">
+            <h2 className="text-2xl font-black uppercase tracking-[0.2em]">Weekly Syllabus Breakdown</h2>
           </div>
         </div>
 
-        {/* Info Section */}
-        <div className="grid grid-cols-2 gap-y-1 mb-6 text-sm">
-          <div className="flex"><span className="w-48 font-bold">Date</span>: {startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} to {endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-          <div className="flex"><span className="w-48 font-bold">Class & Sec</span>: {className} {classTeacherProfile?.classTeacherOf?.section || 'D'}</div>
-          <div className="flex"><span className="w-48 font-bold">Name of Class Teacher</span>: {classTeacherProfile?.name || '---'}</div>
+        {/* Audit Details */}
+        <div className="grid grid-cols-2 gap-y-2 mb-8 text-sm font-bold italic">
+          <div className="flex border-b border-black/10 pb-1"><span className="w-56 font-black uppercase not-italic">Reporting Period</span>: {startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} to {endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+          <div className="flex border-b border-black/10 pb-1"><span className="w-56 font-black uppercase not-italic">Target Cohort</span>: Class {className} (All Sections)</div>
+          <div className="flex border-b border-black/10 pb-1"><span className="w-56 font-black uppercase not-italic">Class Teacher</span>: {classTeacherProfile?.name || 'NOT ASSIGNED'}</div>
+          <div className="flex border-b border-black/10 pb-1"><span className="w-56 font-black uppercase not-italic">Compilation Date</span>: {new Date().toLocaleDateString('en-GB')}</div>
         </div>
 
-        {/* Table */}
-        <table className="w-full border-collapse border-2 border-black text-[11px]">
-          <thead>
-            <tr className="bg-slate-50">
-              <th className="border-2 border-black p-2 text-left w-24">Subject</th>
-              <th className="border-2 border-black p-2 text-left w-32">Subject Teacher</th>
-              <th className="border-2 border-black p-2 text-left w-32">Chapter Name</th>
-              <th className="border-2 border-black p-2 text-left">Topics/Sub-Topics</th>
-              <th className="border-2 border-black p-2 text-left w-48">Home Assignments</th>
+        {/* Master Syllabus Table */}
+        <table className="w-full border-collapse border-[2px] border-black text-[11px]">
+          <thead className="bg-slate-100">
+            <tr>
+              <th className="border-[2px] border-black p-3 text-left w-28 uppercase font-black">Subject</th>
+              <th className="border-[2px] border-black p-3 text-left w-36 uppercase font-black">Subject Expert</th>
+              <th className="border-[2px] border-black p-3 text-left w-36 uppercase font-black">Chapter / Module</th>
+              <th className="border-[2px] border-black p-3 text-left uppercase font-black">Topics & Objectives</th>
+              <th className="border-[2px] border-black p-3 text-left w-52 uppercase font-black">Home Assignments</th>
             </tr>
           </thead>
           <tbody>
-            {classPlans.length > 0 ? classPlans.map((plan, idx) => (
-              <tr key={idx} className="align-top">
-                <td className="border-2 border-black p-2 font-bold">{plan.subject}</td>
-                <td className="border-2 border-black p-2">{plan.teacherName}</td>
-                <td className="border-2 border-black p-2 uppercase font-semibold">{plan.chapter}</td>
-                <td className="border-2 border-black p-2 whitespace-pre-wrap leading-tight">{plan.topics}</td>
-                <td className="border-2 border-black p-2 whitespace-pre-wrap leading-tight">{plan.homework}</td>
-              </tr>
-            )) : (
+            {classAssignments.length > 0 ? classAssignments.map((asgn, idx) => {
+              // Find if this teacher submitted a plan for this subject/class for the current week
+              const plan = plans.find(p => 
+                p.teacherId === asgn.teacher.id && 
+                p.className === className && 
+                p.subject === asgn.subject &&
+                p.weekStarting === weekStarting
+              );
+
+              return (
+                <tr key={idx} className="align-top">
+                  <td className="border-[2px] border-black p-3 font-black bg-slate-50/50">
+                    {asgn.subject}
+                    <div className="text-[9px] font-bold text-slate-500 mt-1 uppercase">Sec: {asgn.sections}</div>
+                  </td>
+                  <td className="border-[2px] border-black p-3 font-bold uppercase">{asgn.teacher.name}</td>
+                  <td className={`border-[2px] border-black p-3 uppercase font-black ${!plan ? 'text-red-600 animate-pulse' : ''}`}>
+                    {plan ? plan.chapter : 'LESSON PLAN PENDING'}
+                  </td>
+                  <td className={`border-[2px] border-black p-3 whitespace-pre-wrap leading-tight font-semibold ${!plan ? 'text-red-600 italic' : ''}`}>
+                    {plan ? plan.topics : 'Data not submitted for the upcoming week.'}
+                  </td>
+                  <td className={`border-[2px] border-black p-3 whitespace-pre-wrap leading-tight font-medium ${!plan ? 'text-red-600' : ''}`}>
+                    {plan ? plan.homework : 'PENDING'}
+                  </td>
+                </tr>
+              );
+            }) : (
               <tr>
-                <td colSpan={5} className="border-2 border-black p-12 text-center text-slate-400 italic">No syllabus submissions found for this class and date range.</td>
+                <td colSpan={5} className="border-2 border-black p-16 text-center text-slate-400 font-black uppercase tracking-widest italic text-xl">
+                  No subject assignments found for Class {className}.
+                </td>
               </tr>
             )}
           </tbody>
         </table>
 
-        {/* Footer Area */}
-        <div className="mt-12 flex justify-between items-end px-4">
-           <div className="text-center border-t border-black pt-1 w-32 font-bold text-[10px]">Class Teacher</div>
-           <div className="text-center border-t border-black pt-1 w-32 font-bold text-[10px]">Academic In-charge</div>
-           <div className="text-center border-t border-black pt-1 w-32 font-bold text-[10px]">Principal</div>
+        {/* Institutional Authentication */}
+        <div className="mt-16 flex justify-between items-end px-6">
+           <div className="text-center border-t-2 border-black pt-2 w-40 font-black text-[10px] uppercase tracking-tighter">Authorized Class Teacher</div>
+           <div className="text-center border-t-2 border-black pt-2 w-40 font-black text-[10px] uppercase tracking-tighter">Academic Coordinator</div>
+           <div className="text-center border-t-2 border-black pt-2 w-40 font-black text-[10px] uppercase tracking-tighter">Principal's Seal</div>
         </div>
+      </div>
+      
+      <div className="mt-4 text-[9px] text-slate-400 font-bold uppercase text-center tracking-[0.5em] print:hidden">
+        Automated Academic Record • Sacred Heart Cloud Infrastructure
       </div>
     </div>
   );
