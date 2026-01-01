@@ -15,6 +15,10 @@ const App: React.FC = () => {
     teachers: [],
     lessonPlans: []
   });
+  
+  // ✅ PATCH STEP 1 — ADD ONE STATE (AUTH INITIALIZATION GUARD)
+  const [authInitialized, setAuthInitialized] = useState(false);
+  
   const [activeTab, setActiveTab] = useState<'plans' | 'registry' | 'compile'>('plans');
   const [selectedClass, setSelectedClass] = useState<ClassName>('V');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -49,7 +53,7 @@ const App: React.FC = () => {
     }
   };
 
-  // ✅ PATCH 2 — FINAL CORRECT useEffect AUTH BLOCK
+  // ✅ PATCH STEP 2 — REPLACE THE useEffect AUTH BLOCK ENTIRELY
   useEffect(() => {
     const unsubscribe = APIService.onAuthChange(async (user) => {
       try {
@@ -63,7 +67,6 @@ const App: React.FC = () => {
             setState(prev => ({ ...prev, currentUser: 'admin' }));
             await fetchData();
             setIsAuthenticating(false);
-            setIsSyncing(false);
             return;
           }
 
@@ -108,22 +111,27 @@ const App: React.FC = () => {
             setState(prev => ({ ...prev, currentUser: null }));
           }
         } else {
+          // 🚫 Initial auth check — NOT a failure
           setState(prev => ({ ...prev, currentUser: null }));
         }
       } catch (err) {
         console.error("Critical Auth Error:", err);
         setState(prev => ({ ...prev, currentUser: null }));
       } finally {
-        // ✅ SINGLE, AUTHORITATIVE EXIT POINT
-        setIsAuthenticating(false);
+        // ✅ AUTH LIFECYCLE CONTROL (THE REAL FIX)
+        if (!authInitialized) {
+          setAuthInitialized(true);     // first auth resolution
+        } else {
+          setIsAuthenticating(false);   // real auth completion
+        }
         setIsSyncing(false);
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [authInitialized]);
 
-  // ✅ PATCH 3 — FIX STUCK "Authenticating..." BUTTON
+  // ✅ PATCH STEP 4 — KEEP handleLogin SIMPLE (NO TIMEOUTS)
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSyncing(true);
@@ -136,7 +144,7 @@ const App: React.FC = () => {
         `Login Failed: ${res.message}\n\nPlease check:\n1. Email and password are correct\n2. Institutional email is used`
       );
     }
-    // ✅ SUCCESS handled ONLY by onAuthChange
+    // ✅ Success handled ONLY by onAuthChange
   };
 
   const handleLogout = async () => {
@@ -161,10 +169,11 @@ const App: React.FC = () => {
 
   // Add a useEffect to debug authentication state
   useEffect(() => {
-    console.log('Auth debug - isAuthenticating:', isAuthenticating, 'currentUser:', state.currentUser);
-  }, [isAuthenticating, state.currentUser]);
+    console.log('Auth debug - isAuthenticating:', isAuthenticating, 'currentUser:', state.currentUser, 'authInitialized:', authInitialized);
+  }, [isAuthenticating, state.currentUser, authInitialized]);
 
-  if (isAuthenticating && !state.currentUser) {
+  // ✅ PATCH STEP 3 — FIX THE LOADER CONDITION (ONE LINE)
+  if (!authInitialized || (isAuthenticating && !state.currentUser)) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="h-10 w-10 text-indigo-600 animate-spin mb-4" />
