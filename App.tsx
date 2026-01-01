@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Teacher, AppState, ClassName, SectionName, LessonPlan } from './types';
 import { APIService } from './services/api';
 import Layout from './components/Layout';
@@ -7,7 +7,7 @@ import TeacherForm from './components/TeacherForm';
 import AdminRegistry from './components/AdminRegistry';
 import PrintableReport from './components/PrintableReport';
 import { ADMIN_CREDENTIALS, CLASS_CONFIG, INITIAL_TEACHERS } from './constants';
-import { ClipboardList, Users, LogIn, ShieldCheck, Zap, User, Loader2, FileText, Printer, MessageCircle, Mail, Download, Send } from 'lucide-react';
+import { ClipboardList, Users, LogIn, ShieldCheck, Zap, User, Loader2, FileText, Printer, Send } from 'lucide-react';
 import { getUpcomingMonday } from './utils';
 
 const App: React.FC = () => {
@@ -26,7 +26,7 @@ const App: React.FC = () => {
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [loginForm, setLoginForm] = useState({ email: '', password: '', type: 'teacher' as 'teacher' | 'admin' });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setIsSyncing(true);
       const [teachers, lessonPlans] = await Promise.all([
@@ -35,17 +35,24 @@ const App: React.FC = () => {
       ]);
       setState(prev => ({ ...prev, teachers, lessonPlans }));
       setLastSynced(new Date());
-      setIsSyncing(false);
-      return { teachers, lessonPlans };
     } catch (error) {
       console.error("Fetch error:", error);
+    } finally {
       setIsSyncing(false);
-      return { teachers: [], lessonPlans: [] };
     }
-  };
+  }, []);
 
   useEffect(() => {
+    // FAIL-SAFE: If Firebase/CSP hangs, force clear the loader after 5 seconds
+    const safetyTimeout = setTimeout(() => {
+      if (isAuthenticating) {
+        console.warn("Auth listener timed out. Clearing loader.");
+        setIsAuthenticating(false);
+      }
+    }, 5000);
+
     const unsubscribe = APIService.onAuthChange(async (user) => {
+      clearTimeout(safetyTimeout);
       try {
         if (!user) {
           setState(prev => ({ ...prev, currentUser: null }));
@@ -58,52 +65,58 @@ const App: React.FC = () => {
         
         if (email === adminEmail) {
           setState(prev => ({ ...prev, currentUser: 'admin' }));
-          setIsAuthenticating(false); // Release UI immediately
-          fetchData(); // Load data in background
+          setIsAuthenticating(false);
+          fetchData(); 
           return;
         }
 
-        // Fast identification using local registry
+        // Parallel identification
         const localTeacher = INITIAL_TEACHERS.find(t => t.email.toLowerCase().trim() === email);
-        
-        // Background verify with Cloud
         const cloudTeachers = await APIService.fetchTeachers();
-        let teacher = cloudTeachers.find(t => t.email.toLowerCase().trim() === email);
+        let teacher = cloudTeachers.find(t => t.email.toLowerCase().trim() === email) || localTeacher;
         
-        if (!teacher && localTeacher) {
-          await APIService.syncTeacher(localTeacher);
-          teacher = localTeacher;
-        }
-
         if (teacher) {
+          if (!cloudTeachers.find(t => t.email.toLowerCase().trim() === email)) {
+            await APIService.syncTeacher(teacher as Teacher);
+          }
           setState(prev => ({ 
             ...prev, 
             currentUser: teacher as Teacher,
             teachers: cloudTeachers.length > 0 ? cloudTeachers : [teacher as Teacher]
           }));
-          setIsAuthenticating(false); // Release UI immediately
-          fetchData(); // Load remaining data (lesson plans) in background
+          setIsAuthenticating(false);
+          fetchData();
         } else {
-          alert(`Profile Error: ${user.email} is not registered in the school database.`);
+          alert(`Registry Error: ${user.email} not found.`);
           await APIService.logout();
           setState(prev => ({ ...prev, currentUser: null }));
           setIsAuthenticating(false);
         }
       } catch (err) {
-        console.error("Auth Exception:", err);
+        console.error("Auth Listener Error:", err);
         setIsAuthenticating(false);
       }
     });
-    return () => unsubscribe();
-  }, []);
+
+    return () => {
+      unsubscribe();
+      clearTimeout(safetyTimeout);
+    };
+  }, [fetchData]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSyncing(true);
-    const res = await APIService.login(loginForm.email, loginForm.password);
-    if (!res.success) {
+    try {
+      const res = await APIService.login(loginForm.email, loginForm.password);
+      if (!res.success) {
+        alert(`Access Denied: ${res.message}`);
+        setIsSyncing(false);
+      }
+      // If successful, onAuthChange handles state transition
+    } catch (err) {
+      alert("System error during login. Please check connection.");
       setIsSyncing(false);
-      alert(`Login Failed: ${res.message}`);
     }
   };
 
@@ -131,7 +144,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="h-10 w-10 text-indigo-600 animate-spin mb-4" />
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Establishing Secure Connection...</p>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Institutional Verification...</p>
       </div>
     );
   }
@@ -154,7 +167,7 @@ const App: React.FC = () => {
           <form onSubmit={handleLogin} className="space-y-6">
             <input type="email" required placeholder="Institutional Email" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 transition-colors outline-none" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} />
             <input type="password" required placeholder="Security Password" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 transition-colors outline-none" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
-            <button disabled={isSyncing} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs hover:bg-indigo-700 active:scale-95 transition-all">{isSyncing ? 'Authenticating...' : 'Enter Faculty Hub'}</button>
+            <button disabled={isSyncing} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs hover:bg-indigo-700 active:scale-95 transition-all">{isSyncing ? 'Accessing Hub...' : 'Enter Faculty Hub'}</button>
           </form>
         </div>
       </div>
