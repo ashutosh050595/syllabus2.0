@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Teacher, AppState, ClassName, SectionName, LessonPlan } from './types';
 import { APIService } from './services/api';
 import Layout from './components/Layout';
@@ -26,6 +26,9 @@ const App: React.FC = () => {
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [loginForm, setLoginForm] = useState({ email: '', password: '', type: 'teacher' as 'teacher' | 'admin' });
 
+  // Use a ref to prevent stale closures in the auth listener
+  const isAuthenticatingRef = useRef(true);
+
   const fetchData = useCallback(async () => {
     try {
       setIsSyncing(true);
@@ -36,71 +39,70 @@ const App: React.FC = () => {
       setState(prev => ({ ...prev, teachers, lessonPlans }));
       setLastSynced(new Date());
     } catch (error) {
-      console.error("Fetch error:", error);
+      console.error("Data fetch interrupted:", error);
     } finally {
       setIsSyncing(false);
     }
   }, []);
 
   useEffect(() => {
-    // FAIL-SAFE: If Firebase/CSP hangs, force clear the loader after 5 seconds
-    const safetyTimeout = setTimeout(() => {
-      if (isAuthenticating) {
-        console.warn("Auth listener timed out. Clearing loader.");
+    // 1. FAST FAIL-SAFE: Clear loader after 2.5 seconds no matter what
+    const timer = setTimeout(() => {
+      if (isAuthenticatingRef.current) {
+        console.warn("Auth heartbeat timeout. Releasing UI.");
         setIsAuthenticating(false);
+        isAuthenticatingRef.current = false;
       }
-    }, 5000);
+    }, 2500);
 
-    const unsubscribe = APIService.onAuthChange(async (user) => {
-      clearTimeout(safetyTimeout);
-      try {
-        if (!user) {
-          setState(prev => ({ ...prev, currentUser: null }));
-          setIsAuthenticating(false);
-          return;
-        }
+    // 2. RESILIENT AUTH LISTENER
+    const unsubscribe = APIService.onAuthChange((user) => {
+      // Release loader immediately upon ANY signal
+      setIsAuthenticating(false);
+      isAuthenticatingRef.current = false;
+      clearTimeout(timer);
 
-        const email = user.email?.toLowerCase().trim();
-        const adminEmail = ADMIN_CREDENTIALS.id.toLowerCase().trim();
-        
-        if (email === adminEmail) {
-          setState(prev => ({ ...prev, currentUser: 'admin' }));
-          setIsAuthenticating(false);
-          fetchData(); 
-          return;
-        }
+      if (!user) {
+        setState(prev => ({ ...prev, currentUser: null }));
+        return;
+      }
 
-        // Parallel identification
-        const localTeacher = INITIAL_TEACHERS.find(t => t.email.toLowerCase().trim() === email);
-        const cloudTeachers = await APIService.fetchTeachers();
-        let teacher = cloudTeachers.find(t => t.email.toLowerCase().trim() === email) || localTeacher;
-        
-        if (teacher) {
-          if (!cloudTeachers.find(t => t.email.toLowerCase().trim() === email)) {
-            await APIService.syncTeacher(teacher as Teacher);
+      const email = user.email?.toLowerCase().trim();
+      const adminEmail = ADMIN_CREDENTIALS.id.toLowerCase().trim();
+
+      if (email === adminEmail) {
+        setState(prev => ({ ...prev, currentUser: 'admin' }));
+        fetchData(); // Fetch in background
+        return;
+      }
+
+      // Handle Teacher Auth
+      const localProfile = INITIAL_TEACHERS.find(t => t.email.toLowerCase().trim() === email);
+      
+      // We set the user based on local registry first for zero-latency UI
+      if (localProfile) {
+        setState(prev => ({ ...prev, currentUser: localProfile }));
+        fetchData(); // Sync cloud data in background
+      } else {
+        // Only if not found locally do we wait for the cloud registry
+        APIService.fetchTeachers().then(cloudTeachers => {
+          const teacher = cloudTeachers.find(t => t.email.toLowerCase().trim() === email);
+          if (teacher) {
+            setState(prev => ({ ...prev, currentUser: teacher, teachers: cloudTeachers }));
+            fetchData();
+          } else {
+            alert(`Unauthorized: ${user.email} is not in the institutional faculty registry.`);
+            APIService.logout();
           }
-          setState(prev => ({ 
-            ...prev, 
-            currentUser: teacher as Teacher,
-            teachers: cloudTeachers.length > 0 ? cloudTeachers : [teacher as Teacher]
-          }));
+        }).catch(() => {
           setIsAuthenticating(false);
-          fetchData();
-        } else {
-          alert(`Registry Error: ${user.email} not found.`);
-          await APIService.logout();
-          setState(prev => ({ ...prev, currentUser: null }));
-          setIsAuthenticating(false);
-        }
-      } catch (err) {
-        console.error("Auth Listener Error:", err);
-        setIsAuthenticating(false);
+        });
       }
     });
 
     return () => {
       unsubscribe();
-      clearTimeout(safetyTimeout);
+      clearTimeout(timer);
     };
   }, [fetchData]);
 
@@ -110,21 +112,20 @@ const App: React.FC = () => {
     try {
       const res = await APIService.login(loginForm.email, loginForm.password);
       if (!res.success) {
-        alert(`Access Denied: ${res.message}`);
+        alert(res.message);
         setIsSyncing(false);
       }
-      // If successful, onAuthChange handles state transition
+      // If success, the onAuthChange listener clears the syncing state via the refresh
     } catch (err) {
-      alert("System error during login. Please check connection.");
       setIsSyncing(false);
+      alert("Verification failed. Please check your institutional credentials.");
     }
   };
 
   const handleLogout = async () => {
     setIsAuthenticating(true);
+    isAuthenticatingRef.current = true;
     await APIService.logout();
-    setState(prev => ({ ...prev, currentUser: null }));
-    setIsAuthenticating(false);
   };
 
   const handleSendAll = async () => {
@@ -140,11 +141,12 @@ const App: React.FC = () => {
     }
   };
 
+  // The condition "!state.currentUser" ensures we show login if the identity check finishes as null
   if (isAuthenticating && !state.currentUser) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="h-10 w-10 text-indigo-600 animate-spin mb-4" />
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Institutional Verification...</p>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] animate-pulse">Initializing Sacred Heart Hub...</p>
       </div>
     );
   }
@@ -152,7 +154,7 @@ const App: React.FC = () => {
   if (!state.currentUser) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="max-w-md w-full glass-card p-10 rounded-3xl shadow-2xl animate-in zoom-in-95">
+        <div className="max-w-md w-full glass-card p-10 rounded-3xl shadow-2xl animate-in zoom-in-95 duration-300">
           <div className="text-center mb-10">
             <div className="inline-flex p-4 bg-indigo-600 rounded-2xl mb-6 shadow-xl shadow-indigo-100">
               <LogIn className="h-8 w-8 text-white" />
@@ -167,7 +169,9 @@ const App: React.FC = () => {
           <form onSubmit={handleLogin} className="space-y-6">
             <input type="email" required placeholder="Institutional Email" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 transition-colors outline-none" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} />
             <input type="password" required placeholder="Security Password" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 transition-colors outline-none" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
-            <button disabled={isSyncing} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs hover:bg-indigo-700 active:scale-95 transition-all">{isSyncing ? 'Accessing Hub...' : 'Enter Faculty Hub'}</button>
+            <button disabled={isSyncing} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs hover:bg-indigo-700 active:scale-95 transition-all">
+              {isSyncing ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : 'Enter Faculty Hub'}
+            </button>
           </form>
         </div>
       </div>
