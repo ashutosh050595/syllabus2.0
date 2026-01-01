@@ -1,6 +1,5 @@
 
 import { initializeApp, getApp, getApps } from "firebase/app";
-// Fix: Consolidating Firebase Auth imports into a single block to resolve potential module resolution errors
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
@@ -17,7 +16,6 @@ import {
   doc, 
   deleteDoc,
 } from "firebase/firestore";
-// Fix: Importing GoogleGenAI and GenerateContentResponse as per standard SDK practices
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { FIREBASE_CONFIG, DEFAULT_TEACHER_PASSWORD, ADMIN_CREDENTIALS } from "../constants";
 import { Teacher, LessonPlan } from "../types";
@@ -107,22 +105,18 @@ export const APIService = {
 
   // AI CURRICULUM AUDIT
   async generateAIAudit(plans: LessonPlan[]): Promise<string> {
-    // Fix: Using correct initialization for GoogleGenAI with process.env.API_KEY
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const lessonDataString = JSON.stringify(plans, null, 2);
 
-    // Fix: Using recommended model 'gemini-3-pro-preview' for complex auditing tasks
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: `Please audit the following school lesson plans: ${lessonDataString}`,
       config: {
         systemInstruction: "You are a world-class academic auditor for Sacred Heart School. Analyze lesson plans for pedagogical depth, curriculum coverage gaps, and strengths. Provide a detailed, professional report with actionable recommendations.",
-        // Fix: Setting thinkingBudget to max for gemini-3-pro-preview to ensure high-quality reasoning
         thinkingConfig: { thinkingBudget: 32768 }
       },
     });
 
-    // Fix: Accessing .text property directly instead of calling it as a method
     return response.text || "No audit report could be generated at this time.";
   }
 };
