@@ -53,31 +53,151 @@ const App: React.FC = () => {
     }
   };
 
-  // ✅ PATCH 1 — Fix the useEffect dependency (CRITICAL)
+  // ✅ Debug useEffect to track auth state changes
   useEffect(() => {
+    console.log('=== AUTH DEBUG ===');
+    console.log('authInitialized:', authInitialized);
+    console.log('isAuthenticating:', isAuthenticating);
+    console.log('currentUser:', state.currentUser);
+    console.log('isSyncing:', isSyncing);
+    console.log('==================');
+  }, [authInitialized, isAuthenticating, state.currentUser, isSyncing]);
+
+  // ✅ Updated useEffect auth listener with detailed logging
+  useEffect(() => {
+    console.log('🔧 Setting up Firebase auth listener...');
+    
     const unsubscribe = APIService.onAuthChange(async (user) => {
+      console.log('🔥 Firebase auth state changed! User:', user ? user.email : 'null');
+      
       try {
         if (user) {
+          console.log('👤 Processing user:', user.email);
           const userEmail = user.email;
           const normalizedUserEmail = normalizeEmail(userEmail);
           const adminEmail = normalizeEmail(ADMIN_CREDENTIALS.id);
 
+          console.log('🔍 Comparing emails:', normalizedUserEmail, 'vs admin:', adminEmail);
+          
           // ✅ ADMIN LOGIN
           if (normalizedUserEmail === adminEmail) {
+            console.log('👑 Admin login detected');
             setState(prev => ({ ...prev, currentUser: 'admin' }));
             await fetchData();
-            setIsAuthenticating(false);
             return;
           }
 
+          console.log('👨‍🏫 Teacher login flow starting...');
           // ✅ TEACHER LOGIN FLOW
           let cloudTeachers = await APIService.fetchTeachers();
+          console.log(`📚 Found ${cloudTeachers.length} teachers in cloud`);
 
           let teacher = cloudTeachers.find(
             t => normalizeEmail(t.email) === normalizedUserEmail
           );
 
+          console.log('🔎 Teacher found in cloud?', teacher ? teacher.name : 'Not found');
+          
           // 🔁 SELF-HEALING REGISTRY
+          if (!teacher) {
+            console.log('🔄 Checking fallback teachers...');
+            const fallbackTeacher = INITIAL_TEACHERS.find(
+              t => normalizeEmail(t.email) === normalizedUserEmail
+            );
+
+            if (fallbackTeacher) {
+              console.log(`✅ Found teacher in fallback: ${fallbackTeacher.name}, syncing to cloud...`);
+              await APIService.syncTeacher(fallbackTeacher);
+
+              // 🔑 CRITICAL: re-fetch after sync
+              cloudTeachers = await APIService.fetchTeachers();
+              teacher = cloudTeachers.find(
+                t => normalizeEmail(t.email) === normalizedUserEmail
+              );
+            }
+          }
+
+          if (teacher) {
+            console.log(`🎉 Setting teacher as current user: ${teacher.name}`);
+            const lessonPlans = await APIService.fetchLessonPlans();
+            setState(prev => ({
+              ...prev,
+              currentUser: teacher,
+              teachers: cloudTeachers.length > 0 ? cloudTeachers : [teacher],
+              lessonPlans
+            }));
+            setLastSynced(new Date());
+          } else {
+            console.error('❌ Teacher not found after all checks');
+            alert(
+              `Profile Error: ${userEmail} not found in School Registry.\n\nPlease contact Administration.`
+            );
+            await APIService.logout();
+            setState(prev => ({ ...prev, currentUser: null }));
+          }
+        } else {
+          console.log('🚪 No user (logged out or initial state)');
+          setState(prev => ({ ...prev, currentUser: null }));
+        }
+      } catch (err) {
+        console.error("🔥 Critical Auth Error:", err);
+        setState(prev => ({ ...prev, currentUser: null }));
+      } finally {
+        console.log('✅ Auth flow completed, setting states...');
+        setAuthInitialized(true);
+        setIsAuthenticating(false);
+        setIsSyncing(false);
+      }
+    });
+
+    return () => {
+      console.log('🧹 Cleaning up auth listener');
+      unsubscribe();
+    };
+  }, []);
+
+  // ✅ Updated handleLogin with fallback mechanism
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSyncing(true);
+
+    const res = await APIService.login(loginForm.email, loginForm.password);
+
+    if (!res.success) {
+      setIsSyncing(false);
+      alert(
+        `Login Failed: ${res.message}\n\nPlease check:\n1. Email and password are correct\n2. Institutional email is used`
+      );
+    } else {
+      // ✅ Login was successful in Firebase
+      console.log('✅ Login API call successful, waiting for auth state change...');
+      
+      // Wait for auth state to update (Firebase might be async)
+      // If auth state doesn't change within 3 seconds, check current user
+      setTimeout(async () => {
+        const currentUser = (APIService as any).getCurrentUser ? (APIService as any).getCurrentUser() : null;
+        if (currentUser && !state.currentUser) {
+          console.log('✅ Found current user after timeout:', currentUser.email);
+          // Manually trigger the auth state change logic
+          const userEmail = currentUser.email;
+          const normalizedUserEmail = normalizeEmail(userEmail);
+          const adminEmail = normalizeEmail(ADMIN_CREDENTIALS.id);
+          
+          if (normalizedUserEmail === adminEmail) {
+            setState(prev => ({ ...prev, currentUser: 'admin' }));
+            await fetchData();
+            setIsAuthenticating(false);
+            setIsSyncing(false);
+            setAuthInitialized(true);
+            return;
+          }
+          
+          // Teacher login fallback logic
+          let cloudTeachers = await APIService.fetchTeachers();
+          let teacher = cloudTeachers.find(
+            t => normalizeEmail(t.email) === normalizedUserEmail
+          );
+
           if (!teacher) {
             const fallbackTeacher = INITIAL_TEACHERS.find(
               t => normalizeEmail(t.email) === normalizedUserEmail
@@ -85,8 +205,6 @@ const App: React.FC = () => {
 
             if (fallbackTeacher) {
               await APIService.syncTeacher(fallbackTeacher);
-
-              // 🔑 CRITICAL: re-fetch after sync
               cloudTeachers = await APIService.fetchTeachers();
               teacher = cloudTeachers.find(
                 t => normalizeEmail(t.email) === normalizedUserEmail
@@ -103,45 +221,15 @@ const App: React.FC = () => {
               lessonPlans
             }));
             setLastSynced(new Date());
-          } else {
-            alert(
-              `Profile Error: ${userEmail} not found in School Registry.\n\nPlease contact Administration.`
-            );
-            await APIService.logout();
-            setState(prev => ({ ...prev, currentUser: null }));
+            setIsAuthenticating(false);
+            setIsSyncing(false);
+            setAuthInitialized(true);
           }
         } else {
-          // 🚫 Initial auth check — NOT a failure
-          setState(prev => ({ ...prev, currentUser: null }));
+          console.log('❌ No current user found after timeout, keeping syncing state');
         }
-      } catch (err) {
-        console.error("Critical Auth Error:", err);
-        setState(prev => ({ ...prev, currentUser: null }));
-      } finally {
-        // ✅ PATCH 2 — Simplify the finally block (stable version)
-        setAuthInitialized(true);
-        setIsAuthenticating(false);
-        setIsSyncing(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []); // ✅ CRITICAL FIX: Empty dependency array - listener registered ONCE
-
-  // ✅ PATCH 4 — KEEP handleLogin SIMPLE (NO TIMEOUTS)
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSyncing(true);
-
-    const res = await APIService.login(loginForm.email, loginForm.password);
-
-    if (!res.success) {
-      setIsSyncing(false);
-      alert(
-        `Login Failed: ${res.message}\n\nPlease check:\n1. Email and password are correct\n2. Institutional email is used`
-      );
+      }, 3000);
     }
-    // ✅ Success handled ONLY by onAuthChange
   };
 
   const handleLogout = async () => {
@@ -163,11 +251,6 @@ const App: React.FC = () => {
       setIsSendingAll(false);
     }
   };
-
-  // Add a useEffect to debug authentication state
-  useEffect(() => {
-    console.log('Auth debug - isAuthenticating:', isAuthenticating, 'currentUser:', state.currentUser, 'authInitialized:', authInitialized);
-  }, [isAuthenticating, state.currentUser, authInitialized]);
 
   // ✅ PATCH 3 — KEEP loader condition (NO CHANGE)
   if (!authInitialized || (isAuthenticating && !state.currentUser)) {
