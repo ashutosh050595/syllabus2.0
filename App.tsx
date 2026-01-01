@@ -109,6 +109,7 @@ const App: React.FC = () => {
               lessonPlans 
             }));
             setLastSynced(new Date());
+            setIsAuthenticating(false);
             console.log(`Teacher login successful: ${teacher.name} (${teacher.email})`);
           } else {
             // Log debugging information
