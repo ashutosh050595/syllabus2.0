@@ -1,10 +1,12 @@
 
 import React, { useState } from 'react';
 import { Teacher, LessonPlan, ClassName, SectionName, TeacherAssignment } from '../types';
+import { INITIAL_TEACHERS, DEFAULT_TEACHER_PASSWORD } from '../constants';
+import { APIService } from '../services/api';
 import { getUpcomingMonday } from '../utils';
 import { 
   Search, Edit2, Trash2, Plus, X, 
-  Users, CheckCircle2, AlertTriangle, Activity, Mail
+  Users, CheckCircle2, AlertTriangle, Activity, Mail, Database, RefreshCw
 } from 'lucide-react';
 
 interface AdminRegistryProps {
@@ -17,12 +19,12 @@ interface AdminRegistryProps {
 
 const CLASSES: ClassName[] = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const SECTIONS: SectionName[] = ['A', 'B', 'C', 'D'];
-const DEFAULT_PASS = 'shstelaiya@123';
 
 const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, onAddTeacher, onUpdateTeacher, onRemoveTeacher }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const upcomingMonday = getUpcomingMonday().toISOString();
   const currentWeekPlans = lessonPlans.filter(p => p.weekStarting === upcomingMonday);
@@ -30,21 +32,35 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
   const defaulters = teachers.filter(t => !submittedTeacherIds.has(t.id));
 
   const [formData, setFormData] = useState({
-    name: '', email: '', phone: '', password: DEFAULT_PASS, isClassTeacher: false, ctClass: 'V' as ClassName, ctSection: 'A' as SectionName,
+    name: '', email: '', phone: '', password: DEFAULT_TEACHER_PASSWORD, isClassTeacher: false, ctClass: 'V' as ClassName, ctSection: 'A' as SectionName,
     assignments: [{ className: 'V' as ClassName, sections: [] as SectionName[], subject: '' }] as TeacherAssignment[]
   });
 
   const resetForm = () => {
     setFormData({
-      name: '', email: '', phone: '', password: DEFAULT_PASS, isClassTeacher: false, ctClass: 'V' as ClassName, ctSection: 'A' as SectionName,
+      name: '', email: '', phone: '', password: DEFAULT_TEACHER_PASSWORD, isClassTeacher: false, ctClass: 'V' as ClassName, ctSection: 'A' as SectionName,
       assignments: [{ className: 'V' as ClassName, sections: [] as SectionName[], subject: '' }]
     });
     setEditingId(null);
     setIsAdding(false);
   };
 
+  const handleSeed = async () => {
+    if (!confirm("This will upload the default teacher registry to the cloud database. Continue?")) return;
+    setIsSeeding(true);
+    try {
+      await APIService.syncInitialTeachers(INITIAL_TEACHERS);
+      alert("Faculty Registry seeded successfully.");
+      window.location.reload();
+    } catch (e) {
+      alert("Seeding failed: " + e);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   const handleSave = () => {
-    if (!formData.name || !formData.email) return alert("Name and Email are required.");
+    if (!formData.name || !formData.email) return alert("Validation Error: Name and institutional email are required.");
     
     const teacher: Teacher = {
       id: editingId || Math.random().toString(36).substr(2, 9),
@@ -80,20 +96,20 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500">
-      {/* Admin Quick Insights */}
+      {/* RESTORED: Admin Quick Insights with Active User Tracking */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-5">
           <div className="bg-indigo-100 p-4 rounded-2xl text-indigo-600"><Users className="h-6 w-6" /></div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Faculty</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Faculty</p>
             <p className="text-2xl font-black text-slate-900">{teachers.length}</p>
           </div>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-5">
           <div className="bg-emerald-100 p-4 rounded-2xl text-emerald-600"><CheckCircle2 className="h-6 w-6" /></div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Submissions This Week</p>
-            <p className="text-2xl font-black text-slate-900">{submittedTeacherIds.size}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Syllabus Received</p>
+            <p className="text-2xl font-black text-slate-900">{submittedTeacherIds.size} / {teachers.length}</p>
           </div>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-5">
@@ -105,19 +121,19 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
         </div>
       </div>
 
-      {/* Defaulters Alert */}
+      {/* NEW: Defaulters List for Current Week */}
       {defaulters.length > 0 && (
-        <div className="bg-rose-50 border border-rose-100 p-6 rounded-3xl">
+        <div className="bg-rose-50 border border-rose-100 p-6 rounded-3xl animate-in slide-in-from-top-4">
           <h4 className="text-rose-900 font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
-            <Activity className="h-4 w-4" /> Pending Weekly Submissions
+            <Activity className="h-4 w-4" /> Pending Submissions (Email Defaulters)
           </h4>
           <div className="flex flex-wrap gap-2">
             {defaulters.map(t => (
               <div key={t.id} className="bg-white border border-rose-200 p-3 rounded-2xl flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600"><Mail className="h-4 w-4" /></div>
+                <div className="h-8 w-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 font-bold text-xs">{t.name[0]}</div>
                 <div>
-                  <p className="text-[10px] font-black text-slate-900">{t.name}</p>
-                  <p className="text-[9px] text-rose-500 font-bold">{t.email}</p>
+                  <p className="text-[10px] font-black text-slate-900 leading-none">{t.name}</p>
+                  <p className="text-[9px] text-rose-500 font-bold mt-1 uppercase">{t.email}</p>
                 </div>
               </div>
             ))}
@@ -125,155 +141,169 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({ teachers, lessonPlans, on
         </div>
       )}
 
+      {/* RESTORED: Database Sync & Search Bar Row */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input type="text" placeholder="Search faculty by name or email..." className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold focus:ring-2 focus:ring-indigo-500 outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <input type="text" placeholder="Search registry by name or email..." className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
-        <button onClick={() => { setIsAdding(true); setEditingId(null); }} className="w-full md:w-auto bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors">
-          <Plus className="h-4 w-4" /> Add New Teacher
-        </button>
+        <div className="flex gap-2 w-full md:w-auto">
+          <button onClick={handleSeed} disabled={isSeeding} className="flex-1 md:flex-none bg-slate-100 text-slate-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors">
+            {isSeeding ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />} Seed Registry
+          </button>
+          <button onClick={() => { setIsAdding(true); setEditingId(null); }} className="flex-1 md:flex-none bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95">
+            <Plus className="h-4 w-4" /> Add Teacher
+          </button>
+        </div>
       </div>
 
       {(isAdding || editingId) && (
-        <div className="bg-white p-8 rounded-3xl border border-indigo-100 shadow-xl animate-in slide-in-from-top-4">
+        <div className="bg-white p-8 rounded-3xl border border-indigo-100 shadow-2xl animate-in slide-in-from-top-6">
           <div className="flex justify-between items-center mb-8">
-            <h3 className="text-xl font-black italic">Teacher Registry - {editingId ? 'Edit Profile' : 'New Entry'}</h3>
-            <button onClick={resetForm} className="p-2 text-slate-400 hover:text-slate-900"><X className="h-6 w-6" /></button>
+            <h3 className="text-xl font-black italic text-indigo-900 tracking-tight">Faculty Registration & Assignment Editor</h3>
+            <button onClick={resetForm} className="p-2 text-slate-400 hover:text-slate-900 transition-colors"><X className="h-6 w-6" /></button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Full Name</label>
-              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="Teacher's Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] px-1">Full Name</label>
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:bg-white transition-all" placeholder="Enter name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Email (Auth Key)</label>
-              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="Email Address" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] px-1">Institutional Email</label>
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:bg-white transition-all" placeholder="email@sacredheart.org" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Phone</label>
-              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="Phone Number" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] px-1">Phone</label>
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:bg-white transition-all" placeholder="10-digit number" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Password</label>
-              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="Password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] px-1">Auth Password</label>
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:bg-white transition-all" placeholder="Custom password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
             </div>
           </div>
 
-          <div className="mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-200">
+          <div className="mb-8 p-6 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
              <div className="flex items-center gap-4 mb-4">
                 <input type="checkbox" id="ct-check" checked={formData.isClassTeacher} onChange={e => setFormData({...formData, isClassTeacher: e.target.checked})} className="w-5 h-5 rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                <label htmlFor="ct-check" className="font-black text-sm text-slate-900 uppercase tracking-tight">Appoint as Class Teacher</label>
+                <label htmlFor="ct-check" className="font-black text-sm text-slate-900 uppercase tracking-tight">Assign as Class Teacher</label>
              </div>
              {formData.isClassTeacher && (
-               <div className="flex gap-4">
-                  <select className="px-4 py-2 bg-white border rounded-xl font-bold" value={formData.ctClass} onChange={e => setFormData({...formData, ctClass: e.target.value as ClassName})}>
+               <div className="flex gap-4 animate-in fade-in zoom-in-95">
+                  <select className="px-4 py-2 bg-white border border-indigo-200 rounded-xl font-bold text-indigo-900" value={formData.ctClass} onChange={e => setFormData({...formData, ctClass: e.target.value as ClassName})}>
                     {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
                   </select>
-                  <select className="px-4 py-2 bg-white border rounded-xl font-bold" value={formData.ctSection} onChange={e => setFormData({...formData, ctSection: e.target.value as SectionName})}>
+                  <select className="px-4 py-2 bg-white border border-indigo-200 rounded-xl font-bold text-indigo-900" value={formData.ctSection} onChange={e => setFormData({...formData, ctSection: e.target.value as SectionName})}>
                     {SECTIONS.map(s => <option key={s} value={s}>Section {s}</option>)}
                   </select>
                </div>
              )}
           </div>
 
+          {/* RESTORED: Advanced Subject & Section Assignment Logic */}
           <div className="space-y-4">
-            <h4 className="text-xs font-black uppercase text-slate-400 tracking-widest">Subject Assignments</h4>
+            <h4 className="text-xs font-black uppercase text-slate-400 tracking-[0.2em]">Subject Specialist Assignments</h4>
             {formData.assignments.map((asgn, i) => (
-              <div key={i} className="flex flex-wrap gap-4 items-end p-4 bg-white border border-slate-200 rounded-2xl">
-                 <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-slate-400">Class</label>
-                    <select className="w-full px-3 py-2 bg-slate-50 border rounded-lg font-bold" value={asgn.className} onChange={e => {
+              <div key={i} className="flex flex-wrap gap-4 items-end p-5 bg-white border border-slate-200 rounded-2xl shadow-sm animate-in slide-in-from-left-4">
+                 <div className="space-y-1 flex-none w-32">
+                    <label className="text-[9px] font-black uppercase text-slate-400">Class Level</label>
+                    <select className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-lg font-bold" value={asgn.className} onChange={e => {
                       const upd = [...formData.assignments]; upd[i].className = e.target.value as ClassName; setFormData({...formData, assignments: upd});
                     }}>
                       {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                  </div>
-                 <div className="space-y-1 flex-1 min-w-[200px]">
-                    <label className="text-[9px] font-black uppercase text-slate-400">Sections</label>
-                    <div className="flex gap-2">
+                 <div className="space-y-1 flex-1 min-w-[220px]">
+                    <label className="text-[9px] font-black uppercase text-slate-400">Assigned Sections</label>
+                    <div className="flex gap-1.5">
                       {SECTIONS.map(s => (
-                        <button key={s} onClick={() => toggleSection(i, s)} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${asgn.sections.includes(s) ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>{s}</button>
+                        <button key={s} onClick={() => toggleSection(i, s)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all border ${asgn.sections.includes(s) ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-indigo-200 hover:text-indigo-400'}`}>{s}</button>
                       ))}
                     </div>
                  </div>
-                 <div className="space-y-1 flex-1">
-                    <label className="text-[9px] font-black uppercase text-slate-400">Subject</label>
-                    <input className="w-full px-3 py-2 bg-slate-50 border rounded-lg font-bold" placeholder="e.g. Maths" value={asgn.subject} onChange={e => {
+                 <div className="space-y-1 flex-1 min-w-[200px]">
+                    <label className="text-[9px] font-black uppercase text-slate-400">Subject Taught</label>
+                    <input className="w-full px-4 py-2 bg-slate-50 border border-slate-100 rounded-lg font-bold placeholder:font-normal" placeholder="e.g. Science / Maths" value={asgn.subject} onChange={e => {
                       const upd = [...formData.assignments]; upd[i].subject = e.target.value; setFormData({...formData, assignments: upd});
                     }} />
                  </div>
-                 <button onClick={() => removeAssignment(i)} className="p-2 text-slate-300 hover:text-rose-600 transition-colors"><Trash2 className="h-5 w-5" /></button>
+                 <button onClick={() => removeAssignment(i)} className="p-2.5 text-slate-300 hover:text-rose-600 transition-colors bg-slate-50 rounded-xl"><Trash2 className="h-5 w-5" /></button>
               </div>
             ))}
-            <button onClick={addAssignment} className="text-xs font-black text-indigo-600 flex items-center gap-2 hover:translate-x-1 transition-transform uppercase tracking-widest"><Plus className="h-4 w-4" /> Add Assignment Row</button>
+            <button onClick={addAssignment} className="text-xs font-black text-indigo-600 flex items-center gap-2 hover:translate-x-2 transition-transform uppercase tracking-widest pt-2"><Plus className="h-4 w-4" /> Add Assignment Entry</button>
           </div>
 
-          <div className="mt-10 flex justify-end gap-3 border-t pt-8">
-             <button onClick={resetForm} className="px-8 py-3 font-bold text-slate-400 uppercase tracking-widest text-[10px]">Discard Changes</button>
-             <button onClick={handleSave} className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:shadow-indigo-200 transition-all active:scale-95">Sync with Registry</button>
+          <div className="mt-12 flex justify-end gap-3 border-t pt-10">
+             <button onClick={resetForm} className="px-10 py-4 font-black text-slate-400 uppercase tracking-widest text-[10px]">Discard Entry</button>
+             <button onClick={handleSave} className="bg-indigo-900 text-white px-14 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:shadow-indigo-200 transition-all active:scale-95">Commit to Registry</button>
           </div>
         </div>
       )}
 
+      {/* RESTORED: Full Featured Registry Table */}
       <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-slate-50 border-b">
             <tr>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Faculty Name & Registry ID</th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Institutional Role</th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Submission Status</th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Admin Controls</th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Faculty Member</th>
+              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Registry Assignments</th>
+              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Week Status</th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.email.toLowerCase().includes(searchTerm.toLowerCase())).map(t => (
-              <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-5">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400">{t.name[0]}</div>
+              <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
+                <td className="px-8 py-6">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center font-black text-slate-400 text-lg border border-slate-200">{t.name[0]}</div>
                     <div>
-                      <p className="font-black text-slate-900">{t.name}</p>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{t.email}</p>
+                      <p className="font-black text-slate-900 text-base">{t.name}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{t.email}</p>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-5">
-                  <div className="flex flex-wrap gap-1">
-                    {t.isClassTeacher && <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase">CT: {t.classTeacherOf?.className}-{t.classTeacherOf?.section}</span>}
-                    {t.assignments.map((a, i) => <span key={i} className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg text-[9px] font-bold">{a.className}: {a.subject}</span>)}
+                <td className="px-6 py-6">
+                  <div className="flex flex-wrap gap-1.5 max-w-md">
+                    {t.isClassTeacher && <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl text-[9px] font-black uppercase border border-indigo-100">CT {t.classTeacherOf?.className}-{t.classTeacherOf?.section}</span>}
+                    {t.assignments.map((a, i) => (
+                      <span key={i} className="bg-slate-50 text-slate-500 px-3 py-1 rounded-xl text-[9px] font-bold border border-slate-100">
+                        {a.className}: {a.subject} ({a.sections.join(',')})
+                      </span>
+                    ))}
                   </div>
                 </td>
-                <td className="px-6 py-5">
-                  {submittedTeacherIds.has(t.id) ? (
-                    <span className="flex items-center gap-1.5 text-emerald-600 font-black text-[10px] uppercase tracking-widest"><CheckCircle2 className="h-3 w-3" /> Submitted</span>
-                  ) : (
-                    <span className="flex items-center gap-1.5 text-rose-400 font-black text-[10px] uppercase tracking-widest"><AlertTriangle className="h-3 w-3" /> Pending</span>
-                  )}
+                <td className="px-6 py-6">
+                  <div className="flex justify-center">
+                    {submittedTeacherIds.has(t.id) ? (
+                      <div className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-full font-black text-[9px] uppercase tracking-widest border border-emerald-100 shadow-sm"><CheckCircle2 className="h-3 w-3" /> Submitted</div>
+                    ) : (
+                      <div className="flex items-center gap-2 bg-rose-50 text-rose-400 px-4 py-1.5 rounded-full font-black text-[9px] uppercase tracking-widest border border-rose-100"><AlertTriangle className="h-3 w-3" /> Pending</div>
+                    )}
+                  </div>
                 </td>
-                <td className="px-6 py-5">
-                  <div className="flex justify-center gap-3">
+                <td className="px-8 py-6 text-right">
+                  <div className="flex justify-end gap-2">
                     <button onClick={() => { 
                       setEditingId(t.id); 
                       setFormData({
-                        name: t.name, email: t.email, phone: t.phone, password: t.password || DEFAULT_PASS,
+                        name: t.name, email: t.email, phone: t.phone, password: t.password || DEFAULT_TEACHER_PASSWORD,
                         isClassTeacher: t.isClassTeacher,
                         ctClass: t.classTeacherOf?.className || 'V',
                         ctSection: t.classTeacherOf?.section || 'A',
                         assignments: t.assignments
                       });
                       setIsAdding(false);
-                      window.scrollTo({ top: 200, behavior: 'smooth' });
-                    }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><Edit2 className="h-4 w-4" /></button>
-                    <button onClick={() => onRemoveTeacher(t.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><Trash2 className="h-4 w-4" /></button>
+                      window.scrollTo({ top: 400, behavior: 'smooth' });
+                    }} className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><Edit2 className="h-4.5 w-4.5" /></button>
+                    <button onClick={() => onRemoveTeacher(t.id)} className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><Trash2 className="h-4.5 w-4.5" /></button>
                   </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {teachers.length === 0 && <div className="p-20 text-center"><p className="text-slate-400 italic font-bold">No faculty records found in the registry.</p></div>}
+        {teachers.length === 0 && <div className="p-24 text-center"><p className="text-slate-400 italic font-black uppercase tracking-[0.2em]">Cloud Registry Empty • Use Seed Button to Initialize</p></div>}
       </div>
     </div>
   );
