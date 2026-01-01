@@ -49,8 +49,9 @@ const App: React.FC = () => {
       try {
         if (user) {
           const normalizedUserEmail = user.email?.toLowerCase().trim();
+          const adminEmail = ADMIN_CREDENTIALS.id.toLowerCase().trim();
           
-          if (normalizedUserEmail === ADMIN_CREDENTIALS.id.toLowerCase().trim()) {
+          if (normalizedUserEmail === adminEmail) {
             setState(prev => ({ ...prev, currentUser: 'admin' }));
             await fetchData();
           } else {
@@ -60,13 +61,13 @@ const App: React.FC = () => {
             if (teacher) {
               setState(prev => ({ ...prev, currentUser: teacher }));
             } else {
-              // Deep sync fallback for specific profile errors
+              // Deep sync fallback specifically for profile lookup failures
               const freshTeachers = await APIService.fetchTeachers();
               const freshTeacher = freshTeachers.find(t => t.email.toLowerCase().trim() === normalizedUserEmail);
               if (freshTeacher) {
                 setState(prev => ({ ...prev, currentUser: freshTeacher, teachers: freshTeachers }));
               } else {
-                alert(`System Error: Your account exists but your Teacher Profile was not found in the School Registry. Please contact the Administrator to verify your email: ${user.email}`);
+                alert(`Profile Not Found: ${user.email} is not in the School Registry. Please contact Admin.`);
                 await APIService.logout();
                 setState(prev => ({ ...prev, currentUser: null }));
               }
@@ -76,7 +77,7 @@ const App: React.FC = () => {
           setState(prev => ({ ...prev, currentUser: null }));
         }
       } catch (err) {
-        console.error("Auth cycle error:", err);
+        console.error("Auth state error:", err);
       } finally {
         setIsAuthenticating(false);
       }
@@ -90,7 +91,7 @@ const App: React.FC = () => {
     const res = await APIService.login(loginForm.email, loginForm.password);
     if (!res.success) {
       setIsSyncing(false);
-      alert(`Access Denied: ${res.message}`);
+      alert(`Access Error: ${res.message}`);
     }
   };
 
@@ -104,8 +105,8 @@ const App: React.FC = () => {
   if (isAuthenticating && !state.currentUser) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
-        <Loader2 className="h-12 w-12 text-indigo-600 animate-spin mb-4" />
-        <p className="text-sm font-black text-slate-400 uppercase tracking-[0.3em]">Authenticating Secure Session...</p>
+        <Loader2 className="h-10 w-10 text-indigo-600 animate-spin mb-4" />
+        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Securing Session...</p>
       </div>
     );
   }
@@ -113,22 +114,28 @@ const App: React.FC = () => {
   if (!state.currentUser) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="max-w-md w-full glass-card p-10 rounded-3xl shadow-2xl">
+        <div className="max-w-md w-full glass-card p-10 rounded-3xl shadow-2xl animate-in zoom-in-95 duration-300">
           <div className="text-center mb-10">
             <div className="inline-flex p-4 bg-indigo-600 rounded-2xl mb-6 shadow-xl shadow-indigo-100">
               <LogIn className="h-8 w-8 text-white" />
             </div>
             <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Sacred Heart</h2>
-            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2">Faculty Management Portal</p>
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2">Faculty Hub Authentication</p>
           </div>
           <div className="flex bg-slate-100 p-1.5 rounded-xl mb-8 border border-slate-200">
-            <button onClick={() => setLoginForm({...loginForm, type: 'teacher'})} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${loginForm.type === 'teacher' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}><User className="h-4 w-4" /> Faculty</button>
+            <button onClick={() => setLoginForm({...loginForm, type: 'teacher'})} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${loginForm.type === 'teacher' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}><User className="h-4 w-4" /> Teacher</button>
             <button onClick={() => setLoginForm({...loginForm, type: 'admin'})} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${loginForm.type === 'admin' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}><ShieldCheck className="h-4 w-4" /> Admin</button>
           </div>
           <form onSubmit={handleLogin} className="space-y-6">
-            <input type="email" required placeholder="Institutional Email" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 transition-colors outline-none" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} />
-            <input type="password" required placeholder="Security Password" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 transition-colors outline-none" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
-            <button disabled={isSyncing} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs hover:bg-indigo-700 transition-all">{isSyncing ? 'Verifying...' : 'Sign In'}</button>
+            <div className="space-y-1">
+               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Email ID</label>
+               <input type="email" required placeholder="name@sacredheartkoderma.org" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 transition-colors outline-none" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} />
+            </div>
+            <div className="space-y-1">
+               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Password</label>
+               <input type="password" required placeholder="••••••••" className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold focus:border-indigo-600 transition-colors outline-none" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
+            </div>
+            <button disabled={isSyncing} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs hover:bg-indigo-700 transition-all active:scale-[0.98]">{isSyncing ? 'Authenticating...' : 'Sign In'}</button>
           </form>
         </div>
       </div>
@@ -141,18 +148,18 @@ const App: React.FC = () => {
         <div className="space-y-10">
           <div className="flex flex-wrap justify-center gap-2">
             <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm flex gap-1">
-              <button onClick={() => setActiveTab('plans')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'plans' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}><ClipboardList className="h-4 w-4" /> AI Audit</button>
-              <button onClick={() => setActiveTab('registry')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'registry' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}><Users className="h-4 w-4" /> Faculty Registry</button>
-              <button onClick={() => setActiveTab('compile')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'compile' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}><FileText className="h-4 w-4" /> Compiled Syllabus</button>
+              <button onClick={() => setActiveTab('plans')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'plans' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600'}`}><ClipboardList className="h-4 w-4" /> AI Audit</button>
+              <button onClick={() => setActiveTab('registry')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'registry' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600'}`}><Users className="h-4 w-4" /> Faculty Registry</button>
+              <button onClick={() => setActiveTab('compile')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'compile' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600'}`}><FileText className="h-4 w-4" /> Compiled View</button>
             </div>
           </div>
 
           {activeTab === 'compile' && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
                 <div>
-                  <h3 className="text-2xl font-black text-slate-900 italic tracking-tight">Manual Compilation Tool</h3>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Select class to generate printable weekly syllabus exactly as per school format</p>
+                  <h3 className="text-2xl font-black text-slate-900 italic tracking-tight">Report Compiler</h3>
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Generate printable weekly syllabus for school distribution</p>
                 </div>
                 <div className="flex gap-2">
                   {(['V', 'VI', 'VII'] as ClassName[]).map(cls => (
@@ -163,7 +170,7 @@ const App: React.FC = () => {
               <div className="flex justify-center">
                  <div className="w-full max-w-[297mm] overflow-x-auto bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
                     <div className="flex justify-end mb-4 print-hidden">
-                      <button onClick={() => window.print()} className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-transform active:scale-95"><Printer className="h-4 w-4" /> Print PDF</button>
+                      <button onClick={() => window.print()} className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all"><Printer className="h-4 w-4" /> Print PDF</button>
                     </div>
                     <div id="report-preview">
                        <PrintableReport 
@@ -183,26 +190,26 @@ const App: React.FC = () => {
               teachers={state.teachers} 
               onAddTeacher={async (t) => { setIsSyncing(true); await APIService.syncTeacher(t); await fetchData(); setIsSyncing(false); }} 
               onUpdateTeacher={async (id, upd) => { const teacher = state.teachers.find(t => t.id === id); if (teacher) { await APIService.syncTeacher({...teacher, ...upd}); await fetchData(); } }} 
-              onRemoveTeacher={async (id) => { if(confirm("Are you sure you want to remove this teacher from the registry?")) { await APIService.deleteTeacher(id); await fetchData(); } }} 
+              onRemoveTeacher={async (id) => { if(confirm("Permanently remove this teacher?")) { await APIService.deleteTeacher(id); await fetchData(); } }} 
               lessonPlans={state.lessonPlans}
             />
           )}
 
           {activeTab === 'plans' && (
-            <div className="space-y-8">
+            <div className="space-y-8 animate-in fade-in duration-500">
               <div className="flex flex-col md:flex-row justify-between items-center bg-white p-8 rounded-3xl border border-slate-200 shadow-sm gap-6">
                 <div>
-                  <h3 className="text-2xl font-black text-slate-900 italic tracking-tight flex items-center gap-3"><Zap className="h-6 w-6 text-indigo-600" /> AI Pedagogical Audit</h3>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Global standard analysis of curriculum depth and home assignments</p>
+                  <h3 className="text-2xl font-black text-slate-900 italic tracking-tight flex items-center gap-3"><Zap className="h-6 w-6 text-indigo-600" /> Academic Audit Engine</h3>
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">AI analysis of curriculum depth and homework quality</p>
                 </div>
-                <button onClick={async () => { setIsAuditing(true); const res = await APIService.generateAIAudit(state.lessonPlans); setAuditResult(res); setIsAuditing(false); }} disabled={isAuditing || state.lessonPlans.length === 0} className="bg-emerald-600 text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100">{isAuditing ? 'Analyzing...' : 'Run Academic Audit'}</button>
+                <button onClick={async () => { setIsAuditing(true); const res = await APIService.generateAIAudit(state.lessonPlans); setAuditResult(res); setIsAuditing(false); }} disabled={isAuditing || state.lessonPlans.length === 0} className="bg-emerald-600 text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 shadow-lg shadow-emerald-50">{isAuditing ? 'Analyzing...' : 'Generate AI Report'}</button>
               </div>
-              {auditResult && <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm font-bold text-sm text-slate-700 whitespace-pre-wrap leading-relaxed animate-in fade-in">{auditResult}</div>}
+              {auditResult && <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm font-bold text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{auditResult}</div>}
             </div>
           )}
         </div>
       ) : (
-        <TeacherForm teacher={state.currentUser as Teacher} onSubmit={async (plans) => { setIsSyncing(true); await APIService.saveLessonPlans(plans.map((p: any) => ({...p, id: Math.random().toString(36).substr(2, 9), teacherId: (state.currentUser as Teacher).id, teacherName: (state.currentUser as Teacher).name}))); alert("Syllabus plans submitted to the core registry."); await fetchData(); setIsSyncing(false); }} />
+        <TeacherForm teacher={state.currentUser as Teacher} onSubmit={async (plans) => { setIsSyncing(true); await APIService.saveLessonPlans(plans.map((p: any) => ({...p, id: Math.random().toString(36).substr(2, 9), teacherId: (state.currentUser as Teacher).id, teacherName: (state.currentUser as Teacher).name}))); alert("Weekly syllabus successfully submitted."); await fetchData(); setIsSyncing(false); }} />
       )}
     </Layout>
   );
