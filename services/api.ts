@@ -10,8 +10,8 @@ const app = getApps().length > 0 ? getApp() : initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Replace this with your deployed GAS Web App URL
-const GAS_WORKER_URL = "YOUR_GAS_WEB_APP_URL";
+// CRITICAL: Replace with your deployed GAS Web App URL for automated emails
+const GAS_WORKER_URL = "https://script.google.com/macros/s/AKfycby-YOUR-GAS-URL/exec";
 
 export const APIService = {
   async login(email: string, password: string): Promise<any> {
@@ -54,53 +54,50 @@ export const APIService = {
   },
 
   async fetchLessonPlans(teacherId?: string): Promise<LessonPlan[]> {
-    let q = query(collection(db, "lessonPlans"), orderBy("submittedAt", "desc"));
-    if (teacherId) {
-      q = query(collection(db, "lessonPlans"), where("teacherId", "==", teacherId), orderBy("submittedAt", "desc"));
+    try {
+      let q = query(collection(db, "lessonPlans"), orderBy("submittedAt", "desc"));
+      if (teacherId) {
+        q = query(collection(db, "lessonPlans"), where("teacherId", "==", teacherId), orderBy("submittedAt", "desc"));
+      }
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => doc.data() as LessonPlan);
+    } catch (e) {
+      console.error("Firestore Fetch Error:", e);
+      return [];
     }
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => doc.data() as LessonPlan);
   },
 
   async saveLessonPlans(plans: LessonPlan[]): Promise<void> {
     const batchPromises = plans.map(plan => setDoc(doc(db, "lessonPlans", plan.id), { ...plan, resubmissionStatus: 'none' }));
     await Promise.all(batchPromises);
     
-    // Trigger submission alert email via GAS
-    try {
-      fetch(GAS_WORKER_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'submission_alert',
-          teacherEmail: plans[0].teacherId, // assuming email stored here or looked up
-          teacherName: plans[0].teacherName,
-          weekRange: plans[0].weekLabel
-        })
-      });
-    } catch (e) { console.error("GAS Alert Failed", e); }
+    // Notify GAS for Submission Alert email
+    fetch(GAS_WORKER_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({
+        action: 'submission_alert',
+        teacherEmail: plans[0].teacherId, // assuming teacherId is email for login
+        weekRange: plans[0].weekLabel
+      })
+    }).catch(e => console.warn("Email dispatch failed:", e));
   },
 
   async requestResubmission(plan: LessonPlan, teacherEmail: string): Promise<void> {
-    const planRef = doc(db, "lessonPlans", plan.id);
-    await setDoc(planRef, { ...plan, resubmissionStatus: 'pending' });
-
-    // Notify GAS to send emails to teacher and admin
-    try {
-      fetch(GAS_WORKER_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'request_resubmit',
-          teacherName: plan.teacherName,
-          teacherEmail: teacherEmail,
-          planId: plan.id,
-          weekRange: plan.weekLabel
-        })
-      });
-    } catch (e) { console.error("GAS Request Failed", e); }
+    await setDoc(doc(db, "lessonPlans", plan.id), { ...plan, resubmissionStatus: 'pending' });
+    
+    // Notify GAS for Resubmission workflow (Teacher A + Admin B)
+    fetch(GAS_WORKER_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({
+        action: 'request_resubmit',
+        teacherName: plan.teacherName,
+        teacherEmail: teacherEmail,
+        planId: plan.id,
+        weekRange: plan.weekLabel
+      })
+    }).catch(e => console.warn("Resubmit request email failed:", e));
   },
 
   async deleteLessonPlan(id: string): Promise<void> {
