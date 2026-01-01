@@ -50,10 +50,16 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    let isSubscribed = true; // To prevent state updates on unmounted component
-    
+    // Set a timeout to handle cases where auth state doesn't change
+    const authTimeout = setTimeout(() => {
+      if (isAuthenticating) {
+        console.log('Auth timeout - resetting auth state');
+        setIsAuthenticating(false);
+      }
+    }, 10000); // 10 second timeout
+
     const unsubscribe = APIService.onAuthChange(async (user) => {
-      if (!isSubscribed) return; // Don't proceed if component unmounted
+      console.log('Auth state changed:', user ? `User ${user.email}` : 'No user');
       
       try {
         if (user) {
@@ -61,17 +67,20 @@ const App: React.FC = () => {
           const normalizedUserEmail = normalizeEmail(userEmail);
           const adminEmail = normalizeEmail(ADMIN_CREDENTIALS.id);
           
+          console.log('Processing login for:', normalizedUserEmail);
+          
           if (normalizedUserEmail === adminEmail) {
-            if (!isSubscribed) return;
+            console.log('Admin login detected');
             setState(prev => ({ ...prev, currentUser: 'admin' }));
             await fetchData();
-            if (!isSubscribed) return;
             setIsAuthenticating(false);
+            clearTimeout(authTimeout);
             return;
           }
 
           // Fetch teachers to find matching email
           let cloudTeachers = await APIService.fetchTeachers();
+          console.log('Cloud teachers fetched:', cloudTeachers.length);
           
           // Find teacher with case-insensitive email match
           let teacher = cloudTeachers.find(t => {
@@ -79,8 +88,11 @@ const App: React.FC = () => {
             return teacherEmail === normalizedUserEmail;
           });
           
+          console.log('Teacher found in cloud:', teacher ? teacher.name : 'None');
+          
           // Self-healing: check local registry if not in cloud
           if (!teacher) {
+            console.log('Checking fallback teachers...');
             const fallbackTeacher = INITIAL_TEACHERS.find(t => {
               const teacherEmail = normalizeEmail(t.email);
               return teacherEmail === normalizedUserEmail;
@@ -91,7 +103,7 @@ const App: React.FC = () => {
               await APIService.syncTeacher(fallbackTeacher);
               
               // Wait a brief moment for Firestore to update
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 1000));
               
               // ✅ FIX: re-fetch after sync to avoid stale snapshot
               cloudTeachers = await APIService.fetchTeachers();
@@ -107,8 +119,8 @@ const App: React.FC = () => {
           }
 
           if (teacher) {
+            console.log(`Setting teacher as current user: ${teacher.name}`);
             const lessonPlans = await APIService.fetchLessonPlans();
-            if (!isSubscribed) return;
             setState(prev => ({ 
               ...prev, 
               currentUser: teacher as Teacher, 
@@ -117,7 +129,8 @@ const App: React.FC = () => {
             }));
             setLastSynced(new Date());
             console.log(`Teacher login successful: ${teacher.name} (${teacher.email})`);
-            setIsAuthenticating(false); // ✅ MOVE HERE: Set auth complete only after successful login
+            setIsAuthenticating(false);
+            clearTimeout(authTimeout);
           } else {
             // Log debugging information
             console.warn(`Login attempt failed for: ${userEmail} (normalized: ${normalizedUserEmail})`);
@@ -128,45 +141,45 @@ const App: React.FC = () => {
             alert(`Profile Error: ${userEmail} not found in School Registry.\n\nPlease contact the administrator to ensure:\n1. Your email is correctly registered in the Faculty Registry\n2. The email matches your login email exactly`);
             
             await APIService.logout();
-            if (!isSubscribed) return;
             setState(prev => ({ ...prev, currentUser: null }));
-            setIsAuthenticating(false); // ✅ Set auth complete even on error
+            setIsAuthenticating(false);
+            clearTimeout(authTimeout);
           }
         } else {
-          // No user (logged out)
-          if (!isSubscribed) return;
+          console.log('No user, setting currentUser to null');
           setState(prev => ({ ...prev, currentUser: null }));
-          setIsAuthenticating(false); // ✅ Set auth complete
+          setIsAuthenticating(false);
+          clearTimeout(authTimeout);
         }
       } catch (err) {
         console.error("Critical Auth Error:", err);
-        if (!isSubscribed) return;
-        // Don't show technical errors to users during auth
         setState(prev => ({ ...prev, currentUser: null }));
-        setIsAuthenticating(false); // ✅ Set auth complete even on error
+        setIsAuthenticating(false);
+        clearTimeout(authTimeout);
       }
-      // REMOVED: Don't have a finally block that always sets isAuthenticating to false
     });
     
     return () => {
-      isSubscribed = false;
+      clearTimeout(authTimeout);
       unsubscribe();
     };
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Login attempt for:', loginForm.email);
     setIsSyncing(true);
-    // Reset authentication state when starting new login
-    setIsAuthenticating(true);
     
     const res = await APIService.login(loginForm.email, loginForm.password);
+    console.log('Login response:', res);
+    
     if (!res.success) {
       setIsSyncing(false);
-      setIsAuthenticating(false); // Stop authenticating on login failure
       alert(`Login Failed: ${res.message}\n\nPlease check:\n1. Email and password are correct\n2. You're using your institutional email\n3. You have an active internet connection`);
+    } else {
+      // Login successful - keep syncing state until auth state changes
+      console.log('Login successful, waiting for auth state change...');
     }
-    // Auth observer will handle successful login
   };
 
   const handleLogout = async () => {
@@ -189,11 +202,17 @@ const App: React.FC = () => {
     }
   };
 
+  // Add a useEffect to debug authentication state
+  useEffect(() => {
+    console.log('Auth debug - isAuthenticating:', isAuthenticating, 'currentUser:', state.currentUser);
+  }, [isAuthenticating, state.currentUser]);
+
   if (isAuthenticating && !state.currentUser) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="h-10 w-10 text-indigo-600 animate-spin mb-4" />
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Establishing Secure Connection...</p>
+        <p className="text-xs text-slate-500 mt-2">This may take a moment</p>
       </div>
     );
   }
@@ -231,7 +250,7 @@ const App: React.FC = () => {
               onChange={e => setLoginForm({...loginForm, password: e.target.value})} 
             />
             <button 
-              disabled={isSyncing || isAuthenticating}
+              disabled={isSyncing}
               className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
             >
               {isSyncing ? 'Authenticating...' : 'Enter Faculty Hub'}
