@@ -1,3 +1,4 @@
+
 export type ClassName = 'I' | 'II' | 'III' | 'IV' | 'V' | 'VI' | 'VII' | 'VIII' | 'IX' | 'X' | 'XI' | 'XII';
 export type SectionName = 'A' | 'B' | 'C' | 'D';
 
@@ -35,7 +36,8 @@ export interface LessonPlan {
   homework: string;
   weekStarting: string;
   submittedAt: string;
-  resubmissionStatus?: 'pending' | 'approved' | 'declined';
+  resubmissionStatus?: 'none' | 'pending' | 'approved' | 'declined';
+  weekLabel?: string;
 }
 
 export interface AppState {

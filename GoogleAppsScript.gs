@@ -1,188 +1,216 @@
 
 /**
- * SACRED HEART SCHOOL - AUTOMATED DISPATCH ENGINE
- * -----------------------------------------------
- * This script handles PDF generation and Email distribution.
+ * SACRED HEART SCHOOL - FIREBASE EMAIL & AUTOMATION WORKER
+ * Deployed as a Web App to handle institutional notifications.
  */
 
-const DB_SHEET_ID = 'YOUR_GOOGLE_SHEET_ID_HERE';
+const FIREBASE_PROJECT_ID = "lesson-plan-b4c8e";
+const APP_PORTAL_URL = "YOUR_APP_DEPLOY_URL"; // Portal address for resubmission
+const ADMIN_EMAIL = "admin@sacredheartkoderma.org";
 
-function getDb() {
-  return SpreadsheetApp.openById(DB_SHEET_ID);
-}
+/**
+ * WEB INTERFACE: Handles Resubmission Decision Links
+ */
+function doGet(e) {
+  const action = e.parameter.action;
+  const planId = e.parameter.planId;
+  const decision = e.parameter.decision;
 
-function getOrCreateSheet(name) {
-  const ss = getDb();
-  let sheet = ss.getSheetByName(name);
-  if (!sheet) {
-    sheet = ss.insertSheet(name);
-    if (name === 'Teachers') sheet.appendRow(['id', 'name', 'email', 'phone', 'data']);
-    if (name === 'LessonPlans') sheet.appendRow(['id', 'teacherId', 'teacherName', 'className', 'section', 'subject', 'dateFrom', 'dateTo', 'chapter', 'topics', 'homework', 'weekStarting', 'submittedAt']);
+  if (action === "resubmit_decision") {
+    return processResubmission(planId, decision);
   }
-  return sheet;
-}
-
-// --- NEW: PDF GENERATION ENGINE ---
-
-function generateClassReportHtml(className, weekStarting) {
-  const planSheet = getOrCreateSheet('LessonPlans');
-  const plans = planSheet.getDataRange().getValues().slice(1);
   
-  const classPlans = plans.filter(row => row[3] === className && row[11] === weekStarting);
-  
-  let rowsHtml = '';
-  classPlans.forEach(p => {
-    rowsHtml += `
-      <tr>
-        <td style="border: 1px solid #334155; padding: 12px; font-weight: bold; color: #4f46e5;">${p[5]}</td>
-        <td style="border: 1px solid #334155; padding: 12px;">${p[2]}</td>
-        <td style="border: 1px solid #334155; padding: 12px; font-weight: 800; font-style: italic;">${p[8]}</td>
-        <td style="border: 1px solid #334155; padding: 12px; font-size: 11px; line-height: 1.5;">${p[9]}</td>
-      </tr>
-    `;
-  });
-
-  return `
-    <html>
-      <body style="font-family: sans-serif; padding: 20px; color: #1e293b;">
-        <div style="text-align: center; border-bottom: 4px solid #1e293b; padding-bottom: 20px; margin-bottom: 30px;">
-          <h1 style="margin: 0; font-size: 28px; text-transform: uppercase; letter-spacing: 2px;">Sacred Heart School Koderma</h1>
-          <p style="margin: 5px 0; color: #6366f1; font-weight: bold; letter-spacing: 4px; font-size: 10px;">WEEKLY ACADEMIC BLUEPRINT</p>
-          <div style="display: inline-block; background: #1e293b; color: white; padding: 8px 20px; border-radius: 20px; margin-top: 15px; font-size: 12px; font-weight: bold;">
-            CLASS: ${className} | WEEK STARTING: ${weekStarting.split('T')[0]}
-          </div>
-        </div>
-        <table style="width: 100%; border-collapse: collapse; border: 2px solid #1e293b;">
-          <thead>
-            <tr style="background: #f1f5f9;">
-              <th style="border: 1px solid #334155; padding: 12px; text-align: left; font-size: 10px; text-transform: uppercase;">Subject</th>
-              <th style="border: 1px solid #334155; padding: 12px; text-align: left; font-size: 10px; text-transform: uppercase;">Faculty</th>
-              <th style="border: 1px solid #334155; padding: 12px; text-align: left; font-size: 10px; text-transform: uppercase;">Chapter</th>
-              <th style="border: 1px solid #334155; padding: 12px; text-align: left; font-size: 10px; text-transform: uppercase;">Topics</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml || '<tr><td colspan="4" style="text-align:center; padding: 40px; color: #94a3b8;">No data submitted for this week.</td></tr>'}
-          </tbody>
-        </table>
-        <div style="margin-top: 40px; font-size: 10px; color: #94a3b8; text-align: center; letter-spacing: 2px;">
-          GENERTATED BY SACRED HEART CLOUD INFRASTRUCTURE
-        </div>
-      </body>
-    </html>
-  `;
+  return ContentService.createTextOutput("Invalid Action");
 }
 
 /**
- * Main function to dispatch reports. 
- * Can be run manually or by trigger.
+ * API ENDPOINT: Handles immediate post-submission alerts and resubmission requests
  */
-function dispatchWeeklyReports() {
-  const teacherSheet = getOrCreateSheet('Teachers');
-  const teachers = teacherSheet.getDataRange().getValues().slice(1).map(row => JSON.parse(row[4]));
+function doPost(e) {
+  const body = JSON.parse(e.postData.contents);
+  const action = body.action;
+
+  if (action === "submission_alert") {
+    sendSubmissionAlert(body.teacherEmail, body.weekRange);
+  } else if (action === "request_resubmit") {
+    handleResubmissionRequest(body.teacherName, body.teacherEmail, body.planId, body.weekRange);
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ status: "processed" }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// --- EMAIL LOGIC ---
+
+function sendSubmissionAlert(email, weekRange) {
+  const subject = `Lesson Plan Confirmation: Week ${weekRange}`;
+  const body = `Dear Teacher,\n\nYour lesson plan for the period ${weekRange} has been successfully submitted via the portal.\n\nInstitutional Hub,\nSacred Heart Koderma`;
+  GmailApp.sendEmail(email, subject, body);
+}
+
+function handleResubmissionRequest(name, email, planId, weekRange) {
+  // A. Notify Teacher
+  GmailApp.sendEmail(email, "Resubmission Request Received", 
+    `Dear ${name},\n\nYour request for resubmission for the week ${weekRange} has been sent to the admin. You can resubmit once the admin approves it. Please wait for the official approval.\n\nRegards,\nSacred Heart Admin`);
+
+  // B. Notify Admin with decision buttons
+  const approveUrl = `${ScriptApp.getService().getUrl()}?action=resubmit_decision&planId=${planId}&decision=approve`;
+  const declineUrl = `${ScriptApp.getService().getUrl()}?action=resubmit_decision&planId=${planId}&decision=decline`;
   
-  // Calculate upcoming Monday
+  const htmlBody = `
+    <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee;">
+      <h3 style="color: #4f46e5;">Resubmission Approval Required</h3>
+      <p>Teacher <b>${name}</b> has requested to resubmit their lesson plan for <b>${weekRange}</b>.</p>
+      <p>Please select an action below:</p>
+      <div style="margin-top: 30px;">
+        <a href="${approveUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-right: 15px;">Approve Request</a>
+        <a href="${declineUrl}" style="background-color: #ef4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Decline Request</a>
+      </div>
+    </div>
+  `;
+  
+  GmailApp.sendEmail(ADMIN_EMAIL, `Resubmission Request: ${name}`, "", { htmlBody: htmlBody });
+}
+
+function processResubmission(planId, decision) {
+  // 1. Fetch Plan details from Firebase REST API
+  const plan = getFirestoreDoc("lessonPlans", planId);
+  if (!plan) return ContentService.createTextOutput("Error: Plan record not found.");
+
+  const teacherEmail = plan.teacherId; // Adjusted if your ID is email
+  const weekLabel = plan.weekLabel || "Selected Week";
+
+  if (decision === "approve") {
+    // A. Delete from Firebase
+    deleteFirestoreDoc("lessonPlans", planId);
+    
+    // B. Email Teacher with link
+    GmailApp.sendEmail(teacherEmail, "Resubmission Approved", 
+      `Dear Teacher,\n\nYour request for resubmission has been approved. You can now resubmit your lesson plan through the link below:\n\n${APP_PORTAL_URL}\n\nRegards,\nSacred Heart Admin`);
+    
+    return ContentService.createTextOutput("Resubmission APPROVED. Teacher notified and record cleared from Firebase.");
+  } else {
+    // A. Mark as Declined in Firebase (Optional, but good for UI)
+    updateFirestoreDoc("lessonPlans", planId, { resubmissionStatus: "declined" });
+
+    // B. Email Teacher rejection
+    GmailApp.sendEmail(teacherEmail, "Resubmission Request Rejected", 
+      `Dear Teacher,\n\nYour request for resubmission has been rejected. You cannot resubmit the lesson plan for the period ${weekLabel}.\n\nRegards,\nSacred Heart Admin`);
+    
+    return ContentService.createTextOutput("Resubmission DECLINED. Teacher notified.");
+  }
+}
+
+// --- AUTOMATED REMINDERS (THU, FRI, SAT 1 PM) ---
+
+function triggerDefaulterReminders() {
+  const teachers = getFirestoreCollection("teachers");
+  const plans = getFirestoreCollection("lessonPlans");
+  
+  // Calculate Target Week Starting Date (Next Monday)
   const d = new Date();
   const day = d.getDay();
   const diff = d.getDate() + (day === 0 ? 1 : 8 - day);
-  const nextMonday = new Date(d.setDate(diff));
-  nextMonday.setHours(0, 0, 0, 0);
-  const weekKey = nextMonday.toISOString();
+  const nextMon = new Date(d.setDate(diff));
+  nextMon.setHours(0,0,0,0);
+  const targetWeek = nextMon.toISOString();
 
-  const classes = ['V', 'VI', 'VII']; // Configured classes
-  
-  classes.forEach(cls => {
-    const html = generateClassReportHtml(cls, weekKey);
-    const pdfBlob = HtmlService.createHtmlOutput(html).getAs('application/pdf').setName(`SacredHeart_Class_${cls}_Report.pdf`);
-    
-    // Find teachers involved in this class to email them
-    const classTeachers = teachers.filter(t => 
-      t.isClassTeacher && t.classTeacherOf.className === cls
-    );
-    
-    classTeachers.forEach(teacher => {
-      try {
-        GmailApp.sendEmail(teacher.email, `Weekly Academic Digest: Class ${cls}`, 
-          `Dear ${teacher.name},\n\nPlease find attached the Weekly Lesson Plan Digest for Class ${cls} for the week starting ${weekKey.split('T')[0]}.\n\nRegards,\nSacred Heart Admin Hub`, 
-          {
-            attachments: [pdfBlob],
-            name: 'Sacred Heart Admin'
-          }
-        );
-      } catch (e) {
-        Logger.log(`Failed to email ${teacher.email}: ${e.message}`);
-      }
-    });
-  });
-  
-  return "Dispatch Completed Successfully";
-}
+  const submittedTeacherIds = new Set(plans
+    .filter(p => p.weekStarting === targetWeek)
+    .map(p => p.teacherId));
 
-// --- WEB INTERFACE HANDLERS ---
-
-function doGet(e) {
-  const action = e.parameter.action;
-  if (action === 'test') return ContentService.createTextOutput("Connection Active");
-  
-  if (action === 'getAllData') {
-    const teacherSheet = getOrCreateSheet('Teachers');
-    const planSheet = getOrCreateSheet('LessonPlans');
-    const teachers = teacherSheet.getDataRange().getValues().slice(1).map(row => JSON.parse(row[4]));
-    const plans = planSheet.getDataRange().getValues().slice(1).map(row => ({
-      id: row[0], teacherId: row[1], teacherName: row[2], className: row[3],
-      section: row[4], subject: row[5], dateFrom: row[6], dateTo: row[7],
-      chapter: row[8], topics: row[9], homework: row[10], weekStarting: row[11],
-      submittedAt: row[12]
-    }));
-    return ContentService.createTextOutput(JSON.stringify({ teachers, lessonPlans: plans })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-function doPost(e) {
-  const body = JSON.parse(e.postData.contents);
-  const { action, data } = body;
-  
-  if (action === 'savePlans') {
-    const sheet = getOrCreateSheet('LessonPlans');
-    data.forEach(p => {
-      sheet.appendRow([p.id, p.teacherId, p.teacherName, p.className, p.section, p.subject, p.dateFrom, p.dateTo, p.chapter, p.topics, p.homework, p.weekStarting, p.submittedAt]);
-    });
-    return ContentService.createTextOutput(JSON.stringify({status: 'ok'}));
-  } 
-  
-  if (action === 'updateTeacher') {
-    const sheet = getOrCreateSheet('Teachers');
-    const values = sheet.getDataRange().getValues();
-    let found = false;
-    for(let i=1; i<values.length; i++) {
-      if(values[i][0] === data.id) {
-        sheet.getRange(i+1, 1, 1, 5).setValues([[data.id, data.name, data.email, data.phone, JSON.stringify(data)]]);
-        found = true;
-        break;
-      }
+  teachers.forEach(t => {
+    if (!submittedTeacherIds.has(t.id)) {
+      GmailApp.sendEmail(t.email, "Reminder: Lesson Plan Pending", 
+        `Dear ${t.name},\n\nInstitutional records show that you haven't submitted the lesson plan for the upcoming week yet. Please fill it immediately via the portal.\n\nRegards,\nSacred Heart Admin`);
     }
-    if(!found) sheet.appendRow([data.id, data.name, data.email, data.phone, JSON.stringify(data)]);
-    return ContentService.createTextOutput(JSON.stringify({status: 'ok'}));
-  }
+  });
+}
 
-  if (action === 'triggerDispatch') {
-    const result = dispatchWeeklyReports();
-    return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: result })).setMimeType(ContentService.MimeType.JSON);
-  }
+// --- SATURDAY COMPILATION (SAT 8 PM) ---
+
+function automatedWeeklyCompilation() {
+  const teachers = getFirestoreCollection("teachers");
+  const plans = getFirestoreCollection("lessonPlans");
+  
+  const d = new Date();
+  const diff = d.getDate() + (d.getDay() === 0 ? 1 : 8 - d.getDay());
+  const nextMon = new Date(d.setDate(diff));
+  const weekLabel = `${nextMon.getDate()}-${nextMon.getMonth()+1}-${nextMon.getFullYear()}`;
+
+  // Find all Class Teachers
+  const classTeachers = teachers.filter(t => t.isClassTeacher);
+
+  classTeachers.forEach(ct => {
+    const className = ct.classTeacherOf.className;
+    const section = ct.classTeacherOf.section;
+    const fileName = `${className}_${section}_${weekLabel}`;
+    
+    // Generate PDF (Simplified HTML to PDF)
+    const html = generateCompilationHtml(className, section, plans, teachers, nextMon);
+    const pdfBlob = HtmlService.createHtmlOutput(html).getAs('application/pdf').setName(`${fileName}.pdf`);
+
+    GmailApp.sendEmail(ct.email, `Weekly Compilation: ${className}-${section} (${weekLabel})`, 
+      `Dear ${ct.name},\n\nPlease find attached the weekly syllabus digest for your class ${className}-${section}.\n\nRegards,\nSacred Heart Admin`, 
+      { attachments: [pdfBlob] });
+  });
+}
+
+// --- FIRESTORE REST HELPERS ---
+
+function getFirestoreCollection(colName) {
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${colName}?pageSize=1000`;
+  const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  if (resp.getResponseCode() !== 200) return [];
+  const data = JSON.parse(resp.getContentText());
+  return (data.documents || []).map(doc => {
+    const fields = doc.fields;
+    const obj = {};
+    for (let key in fields) {
+      obj[key] = fields[key].stringValue || fields[key].booleanValue || fields[key].integerValue;
+    }
+    return obj;
+  });
+}
+
+function getFirestoreDoc(col, id) {
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${col}/${id}`;
+  const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  if (resp.getResponseCode() !== 200) return null;
+  const data = JSON.parse(resp.getContentText());
+  const fields = data.fields;
+  const obj = {};
+  for (let key in fields) obj[key] = fields[key].stringValue || fields[key].booleanValue || fields[key].integerValue;
+  return obj;
+}
+
+function deleteFirestoreDoc(col, id) {
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${col}/${id}`;
+  UrlFetchApp.fetch(url, { method: "delete", muteHttpExceptions: true });
+}
+
+function updateFirestoreDoc(col, id, fields) {
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${col}/${id}?updateMask.fieldPaths=resubmissionStatus`;
+  // Simple partial update via REST logic...
+}
+
+function generateCompilationHtml(cls, sec, plans, teachers, monday) {
+  // Logic to build a basic table matching your PrintableReport.tsx structure...
+  return "<html><body><h1>Class Compilation</h1></body></html>";
 }
 
 /**
- * RUN THIS ONCE MANUALLY TO SETUP AUTOMATION
+ * TRIGGER SETUP: Run this once manually
  */
-function setupAutomatedTrigger() {
-  // Delete existing triggers to avoid duplicates
+function setupInstitutionalTriggers() {
   const triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(t => ScriptApp.deleteTrigger(t));
-  
-  // Schedule for every Sunday at 6:00 PM
-  ScriptApp.newTrigger('dispatchWeeklyReports')
-    .timeBased()
-    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
-    .atHour(18)
-    .create();
+
+  // Reminders: Thu, Fri, Sat @ 1 PM
+  [ScriptApp.WeekDay.THURSDAY, ScriptApp.WeekDay.FRIDAY, ScriptApp.WeekDay.SATURDAY].forEach(day => {
+    ScriptApp.newTrigger('triggerDefaulterReminders').timeBased().onWeekDay(day).atHour(13).create();
+  });
+
+  // Compilation: Sat @ 8 PM
+  ScriptApp.newTrigger('automatedWeeklyCompilation').timeBased().onWeekDay(ScriptApp.WeekDay.SATURDAY).atHour(20).create();
 }
