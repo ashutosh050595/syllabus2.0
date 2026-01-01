@@ -41,36 +41,36 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, sectionNam
 
   return (
     <div className="bg-white text-black p-0 w-full" style={{ minHeight: '180mm' }}>
-      <div className="border-[3px] border-black p-6">
+      <div className="border-[3px] border-black p-8">
         {/* Institutional Header */}
-        <div className="text-center mb-6 relative">
-          <div className="absolute left-0 top-0 w-16 h-16">
+        <div className="text-center mb-10 relative">
+          <div className="absolute left-0 top-0 w-20 h-20">
              <img src="https://sacredheartkoderma.org/wp-content/uploads/2021/07/logo-150x150.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-2xl font-black uppercase tracking-tight">Sacred Heart School, Telaiya Dam</h1>
-          <p className="text-[10px] font-bold">(Affiliated to CBSE, New Delhi | An ISO Certified Institution)</p>
-          <div className="mt-4 border-b-4 border-black inline-block px-12 pb-1">
-            <h2 className="text-xl font-black uppercase tracking-[0.1em]">Weekly Academic Syllabus Digest</h2>
+          <h1 className="text-3xl font-black uppercase tracking-tight">Sacred Heart School, Telaiya Dam</h1>
+          <p className="text-xs font-bold">(Affiliated to CBSE, New Delhi | An ISO Certified Institution)</p>
+          <div className="mt-6 border-b-4 border-black inline-block px-16 pb-2">
+            <h2 className="text-2xl font-black uppercase tracking-[0.15em]">Weekly Syllabus Digest</h2>
           </div>
         </div>
 
         {/* Audit Details */}
-        <div className="grid grid-cols-2 gap-y-2 mb-6 text-[11px] font-bold italic">
-          <div className="flex border-b border-black/10 pb-1"><span className="w-48 font-black uppercase not-italic">Week Starting</span>: {startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} (Monday)</div>
-          <div className="flex border-b border-black/10 pb-1"><span className="w-48 font-black uppercase not-italic">Week Ending</span>: {endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} (Saturday)</div>
-          <div className="flex border-b border-black/10 pb-1"><span className="w-48 font-black uppercase not-italic">Target Class</span>: {className} - {sectionName}</div>
-          <div className="flex border-b border-black/10 pb-1"><span className="w-48 font-black uppercase not-italic">Class Teacher</span>: {sectionTeacher?.name || 'N/A'}</div>
+        <div className="grid grid-cols-2 gap-y-3 mb-10 text-[12px] font-bold italic">
+          <div className="flex border-b border-black/10 pb-2"><span className="w-52 font-black uppercase not-italic">From Date</span>: {startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} (Monday)</div>
+          <div className="flex border-b border-black/10 pb-2"><span className="w-52 font-black uppercase not-italic">To Date</span>: {endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} (Saturday)</div>
+          <div className="flex border-b border-black/10 pb-2"><span className="w-52 font-black uppercase not-italic">Target Class</span>: {className} - {sectionName}</div>
+          <div className="flex border-b border-black/10 pb-2"><span className="w-52 font-black uppercase not-italic">Class Teacher</span>: {sectionTeacher?.name || 'NOT ASSIGNED'}</div>
         </div>
 
         {/* Master Syllabus Table */}
-        <table className="w-full border-collapse border-[2px] border-black text-[10px]">
+        <table className="w-full border-collapse border-[2px] border-black text-[11px]">
           <thead className="bg-slate-50">
             <tr>
-              <th className="border-[2px] border-black p-2.5 text-left w-32 uppercase font-black">Subject</th>
-              <th className="border-[2px] border-black p-2.5 text-left w-36 uppercase font-black">Faculty</th>
-              <th className="border-[2px] border-black p-2.5 text-left w-40 uppercase font-black">Chapter</th>
-              <th className="border-[2px] border-black p-2.5 text-left uppercase font-black">Topics to be Taught</th>
-              <th className="border-[2px] border-black p-2.5 text-left w-48 uppercase font-black">Homework / Assignment</th>
+              <th className="border-[2px] border-black p-3 text-left w-36 uppercase font-black">Subject</th>
+              <th className="border-[2px] border-black p-3 text-left w-40 uppercase font-black">Faculty Member</th>
+              <th className="border-[2px] border-black p-3 text-left w-44 uppercase font-black">Chapter</th>
+              <th className="border-[2px] border-black p-3 text-left uppercase font-black">Topics & Objectives</th>
+              <th className="border-[2px] border-black p-3 text-left w-56 uppercase font-black">Home Assignments</th>
             </tr>
           </thead>
           <tbody>
@@ -79,46 +79,45 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, sectionNam
               const plan = plans.find(p => 
                 p.teacherId === asgn.teacher.id && 
                 p.className === className && 
-                // Note: TeacherForm might submit to 'sections' array, but for report we check if this section is included
                 p.subject === asgn.subject &&
                 p.weekStarting === weekStarting
               );
 
               return (
                 <tr key={idx} className="align-top">
-                  <td className="border-[2px] border-black p-2.5 font-black bg-slate-50/30">{asgn.subject}</td>
-                  <td className="border-[2px] border-black p-2.5 font-bold uppercase">{asgn.teacher.name}</td>
-                  <td className={`border-[2px] border-black p-2.5 uppercase font-black ${!plan ? 'text-red-600' : ''}`}>
+                  <td className="border-[2px] border-black p-3 font-black bg-slate-50/40 uppercase">{asgn.subject}</td>
+                  <td className="border-[2px] border-black p-3 font-bold uppercase">{asgn.teacher.name}</td>
+                  <td className={`border-[2px] border-black p-3 uppercase font-black ${!plan ? 'text-red-600' : ''}`}>
                     {plan ? plan.chapter : 'LESSON PLAN PENDING'}
                   </td>
-                  <td className={`border-[2px] border-black p-2.5 whitespace-pre-wrap leading-tight font-semibold ${!plan ? 'text-red-600 italic' : ''}`}>
-                    {plan ? plan.topics : 'No data submitted for this section for the upcoming week.'}
+                  <td className={`border-[2px] border-black p-3 whitespace-pre-wrap leading-tight font-semibold ${!plan ? 'text-red-600 italic' : ''}`}>
+                    {plan ? plan.topics : 'Data not available for the upcoming reporting period.'}
                   </td>
-                  <td className={`border-[2px] border-black p-2.5 whitespace-pre-wrap leading-tight font-medium ${!plan ? 'text-red-600 font-black' : ''}`}>
+                  <td className={`border-[2px] border-black p-3 whitespace-pre-wrap leading-tight font-medium ${!plan ? 'text-red-600 font-black' : ''}`}>
                     {plan ? plan.homework : 'PENDING'}
                   </td>
                 </tr>
               );
             }) : (
               <tr>
-                <td colSpan={5} className="border-2 border-black p-12 text-center text-slate-400 font-black uppercase italic">
-                  No subject specialist assigned for {className}-{sectionName}.
+                <td colSpan={5} className="border-2 border-black p-20 text-center text-slate-400 font-black uppercase italic tracking-widest">
+                  Academic mapping required for Class {className}-{sectionName}.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
 
-        {/* Footer Auth */}
-        <div className="mt-12 flex justify-between items-end px-4">
-           <div className="text-center border-t border-black pt-1 w-32 font-black text-[8px] uppercase">Class Teacher</div>
-           <div className="text-center border-t border-black pt-1 w-32 font-black text-[8px] uppercase">Coordinator</div>
-           <div className="text-center border-t border-black pt-1 w-32 font-black text-[8px] uppercase">Principal</div>
+        {/* Institutional Signature Block */}
+        <div className="mt-20 flex justify-between items-end px-10">
+           <div className="text-center border-t-2 border-black pt-2 w-48 font-black text-[10px] uppercase tracking-tighter">Authorized Class Teacher</div>
+           <div className="text-center border-t-2 border-black pt-2 w-48 font-black text-[10px] uppercase tracking-tighter">Academic Coordinator</div>
+           <div className="text-center border-t-2 border-black pt-2 w-48 font-black text-[10px] uppercase tracking-tighter">Principal / H.M Seal</div>
         </div>
       </div>
       
-      <div className="mt-2 text-[8px] text-slate-400 font-bold uppercase text-center tracking-[0.3em] print:hidden">
-        Digital Academic Record • Sacred Heart Cloud
+      <div className="mt-4 text-[9px] text-slate-400 font-bold uppercase text-center tracking-[0.5em] print:hidden">
+        Institutional Record • Sacred Heart Cloud Hub • Digitally Validated
       </div>
     </div>
   );
