@@ -1,4 +1,5 @@
 
+// ... existing imports ...
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Zap, AlertCircle, Users, Printer, History, Key, 
@@ -14,6 +15,7 @@ import AdminCompiler from './components/AdminCompiler';
 import TeacherForm from './components/TeacherForm';
 
 const App: React.FC = () => {
+  // ... existing state ...
   const [state, setState] = useState<AppState>({ 
     currentUser: null, 
     teachers: [], 
@@ -176,7 +178,7 @@ const App: React.FC = () => {
           <div className="flex justify-center flex-wrap gap-2 print-hidden">
             {[
               { id: 'registry', label: 'Faculty Registry', icon: Users },
-              { id: 'compile', label: 'Compiler', icon: Printer },
+              { id: 'compile', label: 'Pdf Compilation', icon: Printer },
               { id: 'requests', label: `Edit Requests ${pendingRequests.length > 0 ? `(${pendingRequests.length})` : ''}`, icon: AlertCircle },
               { id: 'plans', label: 'AI Audit', icon: Zap },
               { id: 'history', label: 'Archive', icon: History },

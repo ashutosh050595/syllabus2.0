@@ -35,7 +35,7 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, sectionNam
   targetAssignments.sort((a, b) => a.subject.localeCompare(b.subject));
 
   return (
-    <div className="bg-white text-black p-0 w-full font-serif" style={{ minHeight: '297mm', width: '210mm', padding: '15mm', margin: '0 auto' }}>
+    <div className="bg-white text-black p-0 w-full font-serif" id="report-preview" style={{ minHeight: '297mm', width: '210mm', padding: '15mm', margin: '0 auto' }}>
       <div className="border-[1.5px] border-black p-10 h-full relative">
         {/* Header Block */}
         <div className="text-center mb-10">
@@ -89,8 +89,8 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, sectionNam
                   <td className={`border border-black p-2.5 whitespace-pre-wrap leading-tight ${!plan ? 'text-red-500 italic' : ''}`}>
                     {plan ? plan.topics : 'Weekly plan not yet submitted by faculty.'}
                   </td>
-                  <td className={`border border-black p-2.5 whitespace-pre-wrap leading-tight ${!plan ? 'text-red-500' : ''}`}>
-                    {plan ? plan.homework : 'NOT ASSIGNED'}
+                  <td className={`border border-black p-2.5 whitespace-pre-wrap leading-tight ${!plan ? 'text-red-600 font-bold italic' : ''}`}>
+                    {plan ? plan.homework : 'Homework Pending'}
                   </td>
                 </tr>
               );

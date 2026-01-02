@@ -16,7 +16,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, onRefresh, is
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f8fafc]">
-      <header className="sticky top-0 z-50 px-4 sm:px-6 lg:px-8 py-4">
+      <header className="sticky top-0 z-50 px-4 sm:px-6 lg:px-8 py-4 print-hidden">
         <div className="max-w-7xl mx-auto bg-white border border-slate-200 rounded-3xl px-8 py-4 shadow-sm flex justify-between items-center">
           <div className="flex items-center space-x-5">
             <div className="bg-indigo-600 p-3 rounded-2xl shadow-indigo-200 shadow-lg">
@@ -69,7 +69,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, onRefresh, is
         {children}
       </main>
 
-      <footer className="py-12 text-center">
+      <footer className="py-12 text-center print-hidden">
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] opacity-60">
           Sacred Heart Koderma • Institutional Management Platform • {new Date().getFullYear()}
         </p>
