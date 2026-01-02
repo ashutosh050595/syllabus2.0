@@ -1,16 +1,16 @@
 
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, type User } from "firebase/auth";
-import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, query, where, orderBy, limit, addDoc, Timestamp } from "firebase/firestore";
+import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, query, where, orderBy, limit, addDoc } from "firebase/firestore";
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { FIREBASE_CONFIG, DEFAULT_TEACHER_PASSWORD } from "../constants";
-import { Teacher, LessonPlan, ClassName, LoginLog } from "../types";
+import { Teacher, LessonPlan, LoginLog } from "../types";
 
 const app = getApps().length > 0 ? getApp() : initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// UPDATED GAS URL PROVIDED BY USER
+// FULLY ACTIVATED GAS URL
 const GAS_WORKER_URL = "https://script.google.com/macros/s/AKfycbySZzxF_gOP2MRMp3jYJ9SgQypkgCpxb1EPKt88HfTV1ggrzxVQ_J96IP6LpTMedF-unQ/exec";
 
 export const APIService = {
@@ -30,10 +30,10 @@ export const APIService = {
           const newUser = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
           return { success: true, user: newUser.user };
         } catch (createError: any) {
-          return { success: false, message: "Credential Error. Contact Office." };
+          return { success: false, message: "Credential Error." };
         }
       }
-      return { success: false, message: "Security match failed. Please check your key." };
+      return { success: false, message: "Access Denied." };
     }
   },
 
@@ -64,8 +64,9 @@ export const APIService = {
   },
 
   async syncInitialTeachers(teachers: Teacher[]): Promise<void> {
-    const promises = teachers.map(t => setDoc(doc(db, "teachers", t.id), t));
-    await Promise.all(promises);
+    for (const t of teachers) {
+      await setDoc(doc(db, "teachers", t.id), t);
+    }
   },
 
   async fetchLessonPlans(teacherId?: string): Promise<LessonPlan[]> {
@@ -80,43 +81,24 @@ export const APIService = {
   },
 
   async saveLessonPlans(plans: LessonPlan[]): Promise<void> {
-    await Promise.all(plans.map(plan => setDoc(doc(db, "lessonPlans", plan.id), { ...plan, resubmissionStatus: 'none' })));
+    const promises = plans.map(plan => setDoc(doc(db, "lessonPlans", plan.id), { ...plan, resubmissionStatus: 'none' }));
+    await Promise.all(promises);
   },
 
   async emailDefaulters(defaulters: Teacher[], weekRange: string): Promise<void> {
-    try {
-      const response = await fetch(GAS_WORKER_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'bulk_defaulter_alert',
-          teachers: defaulters.map(d => ({ email: d.email, name: d.name })),
-          weekRange
-        })
-      });
-      console.log("Defaulter email request sent.");
-    } catch (e) {
-      console.error("GAS Error:", e);
-      throw e;
-    }
+    await fetch(GAS_WORKER_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({ action: 'bulk_defaulter_alert', teachers: defaulters.map(d => ({ email: d.email, name: d.name })), weekRange })
+    });
   },
 
   async sendCompiledToCT(teacher: Teacher, className: string, section: string, weekLabel: string): Promise<void> {
-    try {
-      await fetch(GAS_WORKER_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'send_to_ct',
-          email: teacher.email,
-          className,
-          section,
-          weekLabel
-        })
-      });
-    } catch (e) { console.error(e); }
+    await fetch(GAS_WORKER_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({ action: 'send_to_ct', email: teacher.email, className, section, weekLabel })
+    });
   },
 
   async requestResubmission(plan: LessonPlan, teacherEmail: string): Promise<void> {
@@ -128,10 +110,10 @@ export const APIService = {
     try {
       const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: `Audit Institutional Syllabus: ${JSON.stringify(plans.slice(0, 20))}`,
-        config: { systemInstruction: "Institutional Lead Auditor. Provide critical feedback on pedagogical clarity.", thinkingConfig: { thinkingBudget: 1000 } },
+        contents: `Audit Institutional Syllabus: ${JSON.stringify(plans.slice(0, 10))}`,
+        config: { systemInstruction: "Institutional Lead Auditor.", thinkingConfig: { thinkingBudget: 1000 } },
       });
-      return response.text || "AI Evaluation interrupted.";
-    } catch (e) { return "AI Engine Busy."; }
+      return response.text || "Audit failed.";
+    } catch (e) { return "AI Service Busy."; }
   }
 };

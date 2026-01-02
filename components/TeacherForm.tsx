@@ -26,7 +26,6 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
     }
   }, [activeView, teacher.id]);
 
-  // Group assignments by Class-Subject to show one card for multiple sections
   const uniqueGroups = teacher.assignments.reduce((acc, curr) => {
     const key = `${curr.className}-${curr.subject}`;
     if (!acc[key]) acc[key] = { className: curr.className, subject: curr.subject, sections: [] };
@@ -35,12 +34,13 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
   }, {} as Record<string, { className: ClassName, subject: string, sections: SectionName[] }>);
 
   const groupKeys = Object.keys(uniqueGroups);
-  const [formData, setFormData] = useState<Record<string, any>>(
-    groupKeys.reduce((acc, key) => ({ ...acc, [key]: { chapter: '', topics: '', homework: '' } }), {})
-  );
+  
+  const getInitialFormData = () => groupKeys.reduce((acc, key) => ({ ...acc, [key]: { chapter: '', topics: '', homework: '' } }), {});
+  const [formData, setFormData] = useState<Record<string, any>>(getInitialFormData());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const submissions = groupKeys.map(key => ({
@@ -56,10 +56,10 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
         weekLabel: currentWeekLabel
       }));
       await onSubmit(submissions);
-      alert("Weekly Syllabus Dispatch Successful!");
-      setFormData(groupKeys.reduce((acc, key) => ({ ...acc, [key]: { chapter: '', topics: '', homework: '' } }), {}));
+      setFormData(getInitialFormData());
+      alert("Weekly Syllabus Dispatched Successfully!");
     } catch (error) {
-      alert("Submission error. Please check your connection.");
+      alert("Connection Lost. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -109,7 +109,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
             );
           })}
           
-          <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-[11px] flex items-center justify-center gap-3">
+          <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 active:scale-[0.98] transition-transform">
             {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-4 w-4" />}
             {isSubmitting ? 'Dispatching...' : 'Dispatch Weekly Plans'}
           </button>
@@ -125,18 +125,8 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, onSubmit }) => {
                 </div>
                 <h4 className="text-sm font-black text-slate-800 italic">{plan.chapter}</h4>
               </div>
-              <button 
-                disabled={isRequesting === plan.id}
-                onClick={async () => {
-                   setIsRequesting(plan.id);
-                   await APIService.requestResubmission(plan, teacher.email);
-                   alert("Resubmit request sent to Admin.");
-                   setIsRequesting(null);
-                }} 
-                className="text-[9px] font-black uppercase text-indigo-600 border border-indigo-100 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-2"
-              >
-                {isRequesting === plan.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
-                Request Edit
+              <button disabled={isRequesting === plan.id} onClick={async () => { setIsRequesting(plan.id); await APIService.requestResubmission(plan, teacher.email); alert("Request sent."); setIsRequesting(null); }} className="text-[9px] font-black uppercase text-indigo-600 border border-indigo-100 bg-indigo-50 px-4 py-2 rounded-lg flex items-center gap-2 transition-all">
+                {isRequesting === plan.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />} Request Edit
               </button>
             </div>
           )) : (
