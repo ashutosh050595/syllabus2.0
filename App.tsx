@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Zap, AlertCircle, Users, Printer, History, Key, 
-  ShieldCheck, X, CheckCircle2, RefreshCw, Lock, Mail
+  ShieldCheck, X, CheckCircle2, RefreshCw, Lock, Mail, GraduationCap
 } from 'lucide-react';
 import { AppState, LessonPlan, Teacher } from './types';
 import { APIService } from './services/api';
@@ -23,19 +23,27 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  
+  // Login Form States
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
   const upcomingMonday = getUpcomingMonday();
   const weekLabel = getWeekLabel(upcomingMonday);
 
-  const fetchData = useCallback(async () => {
-    if (!state.currentUser) return;
+  // Memoized data fetcher
+  const fetchData = useCallback(async (userOverride?: any) => {
+    const user = userOverride || state.currentUser;
+    if (!user) return;
+    
     setIsSyncing(true);
     try {
-      const teachers = await APIService.fetchTeachers();
-      const plans = await APIService.fetchLessonPlans();
-      const logs = await APIService.fetchLoginLogs();
+      const [teachers, plans, logs] = await Promise.all([
+        APIService.fetchTeachers(),
+        APIService.fetchLessonPlans(),
+        APIService.fetchLoginLogs()
+      ]);
+      
       setState(prev => ({
         ...prev,
         teachers,
@@ -50,20 +58,29 @@ const App: React.FC = () => {
     }
   }, [state.currentUser]);
 
+  // Initial Auth & Teacher Load
   useEffect(() => {
-    // Initial Auth Check
-    const savedUser = localStorage.getItem('shs_user');
-    if (savedUser) {
-      setState(prev => ({ ...prev, currentUser: JSON.parse(savedUser) }));
-    }
-    setIsAuthenticating(false);
-  }, []);
+    const initApp = async () => {
+      try {
+        // Load teachers first to allow teacher login check
+        const teachers = await APIService.fetchTeachers();
+        setState(prev => ({ ...prev, teachers }));
 
-  useEffect(() => {
-    if (state.currentUser) {
-      fetchData();
-    }
-  }, [state.currentUser, fetchData]);
+        const savedUser = localStorage.getItem('shs_user');
+        if (savedUser) {
+          const parsedUser = JSON.parse(savedUser);
+          setState(prev => ({ ...prev, currentUser: parsedUser }));
+          // Fetch the rest of the data if logged in
+          await fetchData(parsedUser);
+        }
+      } catch (e) {
+        console.error("Initialization Error", e);
+      } finally {
+        setIsAuthenticating(false);
+      }
+    };
+    initApp();
+  }, [fetchData]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,12 +88,14 @@ const App: React.FC = () => {
       const user = 'admin' as const;
       setState(prev => ({ ...prev, currentUser: user }));
       localStorage.setItem('shs_user', JSON.stringify(user));
+      fetchData(user);
     } else {
       const teacher = state.teachers.find(t => t.email === loginEmail);
       const expectedPass = teacher?.password || DEFAULT_TEACHER_PASSWORD;
       if (teacher && loginPassword === expectedPass) {
         setState(prev => ({ ...prev, currentUser: teacher }));
         localStorage.setItem('shs_user', JSON.stringify(teacher));
+        fetchData(teacher);
       } else {
         alert("Invalid credentials. Please contact Administrator.");
       }
@@ -104,17 +123,19 @@ const App: React.FC = () => {
     }
   };
 
+  // 1. Loading State
   if (isAuthenticating) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
           <RefreshCw className="h-10 w-10 text-indigo-600 animate-spin" />
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Booting Infrastructure...</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Sacred Heart Infrastructure Booting...</p>
         </div>
       </div>
     );
   }
 
+  // 2. Login Screen
   if (!state.currentUser) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
@@ -123,8 +144,8 @@ const App: React.FC = () => {
             <div className="inline-flex p-4 bg-indigo-600 rounded-3xl shadow-lg shadow-indigo-100 mb-6">
               <ShieldCheck className="h-8 w-8 text-white" />
             </div>
-            <h2 className="text-2xl font-black uppercase italic tracking-tighter">Sacred Heart Hub</h2>
-            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] mt-2">Institutional Access Only</p>
+            <h2 className="text-2xl font-black uppercase italic tracking-tighter">Institutional Hub</h2>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] mt-2">Faculty Authorization Required</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="relative">
@@ -137,18 +158,22 @@ const App: React.FC = () => {
             </div>
             <button type="submit" className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-indigo-100 uppercase tracking-[0.2em] text-xs hover:bg-indigo-700 transition-all">Authorize Access</button>
           </form>
+          <div className="mt-8 text-center">
+             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sacred Heart School Telaiya</p>
+          </div>
         </div>
       </div>
     );
   }
 
+  // 3. Main Dashboard Rendering
   const pendingRequests = state.lessonPlans.filter(p => p.resubmissionStatus === 'pending');
 
   return (
     <Layout 
       user={state.currentUser} 
       onLogout={handleLogout}
-      onRefresh={fetchData}
+      onRefresh={() => fetchData()}
       isSyncing={isSyncing}
       lastSynced={lastSynced}
     >
@@ -170,7 +195,7 @@ const App: React.FC = () => {
           </div>
 
           {activeTab === 'requests' && (
-            <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
+            <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-8 animate-in slide-in-from-bottom-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-xl font-black uppercase italic tracking-tight">Pending Edit Requests</h3>
                 <span className="bg-rose-50 text-rose-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">{pendingRequests.length} Pending</span>
@@ -213,17 +238,17 @@ const App: React.FC = () => {
           )}
           
           {activeTab === 'plans' && (
-            <div className="p-20 border-2 border-dashed border-slate-100 rounded-[3rem] text-center">
+            <div className="bg-white p-20 rounded-[3rem] border border-slate-200 shadow-sm text-center">
               <Zap className="h-12 w-12 text-indigo-600 mx-auto mb-6" />
-              <h3 className="text-xl font-black uppercase italic italic tracking-tight mb-2">AI Syllabus Audit</h3>
-              <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Select a class to audit weekly compliance.</p>
+              <h3 className="text-xl font-black uppercase italic tracking-tight mb-2">AI Syllabus Audit Engine</h3>
+              <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest max-w-sm mx-auto">This module audits lesson plans against the institutional syllabus to ensure compliance.</p>
             </div>
           )}
         </div>
       ) : (
         <TeacherForm 
           teacher={state.currentUser as Teacher} 
-          history={state.lessonPlans.filter(p => p.teacherId === (state.currentUser as Teacher).id)} 
+          history={state.lessonPlans.filter(p => p.teacherId === (state.currentUser as Teacher).id || p.teacherName === (state.currentUser as Teacher).name)} 
         />
       )}
     </Layout>
