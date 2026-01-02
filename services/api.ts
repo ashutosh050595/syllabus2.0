@@ -7,23 +7,38 @@ import { LessonPlan, Teacher, LoginLog } from "../types";
 const app = !getApps().length ? initializeApp(FIREBASE_CONFIG) : getApp();
 const db = getFirestore(app);
 
-// IMPORTANT: Ensure your Google Apps Script is deployed as "Anyone, even anonymous"
+// IMPORTANT: Replace this placeholder with your deployed Google Apps Script URL
 const GAS_WORKER_URL = 'https://script.google.com/macros/s/AKfycby_placeholder/exec';
 
 export const APIService = {
   async fetchTeachers(): Promise<Teacher[]> {
-    const querySnapshot = await getDocs(collection(db, "teachers"));
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teacher));
+    try {
+      const querySnapshot = await getDocs(collection(db, "teachers"));
+      return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Teacher));
+    } catch (e) {
+      console.error("Error fetching teachers:", e);
+      return [];
+    }
   },
 
   async fetchLessonPlans(): Promise<LessonPlan[]> {
-    const querySnapshot = await getDocs(collection(db, "lessonPlans"));
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LessonPlan));
+    try {
+      const querySnapshot = await getDocs(collection(db, "lessonPlans"));
+      return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as LessonPlan));
+    } catch (e) {
+      console.error("Error fetching lesson plans:", e);
+      return [];
+    }
   },
 
   async fetchLoginLogs(): Promise<LoginLog[]> {
-    const querySnapshot = await getDocs(collection(db, "loginLogs"));
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LoginLog));
+    try {
+      const querySnapshot = await getDocs(collection(db, "loginLogs"));
+      return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as LoginLog));
+    } catch (e) {
+      console.error("Error fetching login logs:", e);
+      return [];
+    }
   },
 
   async submitMultiplePlans(plans: Omit<LessonPlan, 'id' | 'submittedAt'>[]): Promise<void> {
@@ -31,7 +46,11 @@ export const APIService = {
     const timestamp = new Date().toISOString();
     
     plans.forEach(plan => {
-      const id = `${plan.teacherId}_${plan.className}_${plan.section}_${plan.subject}_${plan.weekStarting}`.replace(/\s+/g, '_');
+      // Create a specific ID to prevent duplicates: teacher_class_section_subject_week
+      const id = `${plan.teacherId}_${plan.className}_${plan.section}_${plan.subject}_${plan.weekStarting}`
+        .replace(/[@.]/g, '_')
+        .replace(/\s+/g, '');
+      
       const planRef = doc(db, "lessonPlans", id);
       batch.set(planRef, {
         ...plan,
@@ -40,11 +59,12 @@ export const APIService = {
       });
     });
 
-    // Commit to DB first
+    // CRITICAL: Await the batch commit before doing anything else
     await batch.commit();
 
-    // Fire Email Notification in background (Do not await to prevent UI hang)
-    if (plans.length > 0) {
+    // Trigger Email Notification in background (fire and forget)
+    // We don't await this to ensure the UI updates immediately after DB success
+    if (plans.length > 0 && GAS_WORKER_URL && !GAS_WORKER_URL.includes('placeholder')) {
       const emailPayload = {
         action: 'submission_alert',
         teacherEmail: plans[0].teacherId,
@@ -53,12 +73,12 @@ export const APIService = {
         summary: plans.map(p => `${p.className}-${p.section} (${p.subject})`).join(', ')
       };
 
-      // Use a background fetch that won't block the UI success message
       fetch(GAS_WORKER_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Use text/plain to avoid CORS preflight for GAS
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(emailPayload)
-      }).catch(e => console.debug("Email background task initiated."));
+      }).catch(err => console.debug("Email ping skipped or failed:", err.message));
     }
   },
 
@@ -83,21 +103,37 @@ export const APIService = {
     await batch.commit();
   },
 
-  // Fix: Added triggerDefaulterReminders to satisfy usage in AdminRegistry.tsx
   async triggerDefaulterReminders(): Promise<void> {
+    if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
     await fetch(GAS_WORKER_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      mode: 'no-cors',
       body: JSON.stringify({ action: 'trigger_defaulter_warnings' })
     });
   },
 
-  // Fix: Added compileAndSendReports to satisfy usage in AdminCompiler.tsx
   async compileAndSendReports(): Promise<void> {
+    if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
     await fetch(GAS_WORKER_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      mode: 'no-cors',
       body: JSON.stringify({ action: 'compile_reports' })
     });
+  },
+
+  async requestResubmission(plan: LessonPlan, teacherEmail: string): Promise<void> {
+    await setDoc(doc(db, "lessonPlans", plan.id), { ...plan, resubmissionStatus: 'pending' }, { merge: true });
+    if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
+    fetch(GAS_WORKER_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({ 
+        action: 'request_resubmit', 
+        planId: plan.id, 
+        teacherName: plan.teacherName, 
+        teacherEmail: teacherEmail, 
+        weekRange: plan.weekLabel 
+      })
+    }).catch(() => {});
   }
 };
