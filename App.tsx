@@ -1,5 +1,4 @@
 
-// ... existing imports ...
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Zap, AlertCircle, Users, Printer, History, Key, 
@@ -15,7 +14,6 @@ import AdminCompiler from './components/AdminCompiler';
 import TeacherForm from './components/TeacherForm';
 
 const App: React.FC = () => {
-  // ... existing state ...
   const [state, setState] = useState<AppState>({ 
     currentUser: null, 
     teachers: [], 
@@ -37,17 +35,23 @@ const App: React.FC = () => {
     
     setIsSyncing(true);
     try {
-      const [teachers, plans, logs] = await Promise.all([
+      // Teachers should not attempt to fetch admin logs to prevent permission errors/hangs
+      const fetchPromises: any[] = [
         APIService.fetchTeachers(),
-        APIService.fetchLessonPlans(),
-        APIService.fetchLoginLogs()
-      ]);
+        APIService.fetchLessonPlans()
+      ];
+
+      if (user === 'admin') {
+        fetchPromises.push(APIService.fetchLoginLogs());
+      }
+
+      const results = await Promise.all(fetchPromises);
       
       setState(prev => ({
         ...prev,
-        teachers,
-        lessonPlans: plans,
-        loginLogs: logs
+        teachers: results[0],
+        lessonPlans: results[1],
+        loginLogs: user === 'admin' ? results[2] : []
       }));
       setLastSynced(new Date());
     } catch (e) {
@@ -64,16 +68,35 @@ const App: React.FC = () => {
         if (savedUser) {
           const parsedUser = JSON.parse(savedUser);
           setState(prev => ({ ...prev, currentUser: parsedUser }));
-          fetchData(parsedUser);
+          
+          const fetchPromises: any[] = [
+            APIService.fetchTeachers(),
+            APIService.fetchLessonPlans(),
+          ];
+          
+          if (parsedUser === 'admin') {
+            fetchPromises.push(APIService.fetchLoginLogs());
+          }
+          
+          const results = await Promise.all(fetchPromises);
+          
+          setState(prev => ({ 
+            ...prev, 
+            teachers: results[0], 
+            lessonPlans: results[1], 
+            loginLogs: parsedUser === 'admin' ? results[2] : [] 
+          }));
+          setLastSynced(new Date());
         }
       } catch (e) {
+        console.error("Auth init error:", e);
         localStorage.removeItem('shs_user');
       } finally {
-        setTimeout(() => setIsAuthenticating(false), 800);
+        setIsAuthenticating(false);
       }
     };
     init();
-  }, [fetchData]);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,7 +112,6 @@ const App: React.FC = () => {
           return;
         } else {
           alert("Admin Access Denied.");
-          setIsSyncing(false);
           return;
         }
       }
@@ -99,18 +121,19 @@ const App: React.FC = () => {
         currentTeachers = await APIService.fetchTeachers();
       }
 
-      const teacher = currentTeachers.find(t => t.email.toLowerCase() === loginEmail.toLowerCase());
+      const teacher = currentTeachers.find(t => t.email.toLowerCase().trim() === loginEmail.toLowerCase().trim());
       const expectedPass = teacher?.password || DEFAULT_TEACHER_PASSWORD;
 
       if (teacher && loginPassword === expectedPass) {
-        setState(prev => ({ ...prev, currentUser: teacher }));
+        setState(prev => ({ ...prev, currentUser: teacher, teachers: currentTeachers }));
         localStorage.setItem('shs_user', JSON.stringify(teacher));
         await fetchData(teacher);
       } else {
         alert("Teacher Login Failed: Check credentials.");
       }
     } catch (err) {
-      alert("Connection error.");
+      console.error("Login error:", err);
+      alert("Connection error. Please check your internet.");
     } finally {
       setIsSyncing(false);
     }
@@ -153,8 +176,8 @@ const App: React.FC = () => {
             <form onSubmit={handleLogin} className="space-y-4">
               <input type="email" placeholder="Email Address" required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
               <input type="password" placeholder="Access Code" required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} />
-              <button type="submit" disabled={isSyncing} className={`w-full font-black py-4 rounded-2xl shadow-xl uppercase tracking-widest text-xs transition-all ${loginMode === 'admin' ? 'bg-slate-900 text-white' : 'bg-indigo-600 text-white'}`}>
-                {isSyncing ? <RefreshCw className="h-4 w-4 animate-spin mx-auto" /> : 'Authorize Access'}
+              <button type="submit" disabled={isSyncing} className={`w-full font-black py-4 rounded-2xl shadow-xl uppercase tracking-widest text-xs transition-all flex items-center justify-center ${loginMode === 'admin' ? 'bg-slate-900 text-white' : 'bg-indigo-600 text-white'}`}>
+                {isSyncing ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Authorize Access'}
               </button>
             </form>
           </div>

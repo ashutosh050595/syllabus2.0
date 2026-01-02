@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -35,26 +36,20 @@
           margin: 0; 
         }
         
-        /* Strict isolation: Hide everything except the target container */
-        html, body {
-          background: white !important;
-          margin: 0 !important;
-          padding: 0 !important;
-        }
-
-        /* Hide all UI elements except the report preview */
-        header, footer, nav, button, .print-hidden, .mesh-bg {
+        /* 1. Hide everything by default */
+        html, body, #root, header, footer, nav, button, .print-hidden, .mesh-bg {
           display: none !important;
           visibility: hidden !important;
-          opacity: 0 !important;
           height: 0 !important;
           margin: 0 !important;
           padding: 0 !important;
         }
 
-        #root {
-          padding: 0 !important;
-          margin: 0 !important;
+        /* 2. Show only the report and its parents as blocks */
+        html, body, #root, div:has(> #report-preview) {
+          display: block !important;
+          visibility: visible !important;
+          height: auto !important;
           background: white !important;
         }
 
@@ -79,7 +74,7 @@
           visibility: visible !important;
         }
 
-        /* High-fidelity table print styles */
+        /* Table Fidelity */
         table { 
           border-collapse: collapse !important; 
           width: 100% !important; 
@@ -90,11 +85,6 @@
           padding: 8pt !important; 
           color: black !important; 
           -webkit-print-color-adjust: exact;
-        }
-        .text-red-600 { 
-          color: #dc2626 !important; 
-          font-weight: bold !important; 
-          font-style: italic !important; 
         }
       }
     </style>

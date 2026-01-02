@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { LessonPlan, Teacher, ClassName, SectionName } from '../types';
 
@@ -74,7 +75,7 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, sectionNam
               const plan = plans.find(p => 
                 p.teacherId === asgn.teacher.id && 
                 p.className === className && 
-                p.section === sectionName && // CRITICAL: Must filter by section to identify pending homework correctly
+                p.section === sectionName && 
                 p.subject === asgn.subject &&
                 p.weekStarting === weekStarting
               );
@@ -101,10 +102,19 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, sectionNam
         {/* Footer Signatures */}
         <div className="mt-24 flex justify-between font-bold text-[14px]">
            <div className="text-center">
-              <div className="w-48 border-t border-black pt-1">Class Teacher Signature</div>
+              <div className="w-48 border-t border-black pt-2">
+                CLASS TEACHER
+              </div>
            </div>
            <div className="text-center">
-              <div className="w-48 border-t border-black pt-1">Principal Signature</div>
+              <div className="w-48 border-t border-black pt-2">
+                CO-ORDINATOR
+              </div>
+           </div>
+           <div className="text-center">
+              <div className="w-48 border-t border-black pt-2">
+                PRINCIPAL
+              </div>
            </div>
         </div>
       </div>
@@ -112,4 +122,5 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, sectionNam
   );
 };
 
+// Fixed: Added missing default export to satisfy AdminCompiler.tsx import
 export default PrintableReport;
