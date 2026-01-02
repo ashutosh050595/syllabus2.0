@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Loader2, RefreshCcw, Send, ClipboardList, BookOpen, CheckCircle2 } from 'lucide-react';
+import { Loader2, RefreshCcw, Send, ClipboardList, BookOpen, CheckCircle2, CheckSquare, Square } from 'lucide-react';
 import { Teacher, LessonPlan, ClassName, SectionName } from '../types';
 import { APIService } from '../services/api';
 import { getUpcomingMonday, formatDate, getNextSaturday, getWeekLabel } from '../utils';
@@ -19,46 +19,75 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
   const [isRequesting, setIsRequesting] = useState<string | null>(null);
   const [submittedThisWeek, setSubmittedThisWeek] = useState(false);
 
+  // Flatten assignments into individual class-section-subject options
+  const assignmentOptions = teacher.assignments.flatMap((asgn, asgnIdx) => 
+    asgn.sections.map(sec => ({
+      id: `${asgnIdx}-${sec}`,
+      className: asgn.className,
+      section: sec,
+      subject: asgn.subject,
+      label: `${asgn.subject} (Class ${asgn.className}-${sec})`
+    }))
+  );
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [formData, setFormData] = useState({
-    assignmentIndex: 0,
-    section: (teacher.assignments[0]?.sections[0] || 'A') as SectionName,
     chapter: '',
     topics: '',
     homework: ''
   });
 
-  const currentAssignment = teacher.assignments[formData.assignmentIndex];
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const selectAll = () => {
+    if (selectedIds.length === assignmentOptions.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(assignmentOptions.map(opt => opt.id));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentAssignment) return;
+    if (selectedIds.length === 0) {
+      alert("Please select at least one class/section.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const plan: Omit<LessonPlan, 'id' | 'submittedAt'> = {
-        teacherId: teacher.id,
-        teacherName: teacher.name,
-        className: currentAssignment.className,
-        section: formData.section,
-        subject: currentAssignment.subject,
-        dateFrom: formatDate(upcomingMonday),
-        dateTo: formatDate(nextSaturday),
-        chapter: formData.chapter,
-        topics: formData.topics,
-        homework: formData.homework,
-        weekStarting: upcomingMonday.toISOString(),
-        weekLabel: weekLabel,
-        resubmissionStatus: 'none'
-      };
+      const plansToSubmit = selectedIds.map(id => {
+        const option = assignmentOptions.find(o => o.id === id)!;
+        return {
+          teacherId: teacher.email, // using email as ID consistency
+          teacherName: teacher.name,
+          className: option.className,
+          section: option.section,
+          subject: option.subject,
+          dateFrom: formatDate(upcomingMonday),
+          dateTo: formatDate(nextSaturday),
+          chapter: formData.chapter,
+          topics: formData.topics,
+          homework: formData.homework,
+          weekStarting: upcomingMonday.toISOString(),
+          weekLabel: weekLabel,
+          resubmissionStatus: 'none' as const
+        };
+      });
 
-      // In a real app, we'd use Firestore's auto-ID, here we pass it to APIService
-      const newPlanId = `lp-${Date.now()}`;
-      await APIService.requestResubmission({ ...plan, id: newPlanId, submittedAt: new Date().toISOString() } as LessonPlan, teacher.email);
+      await APIService.submitMultiplePlans(plansToSubmit);
       
       setSubmittedThisWeek(true);
-      alert("Lesson plan submitted successfully!");
+      // Reset form
+      setFormData({ chapter: '', topics: '', homework: '' });
+      setSelectedIds([]);
     } catch (error) {
-      alert("Submission failed. Please try again.");
+      console.error("Submission error:", error);
+      alert("Submission failed. Please check your internet connection.");
     } finally {
       setIsSubmitting(false);
     }
@@ -71,7 +100,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
           <CheckCircle2 className="h-16 w-16 text-emerald-500" />
         </div>
         <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-4">Submission Complete</h2>
-        <p className="text-slate-500 font-medium mb-10">Your lesson plan for {weekLabel} has been securely logged.</p>
+        <p className="text-slate-500 font-medium mb-10">Your lesson plans for {weekLabel} have been securely logged.</p>
         <button onClick={() => setSubmittedThisWeek(false)} className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-100">Submit Another</button>
       </div>
     );
@@ -90,30 +119,38 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Subject & Class</label>
-              <select 
-                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-all"
-                value={formData.assignmentIndex}
-                onChange={e => setFormData({ ...formData, assignmentIndex: parseInt(e.target.value) })}
+          <div className="space-y-3">
+            <div className="flex justify-between items-end px-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Select Target Classes & Sections</label>
+              <button 
+                type="button" 
+                onClick={selectAll}
+                className="text-[9px] font-black uppercase text-indigo-600 hover:underline"
               >
-                {teacher.assignments.map((asgn, idx) => (
-                  <option key={idx} value={idx}>{asgn.subject} (Class {asgn.className})</option>
-                ))}
-              </select>
+                {selectedIds.length === assignmentOptions.length ? 'Deselect All' : 'Select All'}
+              </button>
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Section</label>
-              <select 
-                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-all"
-                value={formData.section}
-                onChange={e => setFormData({ ...formData, section: e.target.value as SectionName })}
-              >
-                {currentAssignment?.sections.map(s => (
-                  <option key={s} value={s}>Section {s}</option>
-                ))}
-              </select>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 scrollbar-thin">
+              {assignmentOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => toggleSelection(opt.id)}
+                  className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                    selectedIds.includes(opt.id) 
+                      ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' 
+                      : 'bg-slate-50 border-slate-100 text-slate-500 hover:border-slate-200'
+                  }`}
+                >
+                  {selectedIds.includes(opt.id) ? (
+                    <CheckSquare className="h-4 w-4 shrink-0" />
+                  ) : (
+                    <Square className="h-4 w-4 shrink-0" />
+                  )}
+                  <span className="text-[10px] font-black uppercase truncate">{opt.label}</span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -158,7 +195,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
           <button 
             type="submit" 
             disabled={isSubmitting}
-            className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-indigo-100 uppercase tracking-[0.2em] text-xs hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
+            className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-indigo-100 uppercase tracking-[0.2em] text-xs hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="h-4 w-4" /> Finalize Submission</>}
           </button>
