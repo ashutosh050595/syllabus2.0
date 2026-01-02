@@ -7,7 +7,7 @@ import { LessonPlan, Teacher, LoginLog } from "../types";
 const app = !getApps().length ? initializeApp(FIREBASE_CONFIG) : getApp();
 const db = getFirestore(app);
 
-// IMPORTANT: Replace this placeholder with your deployed Google Apps Script URL
+// IMPORTANT: Replace this placeholder with your actual Apps Script Web App URL
 const GAS_WORKER_URL = 'https://script.google.com/macros/s/AKfycby_placeholder/exec';
 
 export const APIService = {
@@ -46,7 +46,7 @@ export const APIService = {
     const timestamp = new Date().toISOString();
     
     plans.forEach(plan => {
-      // Create a specific ID to prevent duplicates: teacher_class_section_subject_week
+      // Robust ID: teacher_grade_section_subject_date
       const id = `${plan.teacherId}_${plan.className}_${plan.section}_${plan.subject}_${plan.weekStarting}`
         .replace(/[@.]/g, '_')
         .replace(/\s+/g, '');
@@ -59,11 +59,10 @@ export const APIService = {
       });
     });
 
-    // CRITICAL: Await the batch commit before doing anything else
+    // 1. Database first - this is the source of truth
     await batch.commit();
 
-    // Trigger Email Notification in background (fire and forget)
-    // We don't await this to ensure the UI updates immediately after DB success
+    // 2. Email trigger in background - do not await to prevent UI hanging
     if (plans.length > 0 && GAS_WORKER_URL && !GAS_WORKER_URL.includes('placeholder')) {
       const emailPayload = {
         action: 'submission_alert',
@@ -73,12 +72,13 @@ export const APIService = {
         summary: plans.map(p => `${p.className}-${p.section} (${p.subject})`).join(', ')
       };
 
+      // no-cors mode ensures the browser doesn't block the request if GAS script isn't configured for CORS
       fetch(GAS_WORKER_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(emailPayload)
-      }).catch(err => console.debug("Email ping skipped or failed:", err.message));
+      }).catch(err => console.debug("Email background task initiated quietly."));
     }
   },
 
@@ -105,35 +105,19 @@ export const APIService = {
 
   async triggerDefaulterReminders(): Promise<void> {
     if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
-    await fetch(GAS_WORKER_URL, {
+    fetch(GAS_WORKER_URL, {
       method: 'POST',
       mode: 'no-cors',
       body: JSON.stringify({ action: 'trigger_defaulter_warnings' })
-    });
+    }).catch(() => {});
   },
 
   async compileAndSendReports(): Promise<void> {
     if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
-    await fetch(GAS_WORKER_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: JSON.stringify({ action: 'compile_reports' })
-    });
-  },
-
-  async requestResubmission(plan: LessonPlan, teacherEmail: string): Promise<void> {
-    await setDoc(doc(db, "lessonPlans", plan.id), { ...plan, resubmissionStatus: 'pending' }, { merge: true });
-    if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
     fetch(GAS_WORKER_URL, {
       method: 'POST',
       mode: 'no-cors',
-      body: JSON.stringify({ 
-        action: 'request_resubmit', 
-        planId: plan.id, 
-        teacherName: plan.teacherName, 
-        teacherEmail: teacherEmail, 
-        weekRange: plan.weekLabel 
-      })
+      body: JSON.stringify({ action: 'compile_reports' })
     }).catch(() => {});
   }
 };

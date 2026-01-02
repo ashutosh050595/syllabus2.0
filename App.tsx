@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Zap, AlertCircle, Users, Printer, History, Key, 
   ShieldCheck, X, CheckCircle2, RefreshCw, Lock, Mail, GraduationCap
@@ -24,26 +24,29 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const initialFetchDone = useRef(false);
   
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
   const fetchData = useCallback(async (userOverride?: any) => {
     const user = userOverride || state.currentUser;
-    if (!user) return;
+    if (!user) {
+      setIsAuthenticating(false);
+      return;
+    }
     
     setIsSyncing(true);
     try {
-      // Parallel fetch with background processing
       const [teachers, lessonPlans, loginLogs] = await Promise.all([
         APIService.fetchTeachers(),
         APIService.fetchLessonPlans(),
         user === 'admin' ? APIService.fetchLoginLogs() : Promise.resolve([])
       ]);
       
-      // Auto-Seed Check: If registry is completely empty, populate it automatically
-      if (teachers.length === 0) {
-        console.log("Registry empty. Auto-seeding initial teachers...");
+      // AUTO-SEED: If admin/user logs in and database is empty, seed it once
+      if (teachers.length === 0 && !initialFetchDone.current) {
+        console.log("Empty cloud registry detected. Seeding...");
         await APIService.syncInitialTeachers(INITIAL_TEACHERS);
         const refreshedTeachers = await APIService.fetchTeachers();
         setState(prev => ({ ...prev, teachers: refreshedTeachers, lessonPlans, loginLogs }));
@@ -53,20 +56,21 @@ const App: React.FC = () => {
       
       setLastSynced(new Date());
     } catch (e) {
-      console.error("Sync Failure:", e);
+      console.error("Cloud Sync Error:", e);
     } finally {
       setIsSyncing(false);
-      setIsAuthenticating(false); // Ensure lock is released if it was still active
+      setIsAuthenticating(false);
+      initialFetchDone.current = true;
     }
   }, [state.currentUser]);
 
   useEffect(() => {
-    const init = async () => {
-      // Strict timeout: Don't keep user on splash for more than 4 seconds
-      const timeout = setTimeout(() => {
-        setIsAuthenticating(false);
-      }, 4000);
+    // HARD TIMEOUT: Stop the spinner no matter what after 3.5 seconds
+    const safetyTimeout = setTimeout(() => {
+      setIsAuthenticating(false);
+    }, 3500);
 
+    const init = async () => {
       try {
         const savedUser = localStorage.getItem('shs_user');
         if (savedUser && savedUser !== "undefined") {
@@ -77,11 +81,9 @@ const App: React.FC = () => {
           setIsAuthenticating(false);
         }
       } catch (e) {
-        console.error("Init error", e);
-        localStorage.removeItem('shs_user');
         setIsAuthenticating(false);
       } finally {
-        clearTimeout(timeout);
+        clearTimeout(safetyTimeout);
       }
     };
     init();
@@ -105,11 +107,8 @@ const App: React.FC = () => {
         }
       }
 
-      // Ensure we have teachers loaded to check credentials
       let teachers = state.teachers;
-      if (teachers.length === 0) {
-        teachers = await APIService.fetchTeachers();
-      }
+      if (teachers.length === 0) teachers = await APIService.fetchTeachers();
 
       const teacher = teachers.find(t => t.email.toLowerCase().trim() === loginEmail.toLowerCase().trim());
       const { DEFAULT_TEACHER_PASSWORD } = await import('./constants');
@@ -120,11 +119,10 @@ const App: React.FC = () => {
         localStorage.setItem('shs_user', JSON.stringify(teacher));
         await fetchData(teacher);
       } else {
-        alert("Invalid credentials. Please try again.");
+        alert("Invalid credentials.");
       }
     } catch (err) {
-      console.error("Login error", err);
-      alert("Network Error. Check your connection.");
+      alert("Network failed. Please check internet connection.");
     } finally {
       setIsSyncing(false);
     }
@@ -146,7 +144,6 @@ const App: React.FC = () => {
           </div>
           <div className="text-center">
             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Institutional Protocol Active</p>
-            <p className="text-[8px] font-bold text-slate-300 uppercase mt-2">Connecting to Secure Cloud...</p>
           </div>
         </div>
       </div>
@@ -165,7 +162,7 @@ const App: React.FC = () => {
                  <ShieldCheck className="h-8 w-8 text-white" />
                </div>
                <h1 className="text-3xl font-black italic tracking-tighter uppercase mb-2">Sacred Heart</h1>
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Institutional Management Hub</p>
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Management Hub</p>
              </div>
 
              <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-8">
@@ -184,32 +181,28 @@ const App: React.FC = () => {
              </div>
 
              <form onSubmit={handleLogin} className="space-y-4">
-               <div className="space-y-2">
-                 <div className="relative">
-                   <Mail className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
-                   <input 
-                     required
-                     type="email"
-                     placeholder="Official Email"
-                     className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-all text-sm"
-                     value={loginEmail}
-                     onChange={e => setLoginEmail(e.target.value)}
-                   />
-                 </div>
+               <div className="relative">
+                 <Mail className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
+                 <input 
+                   required
+                   type="email"
+                   placeholder="Official Email"
+                   className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-all text-sm"
+                   value={loginEmail}
+                   onChange={e => setLoginEmail(e.target.value)}
+                 />
                </div>
 
-               <div className="space-y-2">
-                 <div className="relative">
-                   <Lock className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
-                   <input 
-                     required
-                     type="password"
-                     placeholder="Access Pin"
-                     className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-all text-sm tracking-widest"
-                     value={loginPassword}
-                     onChange={e => setLoginPassword(e.target.value)}
-                   />
-                 </div>
+               <div className="relative">
+                 <Lock className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
+                 <input 
+                   required
+                   type="password"
+                   placeholder="Access Pin"
+                   className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-all text-sm tracking-widest"
+                   value={loginPassword}
+                   onChange={e => setLoginPassword(e.target.value)}
+                 />
                </div>
 
                <button 
@@ -219,10 +212,6 @@ const App: React.FC = () => {
                  {isSyncing ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Authorize Entry"}
                </button>
              </form>
-
-             <p className="mt-8 text-center text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-               Authorized Personnel Only
-             </p>
           </div>
         </div>
       </div>
@@ -243,7 +232,6 @@ const App: React.FC = () => {
             {[
               { id: 'registry', label: 'Faculty Registry', icon: Users },
               { id: 'compile', label: 'Pdf Compilation', icon: Printer },
-              { id: 'requests', label: `Edit Requests`, icon: AlertCircle },
               { id: 'history', label: 'Archive', icon: History },
               { id: 'logins', label: 'Access Logs', icon: Key }
             ].map(tab => (
@@ -281,8 +269,7 @@ const App: React.FC = () => {
                   </div>
                </div>
             )}
-            {/* Archive and Requests placeholders */}
-            {(activeTab === 'history' || activeTab === 'requests') && (
+            {activeTab === 'history' && (
               <div className="text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
                  <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Section Under Maintenance</p>
               </div>
