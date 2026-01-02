@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Users, CloudUpload, Loader2, Trash2, Edit3 } from 'lucide-react';
+import { Users, CloudUpload, Loader2, Trash2, Edit3, AlertTriangle, Mail } from 'lucide-react';
 import { Teacher, LessonPlan } from '../types';
 import { APIService } from '../services/api';
 import { INITIAL_TEACHERS } from '../constants';
@@ -21,15 +21,14 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
   onRemoveTeacher 
 }) => {
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isSendingAlerts, setIsSendingAlerts] = useState(false);
 
-  // Fix: Implemented handleSeed with necessary state management and dependency imports (INITIAL_TEACHERS, APIService)
   const handleSeed = async () => {
     if (!confirm(`Seed cloud faculty registry with ${INITIAL_TEACHERS.length} local records?`)) return;
     setIsSeeding(true);
     try {
       await APIService.syncInitialTeachers(INITIAL_TEACHERS);
       alert(`Success: ${INITIAL_TEACHERS.length} faculty members synchronized to cloud.`);
-      // Refresh will be handled by App.tsx fetching data or manual reload
       window.location.reload(); 
     } catch (e) {
       alert("Sync error: " + e);
@@ -38,21 +37,42 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
     }
   };
 
+  const handleSendWarnings = async () => {
+    if (!confirm("Send automated email reminders to all teachers who haven't submitted plans for next week?")) return;
+    setIsSendingAlerts(true);
+    try {
+      await APIService.triggerDefaulterReminders();
+      alert("Warning protocol initiated via Google Apps Script.");
+    } catch (e) {
+      alert("Failed to trigger warnings.");
+    } finally {
+      setIsSendingAlerts(false);
+    }
+  };
+
   return (
     <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
       <div className="flex justify-between items-center">
         <div>
           <h3 className="text-xl font-black uppercase italic tracking-tight">Faculty Registry</h3>
-          <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em] mt-1">Cloud Synchronized Database</p>
+          <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em] mt-1">Institutional Database</p>
         </div>
         <div className="flex gap-3">
+          <button 
+            onClick={handleSendWarnings}
+            disabled={isSendingAlerts}
+            className="flex items-center gap-2 px-6 py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all disabled:opacity-50"
+          >
+            {isSendingAlerts ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />}
+            Send Warnings
+          </button>
           <button 
             onClick={handleSeed}
             disabled={isSeeding}
             className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all disabled:opacity-50"
           >
             {isSeeding ? <Loader2 className="h-3 w-3 animate-spin" /> : <CloudUpload className="h-3 w-3" />}
-            Seed Registry
+            Seed Cloud
           </button>
         </div>
       </div>

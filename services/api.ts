@@ -1,12 +1,13 @@
 
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs } from "firebase/firestore";
+import { initializeApp, getApp, getApps } from "firebase/app";
+import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, writeBatch } from "firebase/firestore";
 import { FIREBASE_CONFIG } from "../constants";
 import { LessonPlan, Teacher, LoginLog } from "../types";
 
-const app = initializeApp(FIREBASE_CONFIG);
+const app = !getApps().length ? initializeApp(FIREBASE_CONFIG) : getApp();
 const db = getFirestore(app);
 
+// Update this with your actual Google Apps Script Web App URL
 const GAS_WORKER_URL = 'https://script.google.com/macros/s/AKfycby_placeholder/exec';
 
 export const APIService = {
@@ -38,9 +39,26 @@ export const APIService = {
   },
 
   async syncInitialTeachers(teachers: Teacher[]): Promise<void> {
-    // Using Promise.all for reliable batch processing
-    const tasks = teachers.map(t => setDoc(doc(db, "teachers", t.email), t));
-    await Promise.all(tasks);
+    const batch = writeBatch(db);
+    teachers.forEach((t) => {
+      const teacherRef = doc(db, "teachers", t.email);
+      batch.set(teacherRef, t);
+    });
+    await batch.commit();
+  },
+
+  async triggerDefaulterReminders(): Promise<void> {
+    try {
+      await fetch(GAS_WORKER_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'trigger_reminders' })
+      });
+    } catch (e) {
+      console.error("Reminder trigger failed:", e);
+      throw e;
+    }
   },
 
   async requestResubmission(plan: LessonPlan, teacherEmail: string): Promise<void> {
