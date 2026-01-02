@@ -10,7 +10,7 @@ const app = getApps().length > 0 ? getApp() : initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// FULLY ACTIVATED GAS URL
+// FULLY ACTIVATED GAS URL PROVIDED BY USER
 const GAS_WORKER_URL = "https://script.google.com/macros/s/AKfycbySZzxF_gOP2MRMp3jYJ9SgQypkgCpxb1EPKt88HfTV1ggrzxVQ_J96IP6LpTMedF-unQ/exec";
 
 export const APIService = {
@@ -30,10 +30,10 @@ export const APIService = {
           const newUser = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
           return { success: true, user: newUser.user };
         } catch (createError: any) {
-          return { success: false, message: "Credential Error." };
+          return { success: false, message: "Registry Auth Error." };
         }
       }
-      return { success: false, message: "Access Denied." };
+      return { success: false, message: "Security Key Mismatch." };
     }
   },
 
@@ -64,9 +64,9 @@ export const APIService = {
   },
 
   async syncInitialTeachers(teachers: Teacher[]): Promise<void> {
-    for (const t of teachers) {
-      await setDoc(doc(db, "teachers", t.id), t);
-    }
+    // Ensuring data is permanent in Cloud
+    const promises = teachers.map(t => setDoc(doc(db, "teachers", t.id), t));
+    await Promise.all(promises);
   },
 
   async fetchLessonPlans(teacherId?: string): Promise<LessonPlan[]> {
@@ -81,14 +81,16 @@ export const APIService = {
   },
 
   async saveLessonPlans(plans: LessonPlan[]): Promise<void> {
-    const promises = plans.map(plan => setDoc(doc(db, "lessonPlans", plan.id), { ...plan, resubmissionStatus: 'none' }));
-    await Promise.all(promises);
+    // Explicit promise handling to prevent UI hang
+    const batch = plans.map(plan => setDoc(doc(db, "lessonPlans", plan.id), { ...plan, resubmissionStatus: 'none' }));
+    await Promise.all(batch);
   },
 
   async emailDefaulters(defaulters: Teacher[], weekRange: string): Promise<void> {
     await fetch(GAS_WORKER_URL, {
       method: 'POST',
       mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'bulk_defaulter_alert', teachers: defaulters.map(d => ({ email: d.email, name: d.name })), weekRange })
     });
   },
@@ -97,6 +99,7 @@ export const APIService = {
     await fetch(GAS_WORKER_URL, {
       method: 'POST',
       mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'send_to_ct', email: teacher.email, className, section, weekLabel })
     });
   },
@@ -110,10 +113,10 @@ export const APIService = {
     try {
       const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: `Audit Institutional Syllabus: ${JSON.stringify(plans.slice(0, 10))}`,
-        config: { systemInstruction: "Institutional Lead Auditor.", thinkingConfig: { thinkingBudget: 1000 } },
+        contents: `Institutional Audit: ${JSON.stringify(plans.slice(0, 10))}`,
+        config: { systemInstruction: "Institutional Auditor.", thinkingConfig: { thinkingBudget: 1000 } },
       });
       return response.text || "Audit failed.";
-    } catch (e) { return "AI Service Busy."; }
+    } catch (e) { return "AI busy."; }
   }
 };
