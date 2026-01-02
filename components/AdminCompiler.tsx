@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
-import { Printer, Share2, Download, Filter, FileText, ChevronRight } from 'lucide-react';
+import { Printer, Share2, Download, Send, Loader2 } from 'lucide-react';
 import { LessonPlan, Teacher, ClassName, SectionName } from '../types';
 import { getUpcomingMonday } from '../utils';
+import { APIService } from '../services/api';
 import PrintableReport from './PrintableReport';
 
 interface AdminCompilerProps {
@@ -16,13 +16,26 @@ const AdminCompiler: React.FC<AdminCompilerProps> = ({ lessonPlans, teachers }) 
 
   const [selectedClass, setSelectedClass] = useState<ClassName>('VI');
   const [selectedSection, setSelectedSection] = useState<SectionName>('A');
-  const [showPreview, setShowPreview] = useState(true);
+  const [isCompiling, setIsCompiling] = useState(false);
 
   const classes: ClassName[] = ['V', 'VI', 'VII'];
   const sections: SectionName[] = ['A', 'B', 'C', 'D'];
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleCompileAndSend = async () => {
+    if (!confirm("This will compile all weekly reports and automatically email them to all Class Teachers. Continue?")) return;
+    setIsCompiling(true);
+    try {
+      await APIService.compileAndSendReports();
+      alert("Success: Compilation and Email protocol initiated.");
+    } catch (e) {
+      alert("Protocol failed: " + e);
+    } finally {
+      setIsCompiling(false);
+    }
   };
 
   const handleWhatsAppShare = () => {
@@ -34,7 +47,7 @@ const AdminCompiler: React.FC<AdminCompilerProps> = ({ lessonPlans, teachers }) 
   return (
     <div className="space-y-8">
       {/* Controls Card */}
-      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 print-hidden">
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-center gap-6 print-hidden">
         <div className="flex items-center gap-6">
           <div className="bg-indigo-600 p-3 rounded-2xl shadow-lg">
             <Printer className="h-6 w-6 text-white" />
@@ -45,7 +58,7 @@ const AdminCompiler: React.FC<AdminCompilerProps> = ({ lessonPlans, teachers }) 
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-3">
           <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
             {classes.map(c => (
               <button 
@@ -70,23 +83,34 @@ const AdminCompiler: React.FC<AdminCompilerProps> = ({ lessonPlans, teachers }) 
             ))}
           </div>
 
-          <div className="h-8 w-[1px] bg-slate-200 mx-2 hidden lg:block" />
+          <div className="h-8 w-[1px] bg-slate-200 mx-2 hidden xl:block" />
 
-          <button 
-            onClick={handlePrint}
-            className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Download PDF
-          </button>
-          
-          <button 
-            onClick={handleWhatsAppShare}
-            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all"
-          >
-            <Share2 className="h-3.5 w-3.5" />
-            WhatsApp
-          </button>
+          <div className="flex flex-wrap gap-2 justify-center">
+            <button 
+              onClick={handleCompileAndSend}
+              disabled={isCompiling}
+              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all disabled:opacity-50"
+            >
+              {isCompiling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              Compile and Send
+            </button>
+
+            <button 
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download PDF
+            </button>
+            
+            <button 
+              onClick={handleWhatsAppShare}
+              className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              WhatsApp
+            </button>
+          </div>
         </div>
       </div>
 

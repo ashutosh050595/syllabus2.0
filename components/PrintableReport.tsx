@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { LessonPlan, Teacher, ClassName, SectionName } from '../types';
 
@@ -75,6 +74,7 @@ const PrintableReport: React.FC<PrintableReportProps> = ({ className, sectionNam
               const plan = plans.find(p => 
                 p.teacherId === asgn.teacher.id && 
                 p.className === className && 
+                p.section === sectionName && // CRITICAL: Must filter by section to identify pending homework correctly
                 p.subject === asgn.subject &&
                 p.weekStarting === weekStarting
               );

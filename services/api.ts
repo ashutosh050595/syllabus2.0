@@ -1,4 +1,3 @@
-
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, writeBatch } from "firebase/firestore";
 import { FIREBASE_CONFIG } from "../constants";
@@ -57,6 +56,20 @@ export const APIService = {
       });
     } catch (e) {
       console.error("Reminder trigger failed:", e);
+      throw e;
+    }
+  },
+
+  async compileAndSendReports(): Promise<void> {
+    try {
+      await fetch(GAS_WORKER_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'compile_and_send' })
+      });
+    } catch (e) {
+      console.error("Bulk compilation and email failed:", e);
       throw e;
     }
   },
