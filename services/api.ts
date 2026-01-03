@@ -7,7 +7,7 @@ const app = !getApps().length ? initializeApp(FIREBASE_CONFIG) : getApp();
 const db = getFirestore(app);
 
 // Update with your actual Google Apps Script URL
-const GAS_WORKER_URL = 'https://script.google.com/macros/s/AKfycby_placeholder/exec';
+const GAS_WORKER_URL = 'https://script.google.com/macros/s/AKfycbySZzxF_gOP2MRMp3jYJ9SgQypkgCpxb1EPKt88HfTV1ggrzxVQ_J96IP6LpTMedF-unQ/exec';
 
 export const APIService = {
   async fetchTeachers(): Promise<Teacher[]> {
