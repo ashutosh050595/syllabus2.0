@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Zap, AlertCircle, Users, Printer, History, Key, 
-  ShieldCheck, X, CheckCircle2, RefreshCw, Lock, Mail, GraduationCap
+  ShieldCheck, X, CheckCircle2, RefreshCw, Lock, Mail, GraduationCap, FileText, User
 } from 'lucide-react';
 import { AppState, LessonPlan, Teacher } from './types';
 import { APIService } from './services/api';
@@ -11,6 +10,7 @@ import Layout from './components/Layout';
 import AdminRegistry from './components/AdminRegistry';
 import AdminCompiler from './components/AdminCompiler';
 import TeacherForm from './components/TeacherForm';
+import SubmissionHistory from './components/SubmissionHistory';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({ 
@@ -19,7 +19,7 @@ const App: React.FC = () => {
     lessonPlans: [], 
     loginLogs: [] 
   });
-  const [activeTab, setActiveTab] = useState<'plans' | 'registry' | 'compile' | 'history' | 'logins' | 'requests'>('registry');
+  const [activeTab, setActiveTab] = useState<'registry' | 'submissions' | 'compile' | 'logins'>('registry');
   const [loginMode, setLoginMode] = useState<'teacher' | 'admin'>('teacher');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(true);
@@ -212,6 +212,14 @@ const App: React.FC = () => {
                  {isSyncing ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Authorize Entry"}
                </button>
              </form>
+             
+             <div className="mt-8 text-center">
+               <p className="text-[9px] text-slate-400 font-bold">
+                 {loginMode === 'teacher' 
+                   ? "Use your registered email and default password" 
+                   : "Admin access requires special credentials"}
+               </p>
+             </div>
           </div>
         </div>
       </div>
@@ -231,8 +239,8 @@ const App: React.FC = () => {
           <div className="flex justify-center flex-wrap gap-2 print-hidden">
             {[
               { id: 'registry', label: 'Faculty Registry', icon: Users },
+              { id: 'submissions', label: 'Submissions', icon: FileText },
               { id: 'compile', label: 'Pdf Compilation', icon: Printer },
-              { id: 'history', label: 'Archive', icon: History },
               { id: 'logins', label: 'Access Logs', icon: Key }
             ].map(tab => (
               <button 
@@ -255,23 +263,64 @@ const App: React.FC = () => {
                 onRemoveTeacher={async (id) => { await APIService.removeTeacher(id); await fetchData(); }}
               />
             )}
-            {activeTab === 'compile' && <AdminCompiler lessonPlans={state.lessonPlans} teachers={state.teachers} />}
-            {activeTab === 'logins' && (
-               <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                  <h3 className="text-xl font-black uppercase italic tracking-tight mb-6">Recent Access Logs</h3>
-                  <div className="space-y-2">
-                    {state.loginLogs.slice(0, 50).map((log, i) => (
-                      <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                        <span className="text-[10px] font-black uppercase text-slate-800">{log.name}</span>
-                        <span className="text-[9px] font-bold text-slate-400">{new Date(log.timestamp).toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-               </div>
+            
+            {activeTab === 'submissions' && (
+              <SubmissionHistory 
+                lessonPlans={state.lessonPlans} 
+                teachers={state.teachers} 
+              />
             )}
-            {activeTab === 'history' && (
-              <div className="text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
-                 <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Section Under Maintenance</p>
+            
+            {activeTab === 'compile' && (
+              <AdminCompiler 
+                lessonPlans={state.lessonPlans} 
+                teachers={state.teachers} 
+              />
+            )}
+            
+            {activeTab === 'logins' && (
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-black uppercase italic tracking-tight">Recent Access Logs</h3>
+                    <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em] mt-1">
+                      Last 50 login activities
+                    </p>
+                  </div>
+                  <div className="text-[10px] font-black text-slate-400">
+                    Total: {state.loginLogs.length}
+                  </div>
+                </div>
+                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                  {state.loginLogs.length === 0 ? (
+                    <div className="text-center py-10 border-2 border-dashed border-slate-100 rounded-2xl">
+                      <Key className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+                      <p className="text-slate-400 font-bold text-sm">No login records found</p>
+                    </div>
+                  ) : (
+                    state.loginLogs.slice(0, 50).map((log, i) => (
+                      <div key={i} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100 hover:bg-white transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-indigo-50 p-2 rounded-lg">
+                            <User className="h-4 w-4 text-indigo-600" />
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-black uppercase text-slate-800">{log.name}</div>
+                            <div className="text-[9px] font-bold text-slate-500">{log.email}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[9px] font-black text-slate-400">
+                            {new Date(log.timestamp).toLocaleDateString()}
+                          </div>
+                          <div className="text-[8px] text-slate-300 font-bold">
+                            {new Date(log.timestamp).toLocaleTimeString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>
