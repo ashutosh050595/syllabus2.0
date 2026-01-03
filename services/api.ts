@@ -1,13 +1,12 @@
-
 import { initializeApp, getApp, getApps } from "firebase/app";
-import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, writeBatch } from "firebase/firestore";
+import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, writeBatch, updateDoc } from "firebase/firestore";
 import { FIREBASE_CONFIG } from "../constants";
 import { LessonPlan, Teacher, LoginLog } from "../types";
 
 const app = !getApps().length ? initializeApp(FIREBASE_CONFIG) : getApp();
 const db = getFirestore(app);
 
-// IMPORTANT: Replace this placeholder with your actual Apps Script Web App URL
+// Update with your actual Google Apps Script URL
 const GAS_WORKER_URL = 'https://script.google.com/macros/s/AKfycby_placeholder/exec';
 
 export const APIService = {
@@ -16,7 +15,7 @@ export const APIService = {
       const querySnapshot = await getDocs(collection(db, "teachers"));
       return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Teacher));
     } catch (e) {
-      console.error("Error fetching teachers:", e);
+      console.warn("Teachers fetch failed, using offline fallback");
       return [];
     }
   },
@@ -26,7 +25,6 @@ export const APIService = {
       const querySnapshot = await getDocs(collection(db, "lessonPlans"));
       return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as LessonPlan));
     } catch (e) {
-      console.error("Error fetching lesson plans:", e);
       return [];
     }
   },
@@ -36,7 +34,6 @@ export const APIService = {
       const querySnapshot = await getDocs(collection(db, "loginLogs"));
       return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as LoginLog));
     } catch (e) {
-      console.error("Error fetching login logs:", e);
       return [];
     }
   },
@@ -46,7 +43,7 @@ export const APIService = {
     const timestamp = new Date().toISOString();
     
     plans.forEach(plan => {
-      // Robust ID: teacher_grade_section_subject_date
+      // Unique ID to prevent duplication
       const id = `${plan.teacherId}_${plan.className}_${plan.section}_${plan.subject}_${plan.weekStarting}`
         .replace(/[@.]/g, '_')
         .replace(/\s+/g, '');
@@ -55,31 +52,61 @@ export const APIService = {
       batch.set(planRef, {
         ...plan,
         id,
-        submittedAt: timestamp
+        submittedAt: timestamp,
+        resubmissionStatus: 'none'
       });
     });
 
-    // 1. Database first - this is the source of truth
     await batch.commit();
 
-    // 2. Email trigger in background - do not await to prevent UI hanging
+    // Send email confirmation for each unique teacher
     if (plans.length > 0 && GAS_WORKER_URL && !GAS_WORKER_URL.includes('placeholder')) {
-      const emailPayload = {
-        action: 'submission_alert',
-        teacherEmail: plans[0].teacherId,
-        teacherName: plans[0].teacherName,
-        weekRange: plans[0].weekLabel,
-        summary: plans.map(p => `${p.className}-${p.section} (${p.subject})`).join(', ')
-      };
+      const uniqueTeachers = Array.from(new Set(plans.map(p => p.teacherId)));
+      
+      uniqueTeachers.forEach(teacherEmail => {
+        const teacherPlans = plans.filter(p => p.teacherId === teacherEmail);
+        const emailPayload = {
+          action: 'submission_alert',
+          teacherEmail: teacherEmail,
+          teacherName: teacherPlans[0].teacherName,
+          weekRange: teacherPlans[0].weekLabel,
+          summary: teacherPlans.map(p => `${p.className}-${p.section} (${p.subject})`).join(', ')
+        };
 
-      // no-cors mode ensures the browser doesn't block the request if GAS script isn't configured for CORS
-      fetch(GAS_WORKER_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(emailPayload)
-      }).catch(err => console.debug("Email background task initiated quietly."));
+        fetch(GAS_WORKER_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(emailPayload)
+        }).catch(() => console.debug("Email background task initiated."));
+      });
     }
+  },
+
+  async requestResubmission(planId: string, teacherEmail: string, teacherName: string, weekRange: string): Promise<void> {
+    if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
+    
+    // Update the plan status in Firebase
+    const planRef = doc(db, "lessonPlans", planId);
+    await updateDoc(planRef, {
+      resubmissionStatus: 'pending'
+    });
+
+    // Send request to GAS for email notifications
+    const resubmitPayload = {
+      action: 'request_resubmit',
+      planId: planId,
+      teacherEmail: teacherEmail,
+      teacherName: teacherName,
+      weekRange: weekRange
+    };
+
+    fetch(GAS_WORKER_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(resubmitPayload)
+    }).catch(() => console.debug("Resubmission request sent."));
   },
 
   async addTeacher(teacher: Teacher): Promise<void> {
@@ -108,6 +135,7 @@ export const APIService = {
     fetch(GAS_WORKER_URL, {
       method: 'POST',
       mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'trigger_defaulter_warnings' })
     }).catch(() => {});
   },
@@ -117,6 +145,7 @@ export const APIService = {
     fetch(GAS_WORKER_URL, {
       method: 'POST',
       mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'compile_reports' })
     }).catch(() => {});
   }
