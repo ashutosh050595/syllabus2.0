@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Zap, AlertCircle, Users, Printer, History, Key, 
-  ShieldCheck, X, CheckCircle2, RefreshCw, Lock, Mail, GraduationCap, FileText, User
+  ShieldCheck, X, CheckCircle2, RefreshCw, Lock, Mail, GraduationCap, FileText, User, Clock, AlertTriangle
 } from 'lucide-react';
-import { AppState, LessonPlan, Teacher } from './types';
+import { AppState, LessonPlan, Teacher, LoginLog } from './types';
 import { APIService } from './services/api';
 import { INITIAL_TEACHERS } from './constants';
 import Layout from './components/Layout';
@@ -11,6 +11,8 @@ import AdminRegistry from './components/AdminRegistry';
 import AdminCompiler from './components/AdminCompiler';
 import TeacherForm from './components/TeacherForm';
 import SubmissionHistory from './components/SubmissionHistory';
+import DefaultersList from './components/DefaultersList';
+import TeacherLoginHistory from './components/TeacherLoginHistory';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({ 
@@ -19,15 +21,27 @@ const App: React.FC = () => {
     lessonPlans: [], 
     loginLogs: [] 
   });
-  const [activeTab, setActiveTab] = useState<'registry' | 'submissions' | 'compile' | 'logins'>('registry');
+  const [activeTab, setActiveTab] = useState<'registry' | 'submissions' | 'defaulters' | 'teacher-logins' | 'compile' | 'logins'>('registry');
   const [loginMode, setLoginMode] = useState<'teacher' | 'admin'>('teacher');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
-  const initialFetchDone = useRef(false);
+  const [isSeeded, setIsSeeded] = useState(false); // Track if data is seeded
   
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+
+  // Check if database is already seeded
+  const checkIfSeeded = useCallback(async () => {
+    try {
+      const teachers = await APIService.fetchTeachers();
+      setIsSeeded(teachers.length > 0);
+      return teachers.length > 0;
+    } catch (error) {
+      console.error("Error checking seed status:", error);
+      return false;
+    }
+  }, []);
 
   const fetchData = useCallback(async (userOverride?: any) => {
     const user = userOverride || state.currentUser;
@@ -44,12 +58,18 @@ const App: React.FC = () => {
         user === 'admin' ? APIService.fetchLoginLogs() : Promise.resolve([])
       ]);
       
-      // AUTO-SEED: If admin/user logs in and database is empty, seed it once
-      if (teachers.length === 0 && !initialFetchDone.current) {
-        console.log("Empty cloud registry detected. Seeding...");
-        await APIService.syncInitialTeachers(INITIAL_TEACHERS);
-        const refreshedTeachers = await APIService.fetchTeachers();
-        setState(prev => ({ ...prev, teachers: refreshedTeachers, lessonPlans, loginLogs }));
+      // Only seed if database is empty and hasn't been seeded before
+      if (teachers.length === 0 && !isSeeded) {
+        const alreadySeeded = await checkIfSeeded();
+        if (!alreadySeeded) {
+          console.log("Empty cloud registry detected. Seeding...");
+          await APIService.syncInitialTeachers(INITIAL_TEACHERS);
+          const refreshedTeachers = await APIService.fetchTeachers();
+          setState(prev => ({ ...prev, teachers: refreshedTeachers, lessonPlans, loginLogs }));
+          setIsSeeded(true);
+        } else {
+          setState(prev => ({ ...prev, teachers, lessonPlans, loginLogs }));
+        }
       } else {
         setState(prev => ({ ...prev, teachers, lessonPlans, loginLogs }));
       }
@@ -60,11 +80,13 @@ const App: React.FC = () => {
     } finally {
       setIsSyncing(false);
       setIsAuthenticating(false);
-      initialFetchDone.current = true;
     }
-  }, [state.currentUser]);
+  }, [state.currentUser, isSeeded, checkIfSeeded]);
 
   useEffect(() => {
+    // Check if data is already seeded on initial load
+    checkIfSeeded();
+    
     // HARD TIMEOUT: Stop the spinner no matter what after 3.5 seconds
     const safetyTimeout = setTimeout(() => {
       setIsAuthenticating(false);
@@ -87,7 +109,7 @@ const App: React.FC = () => {
       }
     };
     init();
-  }, [fetchData]);
+  }, [fetchData, checkIfSeeded]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,14 +234,6 @@ const App: React.FC = () => {
                  {isSyncing ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Authorize Entry"}
                </button>
              </form>
-             
-             <div className="mt-8 text-center">
-               <p className="text-[9px] text-slate-400 font-bold">
-                 {loginMode === 'teacher' 
-                   ? "Use your registered email and default password" 
-                   : "Admin access requires special credentials"}
-               </p>
-             </div>
           </div>
         </div>
       </div>
@@ -240,8 +254,10 @@ const App: React.FC = () => {
             {[
               { id: 'registry', label: 'Faculty Registry', icon: Users },
               { id: 'submissions', label: 'Submissions', icon: FileText },
+              { id: 'defaulters', label: 'Defaulters', icon: AlertTriangle },
+              { id: 'teacher-logins', label: 'Teacher Logins', icon: Clock },
               { id: 'compile', label: 'Pdf Compilation', icon: Printer },
-              { id: 'logins', label: 'Access Logs', icon: Key }
+              { id: 'logins', label: 'All Logs', icon: Key }
             ].map(tab => (
               <button 
                 key={tab.id} 
@@ -271,6 +287,19 @@ const App: React.FC = () => {
               />
             )}
             
+            {activeTab === 'defaulters' && (
+              <DefaultersList 
+                teachers={state.teachers} 
+                lessonPlans={state.lessonPlans} 
+              />
+            )}
+            
+            {activeTab === 'teacher-logins' && (
+              <TeacherLoginHistory 
+                loginLogs={state.loginLogs.filter(log => log.email !== 'admin')}
+              />
+            )}
+            
             {activeTab === 'compile' && (
               <AdminCompiler 
                 lessonPlans={state.lessonPlans} 
@@ -284,7 +313,7 @@ const App: React.FC = () => {
                   <div>
                     <h3 className="text-xl font-black uppercase italic tracking-tight">Recent Access Logs</h3>
                     <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em] mt-1">
-                      Last 50 login activities
+                      All login activities
                     </p>
                   </div>
                   <div className="text-[10px] font-black text-slate-400">
@@ -301,8 +330,8 @@ const App: React.FC = () => {
                     state.loginLogs.slice(0, 50).map((log, i) => (
                       <div key={i} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100 hover:bg-white transition-colors">
                         <div className="flex items-center gap-3">
-                          <div className="bg-indigo-50 p-2 rounded-lg">
-                            <User className="h-4 w-4 text-indigo-600" />
+                          <div className={`p-2 rounded-lg ${log.email === 'admin' ? 'bg-purple-50' : 'bg-indigo-50'}`}>
+                            <User className={`h-4 w-4 ${log.email === 'admin' ? 'text-purple-600' : 'text-indigo-600'}`} />
                           </div>
                           <div>
                             <div className="text-[11px] font-black uppercase text-slate-800">{log.name}</div>
@@ -329,6 +358,7 @@ const App: React.FC = () => {
         <TeacherForm 
           teacher={state.currentUser as Teacher} 
           history={state.lessonPlans.filter(p => p.teacherId === (state.currentUser as Teacher).email)} 
+          onRefresh={() => fetchData()}
         />
       )}
     </Layout>
