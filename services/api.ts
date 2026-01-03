@@ -1,5 +1,5 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
-import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, writeBatch, updateDoc, query, where, getDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, writeBatch, updateDoc } from "firebase/firestore";
 import { FIREBASE_CONFIG } from "../constants";
 import { LessonPlan, Teacher, LoginLog } from "../types";
 
@@ -39,66 +39,84 @@ export const APIService = {
   },
 
   async submitMultiplePlans(plans: Omit<LessonPlan, 'id' | 'submittedAt'>[]): Promise<void> {
-    // Check if any of these plans already exist and have resubmissionStatus 'none'
-    const existingPlans = await this.fetchLessonPlans();
-    
-    for (const plan of plans) {
-      const existingPlan = existingPlans.find(p => 
-        p.teacherId === plan.teacherId &&
-        p.className === plan.className &&
-        p.section === plan.section &&
-        p.subject === plan.subject &&
-        p.weekStarting === plan.weekStarting &&
-        p.resubmissionStatus === 'none'
-      );
+    try {
+      // First, check if any of these plans already exist with 'none' status
+      const existingPlans = await this.fetchLessonPlans();
       
-      if (existingPlan) {
-        throw new Error(`A lesson plan for ${plan.className}-${plan.section} (${plan.subject}) has already been submitted for this week. If modifications are required, please use the "Request Modification" option.`);
+      const duplicateErrors: string[] = [];
+      
+      plans.forEach(plan => {
+        const existingPlan = existingPlans.find(p => 
+          p.teacherId === plan.teacherId &&
+          p.className === plan.className &&
+          p.section === plan.section &&
+          p.subject === plan.subject &&
+          p.weekStarting === plan.weekStarting &&
+          p.resubmissionStatus === 'none'
+        );
+        
+        if (existingPlan) {
+          duplicateErrors.push(
+            `Lesson plan for ${plan.className}-${plan.section} (${plan.subject}) has already been submitted for this week.`
+          );
+        }
+      });
+      
+      if (duplicateErrors.length > 0) {
+        throw new Error(`DUPLICATE_SUBMISSION: ${duplicateErrors.join(' ')} If modifications are required, please use the "Request Modification" option.`);
       }
-    }
-    
-    const batch = writeBatch(db);
-    const timestamp = new Date().toISOString();
-    
-    plans.forEach(plan => {
-      // Unique ID to prevent duplication
-      const id = `${plan.teacherId}_${plan.className}_${plan.section}_${plan.subject}_${plan.weekStarting}`
-        .replace(/[@.]/g, '_')
-        .replace(/\s+/g, '');
       
-      const planRef = doc(db, "lessonPlans", id);
-      batch.set(planRef, {
-        ...plan,
-        id,
-        submittedAt: timestamp,
-        resubmissionStatus: plan.resubmissionStatus || 'none'
-      });
-    });
-
-    await batch.commit();
-
-    // Send email confirmation for each unique teacher
-    if (plans.length > 0 && GAS_WORKER_URL && !GAS_WORKER_URL.includes('placeholder')) {
-      const uniqueTeachers = Array.from(new Set(plans.map(p => p.teacherId)));
+      // If we're here, all plans are valid to submit
+      const batch = writeBatch(db);
+      const timestamp = new Date().toISOString();
       
-      uniqueTeachers.forEach(teacherEmail => {
-        const teacherPlans = plans.filter(p => p.teacherId === teacherEmail);
-        const teacherName = teacherPlans[0].teacherName;
-        const emailPayload = {
-          action: 'submission_alert',
-          teacherEmail: teacherEmail,
-          teacherName: teacherName,
-          weekRange: teacherPlans[0].weekLabel,
-          summary: teacherPlans.map(p => `${p.className}-${p.section} (${p.subject})`).join(', ')
-        };
-
-        fetch(GAS_WORKER_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(emailPayload)
-        }).catch(() => console.debug("Email background task initiated."));
+      plans.forEach(plan => {
+        // Unique ID to prevent duplication
+        const id = `${plan.teacherId}_${plan.className}_${plan.section}_${plan.subject}_${plan.weekStarting}`
+          .replace(/[@.]/g, '_')
+          .replace(/\s+/g, '');
+        
+        const planRef = doc(db, "lessonPlans", id);
+        batch.set(planRef, {
+          ...plan,
+          id,
+          submittedAt: timestamp,
+          resubmissionStatus: plan.resubmissionStatus || 'none'
+        });
       });
+
+      await batch.commit();
+
+      // Send email confirmation for each unique teacher
+      if (plans.length > 0 && GAS_WORKER_URL && !GAS_WORKER_URL.includes('placeholder')) {
+        const uniqueTeachers = Array.from(new Set(plans.map(p => p.teacherId)));
+        
+        uniqueTeachers.forEach(teacherEmail => {
+          const teacherPlans = plans.filter(p => p.teacherId === teacherEmail);
+          const emailPayload = {
+            action: 'submission_alert',
+            teacherEmail: teacherEmail,
+            teacherName: teacherPlans[0].teacherName,
+            weekRange: teacherPlans[0].weekLabel,
+            summary: teacherPlans.map(p => `${p.className}-${p.section} (${p.subject})`).join(', ')
+          };
+
+          fetch(GAS_WORKER_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(emailPayload)
+          }).catch(() => console.debug("Email background task initiated."));
+        });
+      }
+      
+    } catch (error) {
+      console.error("Submission error in submitMultiplePlans:", error);
+      if (error instanceof Error) {
+        // Re-throw with proper error message
+        throw new Error(error.message);
+      }
+      throw new Error("Failed to submit lesson plans. Please check your connection and try again.");
     }
   },
 
@@ -383,7 +401,8 @@ export const APIService = {
       const lessonPlans = await this.fetchLessonPlans();
       return lessonPlans.find(plan => 
         plan.teacherId === teacherEmail && 
-        plan.weekStarting === weekStarting
+        plan.weekStarting === weekStarting &&
+        plan.resubmissionStatus === 'none'
       ) || null;
     } catch (error) {
       console.error("Error checking existing submission:", error);
