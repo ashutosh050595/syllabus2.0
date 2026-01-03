@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Send, BookOpen, CheckCircle2, CheckSquare, Square, Layers, ChevronRight, AlertCircle, History, AlertTriangle, Clock, Info, Calendar } from 'lucide-react';
+import { 
+  Loader2, Send, BookOpen, CheckCircle2, CheckSquare, Square, 
+  Layers, ChevronRight, AlertCircle, History, AlertTriangle, 
+  Clock, Info, Calendar, Mail, User, Check
+} from 'lucide-react';
 import { Teacher, LessonPlan, ClassName } from '../types';
 import { APIService } from '../services/api';
 import { getUpcomingMonday, formatDate, getNextSaturday, getWeekLabel, isFutureWeek, getWeekRangeLabel } from '../utils';
@@ -20,9 +24,11 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
   const [submittedThisWeek, setSubmittedThisWeek] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [canSubmit, setCanSubmit] = useState(true);
   const [existingSubmission, setExistingSubmission] = useState<LessonPlan | null>(null);
   const [showSubmissionInfo, setShowSubmissionInfo] = useState(true);
+  const [submissionTimeout, setSubmissionTimeout] = useState<NodeJS.Timeout | null>(null);
 
   // Check if teacher has already submitted for this week
   useEffect(() => {
@@ -108,8 +114,13 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Clear any previous messages
+    setSuccessMessage('');
+    setErrorMessage('');
+    
     if (!canSubmit) {
-      alert(errorMessage || "Submission is not permitted at this time. Please review the status of your existing submission.");
+      const alertMsg = errorMessage || "Submission is not permitted at this time. Please review the status of your existing submission.";
+      alert(alertMsg);
       return;
     }
     
@@ -123,18 +134,33 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
       return;
     }
 
-    // Double-check if submission already exists
-    const currentWeekStart = upcomingMonday.toISOString();
-    const existing = planHistory.find(plan => 
-      plan.weekStarting === currentWeekStart && plan.resubmissionStatus === 'none'
-    );
-    
-    if (existing && existing.resubmissionStatus !== 'approved') {
-      alert("A lesson plan has already been submitted for this week. If modifications are required, please use the 'Request Modification' option in your submission history.");
+    // Validate form data
+    if (!formData.chapter.trim()) {
+      alert("Please enter the chapter name/number.");
+      return;
+    }
+
+    if (!formData.topics.trim()) {
+      alert("Please enter the topics to be covered.");
+      return;
+    }
+
+    if (!formData.homework.trim()) {
+      alert("Please enter the homework assignments.");
       return;
     }
 
     setIsSubmitting(true);
+    
+    // Set timeout to prevent infinite spinner (30 seconds)
+    const timeoutId = setTimeout(() => {
+      setIsSubmitting(false);
+      if (submissionTimeout) clearTimeout(submissionTimeout);
+      alert("Submission is taking longer than expected. Please check your internet connection and try again. If the problem persists, contact the administration.");
+    }, 30000);
+    
+    setSubmissionTimeout(timeoutId);
+
     try {
       const plans = selectedKeys.map(key => {
         const [className, section, subject] = key.split('-');
@@ -146,9 +172,9 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
           subject,
           dateFrom: formatDate(upcomingMonday),
           dateTo: formatDate(nextSaturday),
-          chapter: formData.chapter,
-          topics: formData.topics,
-          homework: formData.homework,
+          chapter: formData.chapter.trim(),
+          topics: formData.topics.trim(),
+          homework: formData.homework.trim(),
           weekStarting: upcomingMonday.toISOString(),
           weekLabel,
           resubmissionStatus: existingSubmission?.resubmissionStatus === 'approved' ? 'resubmitted' : 'none' as const
@@ -156,19 +182,41 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
       });
 
       await APIService.submitMultiplePlans(plans);
+      
+      // Clear timeout on success
+      clearTimeout(timeoutId);
+      
       setSubmittedThisWeek(true);
       setCanSubmit(false);
       setFormData({ chapter: '', topics: '', homework: '' });
+      setSuccessMessage("Lesson plans submitted successfully!");
       
       // Refresh data
       await onRefresh();
       
+      // Show success message
       alert("✓ Lesson plans submitted successfully!\n\nA confirmation email has been dispatched to your registered email address.\n\nNote: You cannot submit additional lesson plans for this week. If modifications are required, please use the 'Request Modification' option.");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Submission error:", err);
-      alert("✗ Submission failed. Please verify your internet connectivity and attempt again.");
+      
+      // Clear timeout on error
+      clearTimeout(timeoutId);
+      
+      if (err.message?.includes('DUPLICATE_SUBMISSION:')) {
+        // Extract just the error message without the prefix
+        const errorMsg = err.message.replace('DUPLICATE_SUBMISSION:', '').trim();
+        alert(`✗ Submission Failed:\n\n${errorMsg}\n\nIf you need to make changes, please use the "Request Modification" option in your submission history.`);
+      } else if (err.message?.includes('Failed to submit')) {
+        alert(`✗ Submission Failed:\n\n${err.message}\n\nPlease check your internet connection and try again.`);
+      } else {
+        alert("✗ An unexpected error occurred during submission. Please try again. If the problem persists, contact the administration.");
+      }
     } finally {
       setIsSubmitting(false);
+      if (submissionTimeout) {
+        clearTimeout(submissionTimeout);
+        setSubmissionTimeout(null);
+      }
     }
   };
 
@@ -476,6 +524,18 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
           </div>
         )}
 
+        {successMessage && (
+          <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl animate-in slide-in-from-top">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-emerald-700 text-sm font-bold mb-1">Success!</p>
+                <p className="text-emerald-600 text-xs">{successMessage}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {!canSubmit && errorMessage ? (
           <div className="p-5 bg-rose-50 border border-rose-100 rounded-2xl animate-in slide-in-from-top">
             <div className="flex items-start gap-3">
@@ -566,7 +626,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
                 className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
                 value={formData.chapter} 
                 onChange={e => setFormData({ ...formData, chapter: e.target.value })}
-                disabled={!canSubmit}
+                disabled={!canSubmit || isSubmitting}
               />
             </div>
             <textarea 
@@ -576,7 +636,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
               className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 text-sm resize-none disabled:bg-slate-100 disabled:cursor-not-allowed" 
               value={formData.topics} 
               onChange={e => setFormData({ ...formData, topics: e.target.value })}
-              disabled={!canSubmit}
+              disabled={!canSubmit || isSubmitting}
             />
             <textarea 
               required 
@@ -585,7 +645,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
               className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 text-sm resize-none disabled:bg-slate-100 disabled:cursor-not-allowed" 
               value={formData.homework} 
               onChange={e => setFormData({ ...formData, homework: e.target.value })}
-              disabled={!canSubmit}
+              disabled={!canSubmit || isSubmitting}
             />
           </div>
 
@@ -613,6 +673,9 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
                   </>
                 )}
               </div>
+              {isSubmitting && (
+                <div className="absolute bottom-0 left-0 h-1 bg-indigo-400 animate-pulse w-full"></div>
+              )}
             </button>
             
             <div className="mt-4 text-center">
@@ -622,6 +685,11 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
               {!canSubmit && (
                 <p className="text-[10px] text-rose-400 font-bold mt-2">
                   Submission not permitted. Please review restrictions above.
+                </p>
+              )}
+              {isSubmitting && (
+                <p className="text-[10px] text-indigo-400 font-bold mt-2 animate-pulse">
+                  Please wait while your submission is being processed...
                 </p>
               )}
             </div>
@@ -693,6 +761,21 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
                 </div>
                 <div className="text-sm font-bold truncate" title={plan.chapter}>
                   {plan.chapter}
+                </div>
+                <div className="mt-2">
+                  {plan.resubmissionStatus === 'pending' ? (
+                    <span className="text-[7px] font-black bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded">
+                      Modification Pending
+                    </span>
+                  ) : plan.resubmissionStatus === 'approved' ? (
+                    <span className="text-[7px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded">
+                      Approved for Resubmission
+                    </span>
+                  ) : plan.resubmissionStatus === 'resubmitted' ? (
+                    <span className="text-[7px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded">
+                      Resubmitted
+                    </span>
+                  ) : null}
                 </div>
               </div>
             ))}
