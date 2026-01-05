@@ -8,7 +8,7 @@ import { useTeacherIdentity } from '../hooks/useTeacherIdentity';
 import { Teacher, LessonPlan, Assignment } from '../types';
 import { APIService } from '../services/api';
 import { INITIAL_TEACHERS, DEFAULT_TEACHER_PASSWORD } from '../constants';
-import { useTeacherIdentity } from '../hooks/useTeacherIdentity';
+
 
 
 interface AdminRegistryProps {
@@ -230,7 +230,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
         updates.password = DEFAULT_TEACHER_PASSWORD;
       }
       
-      await onUpdateTeacher(getTeacherId(teacher.email), updates);
+      await onUpdateTeacher(getTeacherId(editingTeacher.email), updates);
       setIsEditing(false);
       setEditingTeacher(null);
       setEditFormData({});
