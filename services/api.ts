@@ -252,8 +252,9 @@ export const APIService = {
           const normalizedEmail = normalizeEmail(teacher.email); // ✅ FIXED
           const teacherRef = doc(db, "teachers", normalizedEmail);
           
+          const { id: _, ...teacherWithoutId } = teacher; // 🔥 REMOVE OLD ID
           batch.set(teacherRef, {
-            ...teacher,
+            ...teacherWithoutId,
             id: normalizedEmail, // ✅ Store normalized email as ID
             email: normalizedEmail, // ✅ Store normalized email in email field
             password: teacher.password || DEFAULT_TEACHER_PASSWORD,
