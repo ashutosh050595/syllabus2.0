@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, CloudUpload, Loader2, Trash2, Edit3, AlertTriangle, 
-  Mail, CheckCircle2, RefreshCw, Save, X, Plus 
+  Mail, CheckCircle2, RefreshCw, Save, X, Plus, Eye, EyeOff 
 } from 'lucide-react';
 import { Teacher, LessonPlan, Assignment } from '../types';
 import { APIService } from '../services/api';
@@ -40,10 +40,13 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
     name: '',
     email: '',
     phone: '',
+    password: 'Teacher@2024', // ✅ Default password for new teacher
     isClassTeacher: false,
     classTeacherOf: null,
     assignments: []
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   useEffect(() => {
     if (editingTeacher) {
@@ -51,6 +54,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
         name: editingTeacher.name,
         email: editingTeacher.email,
         phone: editingTeacher.phone,
+        password: editingTeacher.password, // ✅ Password include karo
         isClassTeacher: editingTeacher.isClassTeacher,
         classTeacherOf: editingTeacher.classTeacherOf,
         assignments: [...editingTeacher.assignments]
@@ -112,13 +116,22 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
   const handleEditClick = (teacher: Teacher) => {
     setEditingTeacher(teacher);
     setIsEditing(true);
+    setShowEditPassword(false); // Reset password visibility
   };
 
   const handleSaveEdit = async () => {
     if (!editingTeacher || !editFormData) return;
     
     try {
-      await onUpdateTeacher(editingTeacher.id, editFormData);
+      // ✅ Password ko preserve karo agar empty nahi hai
+      const updates = { ...editFormData };
+      
+      // Agar password empty hai to default password set karo
+      if (!updates.password || updates.password.trim() === '') {
+        updates.password = 'Teacher@2024';
+      }
+      
+      await onUpdateTeacher(editingTeacher.id, updates);
       setIsEditing(false);
       setEditingTeacher(null);
       setEditFormData({});
@@ -178,7 +191,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
       name: newTeacher.name,
       email: newTeacher.email,
       phone: newTeacher.phone || '',
-      password: 'Teacher@2024',
+      password: newTeacher.password || 'Teacher@2024',
       isClassTeacher: newTeacher.isClassTeacher || false,
       classTeacherOf: newTeacher.classTeacherOf || null,
       assignments: newTeacher.assignments || []
@@ -192,6 +205,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
         name: '',
         email: '',
         phone: '',
+        password: 'Teacher@2024',
         isClassTeacher: false,
         classTeacherOf: null,
         assignments: []
@@ -248,6 +262,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
                     value={editFormData.email || ''}
                     onChange={(e) => setEditFormData(prev => ({ ...prev, email: e.target.value }))}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500"
+                    readOnly
                   />
                 </div>
                 <div>
@@ -260,6 +275,30 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
                     onChange={(e) => setEditFormData(prev => ({ ...prev, phone: e.target.value }))}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500"
                   />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-2">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showEditPassword ? "text" : "password"}
+                      value={editFormData.password || ''}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, password: e.target.value }))}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500 pr-10"
+                      placeholder="Enter new password (leave empty for default)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowEditPassword(!showEditPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-slate-400 mt-1">
+                    Leave empty to keep current password
+                  </p>
                 </div>
                 <div>
                   <label className="block text-[10px] font-black uppercase text-slate-400 mb-2">
@@ -436,6 +475,30 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500"
                 />
               </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase text-slate-400 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter password"
+                    value={newTeacher.password || ''}
+                    onChange={(e) => setNewTeacher(prev => ({ ...prev, password: e.target.value }))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <p className="text-[9px] text-slate-400 mt-1">
+                  Default: Teacher@2024
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-slate-100">
@@ -523,6 +586,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
                 <th className="pb-4 text-[10px] font-black uppercase text-slate-400 tracking-widest px-4">Faculty Member</th>
                 <th className="pb-4 text-[10px] font-black uppercase text-slate-400 tracking-widest px-4">Assignments</th>
                 <th className="pb-4 text-[10px] font-black uppercase text-slate-400 tracking-widest px-4">Status</th>
+                <th className="pb-4 text-[10px] font-black uppercase text-slate-400 tracking-widest px-4">Password</th>
                 <th className="pb-4 text-[10px] font-black uppercase text-slate-400 tracking-widest px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -551,6 +615,11 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
                     ) : (
                       <span className="text-[8px] font-black bg-slate-100 text-slate-400 px-2 py-1 rounded uppercase">Faculty</span>
                     )}
+                  </td>
+                  <td className="py-5 px-4">
+                    <div className="text-[9px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded">
+                      {teacher.password ? '••••••••' : 'Teacher@2024'}
+                    </div>
                   </td>
                   <td className="py-5 px-4 text-right">
                     <div className="flex justify-end gap-2">
