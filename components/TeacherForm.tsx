@@ -29,7 +29,8 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
   const [existingSubmission, setExistingSubmission] = useState<LessonPlan | null>(null);
   const [showSubmissionInfo, setShowSubmissionInfo] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [submissionTimeout, setSubmissionTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [submissionTimeout, setSubmissionTimeout] = useState<number | null>(null);
+// FIXED: NodeJS.Timeout is invalid in browser environment
   const [formData, setFormData] = useState({ chapter: '', topics: '', homework: '' });
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 
@@ -180,7 +181,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
     setIsSubmitting(true);
     
     // Set timeout to prevent infinite spinner (20 seconds)
-    const timeoutId = setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       setIsSubmitting(false);
       if (submissionTimeout) clearTimeout(submissionTimeout);
       alert("Submission is taking longer than expected. Please check your internet connection and try again. If the problem persists, contact the administration.");
@@ -228,7 +229,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
       console.error("Submission error:", err);
       
       // Clear timeout on error
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
       
       if (err.message?.includes('DUPLICATE_SUBMISSION:')) {
         const errorMsg = err.message.replace('DUPLICATE_SUBMISSION:', '').trim();
