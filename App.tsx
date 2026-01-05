@@ -7,6 +7,7 @@ import { AppState, LessonPlan, Teacher } from './types';
 import { APIService } from './services/api';
 import { INITIAL_TEACHERS, DEFAULT_TEACHER_PASSWORD } from './constants';
 import Layout from './components/Layout';
+import { normalizeEmail } from "./utils/identity";
 import AdminRegistry from './components/AdminRegistry';
 import AdminCompiler from './components/AdminCompiler';
 import TeacherForm from './components/TeacherForm';
