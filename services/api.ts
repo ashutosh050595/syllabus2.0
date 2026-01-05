@@ -1,3 +1,4 @@
+import { normalizeEmail, teacherIdFromEmail } from "../utils/identity";
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { 
   getFirestore, 
