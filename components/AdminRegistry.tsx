@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, CloudUpload, Loader2, Trash2, Edit3, AlertTriangle, 
-  Mail, CheckCircle2, RefreshCw, Save, X 
+  Mail, CheckCircle2, RefreshCw, Save, X, Plus 
 } from 'lucide-react';
 import { Teacher, LessonPlan, Assignment } from '../types';
 import { APIService } from '../services/api';
@@ -35,8 +35,16 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
     subject: '',
     sections: ''
   });
+  const [showAddTeacher, setShowAddTeacher] = useState(false);
+  const [newTeacher, setNewTeacher] = useState<Partial<Teacher>>({
+    name: '',
+    email: '',
+    phone: '',
+    isClassTeacher: false,
+    classTeacherOf: null,
+    assignments: []
+  });
 
-  // Initialize edit form when editingTeacher changes
   useEffect(() => {
     if (editingTeacher) {
       setEditFormData({
@@ -54,7 +62,6 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
     if (!confirm(`Seed cloud faculty registry with ${INITIAL_TEACHERS.length} local records?\n\nThis will add all initial teachers to the database.`)) return;
     setIsSeeding(true);
     try {
-      // First check if database is already seeded
       const currentTeachers = await APIService.fetchTeachers();
       if (currentTeachers.length > 0) {
         const shouldOverwrite = confirm(`Database already contains ${currentTeachers.length} teachers. Do you want to overwrite with initial teachers?`);
@@ -124,7 +131,6 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
       assignments: [...(prev.assignments || []), assignment]
     }));
 
-    // Reset new assignment form
     setNewAssignment({
       className: '10',
       subject: '',
@@ -144,9 +150,42 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
     }));
   };
 
+  const handleAddNewTeacher = async () => {
+    if (!newTeacher.name || !newTeacher.email) {
+      alert("Please enter both name and email.");
+      return;
+    }
+
+    const teacherData: Teacher = {
+      id: newTeacher.email,
+      name: newTeacher.name,
+      email: newTeacher.email,
+      phone: newTeacher.phone || '',
+      password: 'Teacher@2024',
+      isClassTeacher: newTeacher.isClassTeacher || false,
+      classTeacherOf: newTeacher.classTeacherOf || null,
+      assignments: newTeacher.assignments || []
+    };
+
+    try {
+      await onAddTeacher(teacherData);
+      setShowAddTeacher(false);
+      setNewTeacher({
+        name: '',
+        email: '',
+        phone: '',
+        isClassTeacher: false,
+        classTeacherOf: null,
+        assignments: []
+      });
+      alert("Teacher added successfully!");
+    } catch (error) {
+      alert("Failed to add teacher. Please try again.");
+    }
+  };
+
   return (
     <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
-      {/* Edit Teacher Modal */}
       {isEditing && editingTeacher && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[2.5rem] p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -222,7 +261,6 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
                 </div>
               </div>
 
-              {/* Assignments Section */}
               <div>
                 <div className="flex justify-between items-center mb-4">
                   <label className="block text-[10px] font-black uppercase text-slate-400">
@@ -233,7 +271,6 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
                   </span>
                 </div>
                 
-                {/* Add New Assignment Form */}
                 <div className="bg-slate-50 p-4 rounded-xl mb-4">
                   <h4 className="text-sm font-black text-slate-700 mb-3">Add New Assignment</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -276,7 +313,6 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
                   </div>
                 </div>
 
-                {/* Current Assignments List */}
                 <div className="space-y-2">
                   {editFormData.assignments?.map((assignment, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl">
@@ -327,6 +363,82 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
         </div>
       )}
 
+      {showAddTeacher && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[2.5rem] p-8 max-w-md w-full">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-black uppercase italic tracking-tight">Add New Teacher</h3>
+                <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em] mt-1">
+                  Add new faculty member
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowAddTeacher(false)}
+                className="p-2 text-slate-400 hover:text-rose-600 rounded-xl"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase text-slate-400 mb-2">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter teacher's name"
+                  value={newTeacher.name}
+                  onChange={(e) => setNewTeacher(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase text-slate-400 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="Enter teacher's email"
+                  value={newTeacher.email}
+                  onChange={(e) => setNewTeacher(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase text-slate-400 mb-2">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  placeholder="Enter phone number"
+                  value={newTeacher.phone}
+                  onChange={(e) => setNewTeacher(prev => ({ ...prev, phone: e.target.value }))}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-slate-100">
+              <button
+                onClick={() => setShowAddTeacher(false)}
+                className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddNewTeacher}
+                className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-indigo-700 flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Teacher
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
           <h3 className="text-xl font-black uppercase italic tracking-tight">Faculty Registry</h3>
@@ -335,6 +447,13 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
           </p>
         </div>
         <div className="flex gap-3">
+          <button 
+            onClick={() => setShowAddTeacher(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all"
+          >
+            <Plus className="h-3 w-3" />
+            Add Teacher
+          </button>
           <button 
             onClick={onRefresh}
             className="flex items-center gap-2 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-200 transition-all"
