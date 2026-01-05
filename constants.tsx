@@ -9,15 +9,13 @@ export const DEFAULT_TEACHER_PASSWORD = 'shstelaiya@123';
 
 // FIREBASE CONFIGURATION
 export const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCw3xYRbBdDk1dzOBBU00lGP6XFzyJgJwY",
-  authDomain: "lesson-plan-b4c8e.firebaseapp.com",
-  projectId: "lesson-plan-b4c8e",
-  storageBucket: "lesson-plan-b4c8e.firebasestorage.app",
-  messagingSenderId: "988824182644",
-  appId: "1:988824182644:web:efbc9bb135afaabeb9d621",
-  measurementId: "G-Y43N7T13E6"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
-
 export const INITIAL_TEACHERS: Teacher[] = [
 // ... existing teachers code ...
   {
