@@ -229,7 +229,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
         updates.password = DEFAULT_TEACHER_PASSWORD;
       }
       
-      await onUpdateTeacher(editingTeacher.id, updates);
+      await onUpdateTeacher(getTeacherId(teacher.email), updates);
       setIsEditing(false);
       setEditingTeacher(null);
       setEditFormData({});
@@ -284,10 +284,9 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
       return;
     }
 
-    const teacherData: Teacher = {
-      id: newTeacher.email.toLowerCase().trim(),
+    const teacherData: Teacher = normalizeTeacher({
       name: newTeacher.name,
-      email: newTeacher.email.toLowerCase().trim(),
+      email: newTeacher.email,
       phone: newTeacher.phone || '',
       password: newTeacher.password || DEFAULT_TEACHER_PASSWORD,
       isClassTeacher: newTeacher.isClassTeacher || false,
@@ -418,7 +417,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
                           <button 
                             onClick={() => {
                               if (confirm(`Remove ${teacher.name} from database?`)) {
-                                onRemoveTeacher(teacher.id).then(() => {
+                                onRemoveTeacher(getTeacherId(teacher.email)).then(() => {
                                   setFirebaseTeachers(prev => prev.filter(t => t.id !== teacher.id));
                                   onRefresh();
                                 });
