@@ -198,7 +198,29 @@ export const APIService = {
       throw new Error("Failed to remove teacher.");
     }
   },
+  async syncInitialTeachers(teachers: Teacher[]): Promise<void> {
+    try {
+      const batch = writeBatch(db);
 
+      teachers.forEach(teacher => {
+        const teacherRef = doc(db, "teachers", teacher.email);
+        batch.set(teacherRef, {
+          ...teacher,
+          id: teacher.email,
+          password: teacher.password || DEFAULT_TEACHER_PASSWORD,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      });
+
+      await batch.commit();
+    } catch (error) {
+      console.error("Error syncing initial teachers:", error);
+      throw new Error("Failed to seed teachers database.");
+    }
+  },
+
+  
   async getTeacherByEmail(email: string): Promise<Teacher | null> {
     try {
       const normalizedEmail = email.toLowerCase().trim();
