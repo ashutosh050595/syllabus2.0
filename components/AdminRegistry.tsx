@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, CloudUpload, Loader2, Trash2, Edit3, AlertTriangle, 
-  Mail, CheckCircle2, RefreshCw, Save, X, Plus, Eye, EyeOff 
+  Mail, CheckCircle2, RefreshCw, Save, X, Plus, Eye, EyeOff, 
+  Eye as EyeIcon, Database, FileText, AlertCircle
 } from 'lucide-react';
 import { Teacher, LessonPlan, Assignment } from '../types';
 import { APIService } from '../services/api';
-import { INITIAL_TEACHERS } from '../constants';
+import { INITIAL_TEACHERS, DEFAULT_TEACHER_PASSWORD } from '../constants';
 
 interface AdminRegistryProps {
   teachers: Teacher[];
@@ -40,13 +41,14 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
     name: '',
     email: '',
     phone: '',
-    password: 'Teacher@2024', // ✅ Default password for new teacher
+    password: 'Teacher@2024',
     isClassTeacher: false,
     classTeacherOf: null,
     assignments: []
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
+  const [showSeedPreview, setShowSeedPreview] = useState(false);
 
   useEffect(() => {
     if (editingTeacher) {
@@ -54,7 +56,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
         name: editingTeacher.name,
         email: editingTeacher.email,
         phone: editingTeacher.phone,
-        password: editingTeacher.password, // ✅ Password include karo
+        password: editingTeacher.password,
         isClassTeacher: editingTeacher.isClassTeacher,
         classTeacherOf: editingTeacher.classTeacherOf,
         assignments: [...editingTeacher.assignments]
@@ -63,6 +65,12 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
   }, [editingTeacher]);
 
   const handleSeed = async () => {
+    // ✅ FIX-1: Prevent multiple concurrent seeding
+    if (isSeeding) {
+      console.log("Seed operation already in progress, ignoring duplicate call");
+      return;
+    }
+
     if (!confirm(
       `Seed cloud faculty registry with ${INITIAL_TEACHERS.length} local records?\n\nThis will add all initial teachers to the database.`
     )) {
@@ -80,23 +88,23 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
         );
 
         if (!shouldOverwrite) {
+          setIsSeeding(false); // ✅ FIX-2: Stop spinner if user cancels overwrite
           return;
         }
 
-        // ✅ FINAL FIX: atomic delete (single batch)
         await APIService.clearTeachersCollection();
       }
 
-      // ✅ seed only after clean slate
       await APIService.syncInitialTeachers(INITIAL_TEACHERS);
 
       alert(`Success: ${INITIAL_TEACHERS.length} faculty members synchronized to cloud.`);
       await onRefresh();
+      setShowSeedPreview(false); // Hide preview after successful seed
     } catch (e) {
       console.error("Seed error:", e);
       alert("Sync error: " + e);
     } finally {
-      setIsSeeding(false); // ✅ spinner kabhi stuck nahi hoga
+      setIsSeeding(false); // ✅ FIX-3: Always stop spinner
     }
   };
 
@@ -104,7 +112,6 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
     if (!confirm("Send automated email reminders to all teachers who haven't submitted plans for next week?")) return;
     setIsSendingAlerts(true);
     try {
-      // FIXED: disabled GAS-based reminders to avoid cross-browser desync
       alert("Automated email reminders are currently disabled.");
     } catch (e) {
       alert("Failed to trigger warnings.");
@@ -116,26 +123,24 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
   const handleEditClick = (teacher: Teacher) => {
     setEditingTeacher(teacher);
     setIsEditing(true);
-    setShowEditPassword(false); // Reset password visibility
+    setShowEditPassword(false);
   };
 
   const handleSaveEdit = async () => {
     if (!editingTeacher || !editFormData) return;
     
     try {
-      // ✅ Password ko preserve karo agar empty nahi hai
       const updates = { ...editFormData };
       
-      // Agar password empty hai to default password set karo
       if (!updates.password || updates.password.trim() === '') {
-        updates.password = 'Teacher@2024';
+        updates.password = DEFAULT_TEACHER_PASSWORD;
       }
       
       await onUpdateTeacher(editingTeacher.id, updates);
       setIsEditing(false);
       setEditingTeacher(null);
       setEditFormData({});
-      await onRefresh(); // FIXED: refresh after edit
+      await onRefresh();
       alert("Teacher information updated successfully!");
     } catch (error) {
       alert("Failed to update teacher. Please try again.");
@@ -187,11 +192,11 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
     }
 
     const teacherData: Teacher = {
-      id: newTeacher.email,
+      id: newTeacher.email.toLowerCase().trim(),
       name: newTeacher.name,
-      email: newTeacher.email,
+      email: newTeacher.email.toLowerCase().trim(),
       phone: newTeacher.phone || '',
-      password: newTeacher.password || 'Teacher@2024',
+      password: newTeacher.password || DEFAULT_TEACHER_PASSWORD,
       isClassTeacher: newTeacher.isClassTeacher || false,
       classTeacherOf: newTeacher.classTeacherOf || null,
       assignments: newTeacher.assignments || []
@@ -199,13 +204,13 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
 
     try {
       await onAddTeacher(teacherData);
-      await onRefresh(); // FIXED: refresh after adding teacher
+      await onRefresh();
       setShowAddTeacher(false);
       setNewTeacher({
         name: '',
         email: '',
         phone: '',
-        password: 'Teacher@2024',
+        password: DEFAULT_TEACHER_PASSWORD,
         isClassTeacher: false,
         classTeacherOf: null,
         assignments: []
@@ -496,7 +501,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
                   </button>
                 </div>
                 <p className="text-[9px] text-slate-400 mt-1">
-                  Default: Teacher@2024
+                  Default: {DEFAULT_TEACHER_PASSWORD}
                 </p>
               </div>
             </div>
@@ -551,8 +556,16 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
             Send Warnings
           </button>
           <button 
+            onClick={() => setShowSeedPreview(true)}
+            disabled={isSeeding} // ✅ FIX-3: Disable when seeding
+            className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-amber-700 transition-all disabled:opacity-50"
+          >
+            <FileText className="h-3 w-3" />
+            Preview Seed Data
+          </button>
+          <button 
             onClick={handleSeed}
-            disabled={isSeeding}
+            disabled={isSeeding} // ✅ FIX-3: Disable when seeding
             className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all disabled:opacity-50"
           >
             {isSeeding ? (
@@ -566,17 +579,152 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
       </div>
 
       {teachers.length === 0 ? (
-        <div className="text-center py-20 border-2 border-dashed border-slate-100 rounded-3xl">
-          <Users className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-400 font-bold mb-2">No teachers found in database</p>
-          <p className="text-[10px] text-slate-300 mb-6">Click "Seed Database" to populate the faculty registry</p>
-          <button 
-            onClick={handleSeed}
-            disabled={isSeeding}
-            className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest"
-          >
-            {isSeeding ? 'Seeding...' : 'Seed Database'}
-          </button>
+        <div className="space-y-6">
+          <div className="text-center py-16 border-2 border-dashed border-slate-100 rounded-3xl">
+            <div className="flex flex-col items-center">
+              <AlertCircle className="h-16 w-16 text-amber-400 mb-4" />
+              <p className="text-slate-800 font-black text-lg mb-2">⚠️ Database is Empty</p>
+              <p className="text-slate-500 mb-6 max-w-md">
+                No teachers found in the database. You can either add individual teachers or seed the database with initial teacher data.
+              </p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setShowAddTeacher(true)}
+                  className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700"
+                >
+                  <Plus className="h-4 w-4 inline mr-2" />
+                  Add Teacher
+                </button>
+                <button 
+                  onClick={handleSeed}
+                  disabled={isSeeding} // ✅ FIX-3: Disable when seeding
+                  className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isSeeding ? (
+                    <>
+                      <Loader2 className="h-4 w-4 inline mr-2 animate-spin" />
+                      Seeding...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="h-4 w-4 inline mr-2" />
+                      Seed Database
+                    </>
+                  )}
+                </button>
+                <button 
+                  onClick={() => setShowSeedPreview(true)}
+                  disabled={isSeeding} // ✅ FIX-3: Disable when seeding
+                  className="px-6 py-3 bg-amber-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-amber-600 disabled:opacity-50"
+                >
+                  <EyeIcon className="h-4 w-4 inline mr-2" />
+                  Preview Seed Data
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Seed Preview Section */}
+          {showSeedPreview && (
+            <div className="border border-amber-200 bg-amber-50 rounded-3xl p-6">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h4 className="text-lg font-black uppercase italic tracking-tight text-amber-800">
+                    📋 Seed Data Preview
+                  </h4>
+                  <p className="text-[10px] text-amber-600 font-black uppercase tracking-[0.2em] mt-1">
+                    {INITIAL_TEACHERS.length} teachers available for seeding
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setShowSeedPreview(false)}
+                    disabled={isSeeding} // ✅ FIX-3: Disable when seeding
+                    className="px-4 py-2 bg-amber-100 text-amber-700 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-amber-200 disabled:opacity-50"
+                  >
+                    Close Preview
+                  </button>
+                  <button 
+                    onClick={handleSeed}
+                    disabled={isSeeding} // ✅ FIX-3: Disable when seeding
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isSeeding ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <CloudUpload className="h-3 w-3" />
+                    )}
+                    {isSeeding ? 'Seeding...' : 'Seed Now'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-amber-200">
+                      <th className="pb-4 text-[10px] font-black uppercase text-amber-600 tracking-widest px-4">Faculty Member</th>
+                      <th className="pb-4 text-[10px] font-black uppercase text-amber-600 tracking-widest px-4">Assignments</th>
+                      <th className="pb-4 text-[10px] font-black uppercase text-amber-600 tracking-widest px-4">Status</th>
+                      <th className="pb-4 text-[10px] font-black uppercase text-amber-600 tracking-widest px-4">Password</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100">
+                    {INITIAL_TEACHERS.map(teacher => (
+                      <tr key={teacher.email} className="group hover:bg-amber-100/50 transition-colors">
+                        <td className="py-5 px-4">
+                          <div className="font-black text-slate-900 italic">{teacher.name}</div>
+                          <div className="text-[10px] text-slate-600 font-bold">{teacher.email}</div>
+                          <div className="text-[8px] text-slate-400 font-bold">{teacher.phone}</div>
+                        </td>
+                        <td className="py-5 px-4">
+                          <div className="flex flex-wrap gap-1">
+                            {teacher.assignments.map((asgn, idx) => (
+                              <span key={idx} className="text-[8px] font-black bg-white border border-amber-200 text-amber-700 px-2 py-0.5 rounded uppercase">
+                                {asgn.subject} ({asgn.className})
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-5 px-4">
+                          {teacher.isClassTeacher ? (
+                            <span className="text-[8px] font-black bg-emerald-50 text-emerald-700 px-2 py-1 rounded uppercase">
+                              CT {teacher.classTeacherOf?.className}-{teacher.classTeacherOf?.section}
+                            </span>
+                          ) : (
+                            <span className="text-[8px] font-black bg-amber-100 text-amber-700 px-2 py-1 rounded uppercase">Faculty</span>
+                          )}
+                        </td>
+                        <td className="py-5 px-4">
+                          <div className="text-[9px] font-bold text-slate-600 bg-amber-100 px-2 py-1 rounded">
+                            {teacher.password || DEFAULT_TEACHER_PASSWORD}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div className="mt-6 pt-6 border-t border-amber-200 flex justify-between items-center">
+                <p className="text-[10px] text-amber-600">
+                  Total: {INITIAL_TEACHERS.length} teachers • Preview only - Click "Seed Now" to add to database
+                </p>
+                <button 
+                  onClick={handleSeed}
+                  disabled={isSeeding} // ✅ FIX-3: Disable when seeding
+                  className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSeeding ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CloudUpload className="h-4 w-4" />
+                  )}
+                  {isSeeding ? 'Seeding Database...' : 'Seed Database Now'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -618,7 +766,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
                   </td>
                   <td className="py-5 px-4">
                     <div className="text-[9px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded">
-                      {teacher.password ? '••••••••' : 'Teacher@2024'}
+                      {teacher.password ? '••••••••' : DEFAULT_TEACHER_PASSWORD}
                     </div>
                   </td>
                   <td className="py-5 px-4 text-right">
