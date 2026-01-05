@@ -157,50 +157,61 @@ const App: React.FC = () => {
         }
       }
 
-      // For teacher login
-      let teachers = state.teachers;
-      if (teachers.length === 0) {
-        console.log("No teachers in state, fetching from API...");
-        teachers = await APIService.fetchTeachers();
-        console.log(`Fetched ${teachers.length} teachers for login`);
-      }
+      // For teacher login - always fetch fresh data
+      console.log("Fetching teachers for login...");
+      const teachers = await APIService.fetchTeachers();
+      console.log(`Fetched ${teachers.length} teachers for login verification`);
 
       const normalizedEmail = loginEmail.toLowerCase().trim();
-      const teacher = teachers.find(t => t.email.toLowerCase().trim() === normalizedEmail);
+      console.log("Looking for teacher with email:", normalizedEmail);
       
-      console.log("Login attempt:", { 
+      // Find teacher by email (email is the document ID in Firestore)
+      const teacher = teachers.find(t => {
+        const teacherEmail = t.email?.toLowerCase().trim();
+        return teacherEmail === normalizedEmail;
+      });
+      
+      console.log("Login attempt result:", { 
         email: normalizedEmail, 
         teacherFound: !!teacher,
-        teacherEmail: teacher?.email 
+        teacherEmail: teacher?.email,
+        allTeachers: teachers.map(t => t.email)
       });
 
       if (!teacher) {
-        setLoginError("Invalid credentials. Teacher not found in the system.");
+        setLoginError(`Teacher not found with email: ${normalizedEmail}. Please contact administrator.`);
         return;
       }
 
+      // Get default password
       const { DEFAULT_TEACHER_PASSWORD } = await import('./constants');
       const expectedPass = teacher.password || DEFAULT_TEACHER_PASSWORD;
-
+      
       console.log("Password check:", {
-        expected: expectedPass.substring(0, 3) + '...',
-        provided: loginPassword.substring(0, 3) + '...'
+        hasPasswordInDB: !!teacher.password,
+        usingDefault: !teacher.password,
+        expectedFirst3: expectedPass.substring(0, 3),
+        providedFirst3: loginPassword.substring(0, 3)
       });
 
+      // Check password
       if (loginPassword === expectedPass) {
         setState(prev => ({ ...prev, currentUser: teacher, teachers }));
         localStorage.setItem('shs_user', JSON.stringify(teacher));
         
         // Log the login activity
-        await APIService.logLoginActivity({ email: teacher.email, name: teacher.name });
+        await APIService.logLoginActivity({ 
+          email: teacher.email, 
+          name: teacher.name 
+        });
         
         await fetchData(teacher);
       } else {
-        setLoginError("Invalid credentials. Please check your password.");
+        setLoginError("Invalid password. Please use the default password provided by the school.");
       }
     } catch (err: any) {
       console.error("Login error:", err);
-      setLoginError(err.message || "Network failed. Please check internet connection.");
+      setLoginError(err.message || "Network error. Please check internet connection and try again.");
     } finally {
       setIsSyncing(false);
     }
