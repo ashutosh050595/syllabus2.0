@@ -59,24 +59,40 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
   }, [editingTeacher]);
 
   const handleSeed = async () => {
-    if (!confirm(`Seed cloud faculty registry with ${INITIAL_TEACHERS.length} local records?\n\nThis will add all initial teachers to the database.`)) return;
+    if (!confirm(
+      `Seed cloud faculty registry with ${INITIAL_TEACHERS.length} local records?\n\nThis will add all initial teachers to the database.`
+    )) {
+      return;
+    }
+
     setIsSeeding(true);
+
     try {
       const currentTeachers = await APIService.fetchTeachers();
+
       if (currentTeachers.length > 0) {
-        const shouldOverwrite = confirm(`Database already contains ${currentTeachers.length} teachers. Do you want to overwrite with initial teachers?`);
-        if (!shouldOverwrite) return;
+        const shouldOverwrite = confirm(
+          `Database already contains ${currentTeachers.length} teachers. Do you want to overwrite with initial teachers?`
+        );
+
+        if (!shouldOverwrite) {
+          return;
+        }
+
+        // ✅ FINAL FIX: atomic delete (single batch)
+        await APIService.clearTeachersCollection();
       }
-      
+
+      // ✅ seed only after clean slate
       await APIService.syncInitialTeachers(INITIAL_TEACHERS);
-      setSeedComplete(true);
+
       alert(`Success: ${INITIAL_TEACHERS.length} faculty members synchronized to cloud.`);
-      await onRefresh(); // FIXED: ensure Firestore refresh after seeding
+      await onRefresh();
     } catch (e) {
       console.error("Seed error:", e);
       alert("Sync error: " + e);
     } finally {
-      setIsSeeding(false);
+      setIsSeeding(false); // ✅ spinner kabhi stuck nahi hoga
     }
   };
 
