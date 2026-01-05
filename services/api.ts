@@ -24,6 +24,11 @@ const GAS_WORKER_URL =
   import.meta.env.VITE_GAS_WORKER_URL ||
   'https://script.google.com/macros/s/AKfycbySZzxF_gOP2MRMp3jYJ9SgQypkgCpxb1EPKt88HfTV1ggrzxVQ_J96IP6LpTMedF-unQ/exec';
 
+// ✅ HELPER FUNCTION: Email normalization
+const normalizeEmail = (email: string): string => {
+  return email.toLowerCase().trim();
+};
+
 export const APIService = {
   async fetchTeachers(): Promise<Teacher[]> {
     try {
@@ -162,10 +167,13 @@ export const APIService = {
 
   async addTeacher(teacher: Teacher): Promise<void> {
     try {
-      const teacherRef = doc(db, "teachers", teacher.email);
+      const normalizedEmail = normalizeEmail(teacher.email); // ✅ FIXED
+      const teacherRef = doc(db, "teachers", normalizedEmail);
+      
       await setDoc(teacherRef, {
         ...teacher,
-        id: teacher.email,
+        id: normalizedEmail, // ✅ Store normalized email as ID
+        email: normalizedEmail, // ✅ Store normalized email in email field too
         password: teacher.password || DEFAULT_TEACHER_PASSWORD,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -178,11 +186,25 @@ export const APIService = {
 
   async updateTeacher(email: string, updates: Partial<Teacher>): Promise<void> {
     try {
-      const teacherRef = doc(db, "teachers", email);
-      const updateData: any = { ...updates, updatedAt: serverTimestamp() };
+      const normalizedEmail = normalizeEmail(email); // ✅ FIXED
+      const teacherRef = doc(db, "teachers", normalizedEmail);
+      
+      const updateData: any = { 
+        ...updates, 
+        updatedAt: serverTimestamp() 
+      };
+      
+      // ✅ FIX: If email is being updated, normalize it too
+      if ('email' in updates && updates.email) {
+        updateData.email = normalizeEmail(updates.email);
+        updateData.id = normalizeEmail(updates.email);
+      }
+      
+      // ✅ FIX: Password ko preserve karo
       if ('password' in updates && updates.password === undefined) {
         delete updateData.password;
       }
+      
       await updateDoc(teacherRef, updateData);
     } catch (error) {
       console.error("Error updating teacher:", error);
@@ -192,7 +214,8 @@ export const APIService = {
 
   async removeTeacher(email: string): Promise<void> {
     try {
-      await deleteDoc(doc(db, "teachers", email));
+      const normalizedEmail = normalizeEmail(email); // ✅ FIXED
+      await deleteDoc(doc(db, "teachers", normalizedEmail));
     } catch (error) {
       console.error("Error removing teacher:", error);
       throw new Error("Failed to remove teacher.");
@@ -218,7 +241,7 @@ export const APIService = {
 
   async syncInitialTeachers(teachers: Teacher[]): Promise<void> {
     try {
-      const BATCH_SIZE = 400; // FIXED: Firestore limit is 500
+      const BATCH_SIZE = 400; // Firestore limit is 500
       let index = 0;
 
       while (index < teachers.length) {
@@ -226,17 +249,20 @@ export const APIService = {
         const slice = teachers.slice(index, index + BATCH_SIZE);
 
         slice.forEach(teacher => {
-          const teacherRef = doc(db, "teachers", teacher.email);
+          const normalizedEmail = normalizeEmail(teacher.email); // ✅ FIXED
+          const teacherRef = doc(db, "teachers", normalizedEmail);
+          
           batch.set(teacherRef, {
             ...teacher,
-            id: teacher.email,
+            id: normalizedEmail, // ✅ Store normalized email as ID
+            email: normalizedEmail, // ✅ Store normalized email in email field
             password: teacher.password || DEFAULT_TEACHER_PASSWORD,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
           });
         });
 
-        await batch.commit(); // FIXED: commit in safe chunks
+        await batch.commit();
         index += BATCH_SIZE;
       }
     } catch (error) {
@@ -247,10 +273,12 @@ export const APIService = {
 
   async getTeacherByEmail(email: string): Promise<Teacher | null> {
     try {
-      const normalizedEmail = email.toLowerCase().trim();
+      const normalizedEmail = normalizeEmail(email); // ✅ Already fixed
       const teacherRef = doc(db, "teachers", normalizedEmail);
-      const snap = await getDoc(teacherRef); // FIXED: authoritative Firestore read to avoid cross-browser stale cache
+      const snap = await getDoc(teacherRef);
+      
       if (!snap.exists()) return null;
+      
       const data = snap.data();
       return {
         ...data,
