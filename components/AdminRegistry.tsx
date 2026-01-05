@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { Users, CloudUpload, Loader2, Trash2, Edit3, AlertTriangle, Mail, CheckCircle2 } from 'lucide-react';
+import { Users, CloudUpload, Loader2, Trash2, Edit3, AlertTriangle, Mail, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Teacher, LessonPlan } from '../types';
 import { APIService } from '../services/api';
 import { INITIAL_TEACHERS } from '../constants';
 
 interface AdminRegistryProps {
   teachers: Teacher[];
-  lessonPlans: LessonPlan[];
+  lessonPlans: LessonPlans[];
   onAddTeacher: (teacher: Teacher) => Promise<void>;
   onUpdateTeacher: (id: string, updates: Partial<Teacher>) => Promise<void>;
   onRemoveTeacher: (id: string) => Promise<void>;
+  onRefresh: () => Promise<void>;
 }
 
 const AdminRegistry: React.FC<AdminRegistryProps> = ({ 
@@ -17,21 +18,28 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
   lessonPlans, 
   onAddTeacher, 
   onUpdateTeacher, 
-  onRemoveTeacher 
+  onRemoveTeacher,
+  onRefresh 
 }) => {
   const [isSeeding, setIsSeeding] = useState(false);
   const [isSendingAlerts, setIsSendingAlerts] = useState(false);
   const [seedComplete, setSeedComplete] = useState(false);
 
   const handleSeed = async () => {
-    if (!confirm(`Seed cloud faculty registry with ${INITIAL_TEACHERS.length} local records?`)) return;
+    if (!confirm(`Seed cloud faculty registry with ${INITIAL_TEACHERS.length} local records?\n\nThis will add all initial teachers to the database.`)) return;
     setIsSeeding(true);
     try {
+      // First check if database is already seeded
+      const currentTeachers = await APIService.fetchTeachers();
+      if (currentTeachers.length > 0) {
+        const shouldOverwrite = confirm(`Database already contains ${currentTeachers.length} teachers. Do you want to overwrite with initial teachers?`);
+        if (!shouldOverwrite) return;
+      }
+      
       await APIService.syncInitialTeachers(INITIAL_TEACHERS);
       setSeedComplete(true);
       alert(`Success: ${INITIAL_TEACHERS.length} faculty members synchronized to cloud.`);
-      // Reload the page to fetch updated data
-      setTimeout(() => window.location.reload(), 1000);
+      await onRefresh(); // Refresh the data
     } catch (e) {
       console.error("Seed error:", e);
       alert("Sync error: " + e);
@@ -64,6 +72,13 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
         </div>
         <div className="flex gap-3">
           <button 
+            onClick={onRefresh}
+            className="flex items-center gap-2 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-200 transition-all"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Refresh
+          </button>
+          <button 
             onClick={handleSendWarnings}
             disabled={isSendingAlerts}
             className="flex items-center gap-2 px-6 py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all disabled:opacity-50"
@@ -73,17 +88,15 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
           </button>
           <button 
             onClick={handleSeed}
-            disabled={isSeeding || seedComplete}
+            disabled={isSeeding}
             className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all disabled:opacity-50"
           >
             {isSeeding ? (
               <Loader2 className="h-3 w-3 animate-spin" />
-            ) : seedComplete ? (
-              <CheckCircle2 className="h-3 w-3" />
             ) : (
               <CloudUpload className="h-3 w-3" />
             )}
-            {isSeeding ? 'Seeding...' : seedComplete ? 'Seeded' : 'Seed Cloud'}
+            {isSeeding ? 'Seeding...' : 'Seed Database'}
           </button>
         </div>
       </div>
@@ -92,7 +105,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
         <div className="text-center py-20 border-2 border-dashed border-slate-100 rounded-3xl">
           <Users className="h-12 w-12 text-slate-300 mx-auto mb-4" />
           <p className="text-slate-400 font-bold mb-2">No teachers found in database</p>
-          <p className="text-[10px] text-slate-300 mb-6">Click "Seed Cloud" to populate the faculty registry</p>
+          <p className="text-[10px] text-slate-300 mb-6">Click "Seed Database" to populate the faculty registry</p>
           <button 
             onClick={handleSeed}
             disabled={isSeeding}
