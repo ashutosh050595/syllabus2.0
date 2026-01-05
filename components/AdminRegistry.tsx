@@ -4,6 +4,7 @@ import {
   Mail, CheckCircle2, RefreshCw, Save, X, Plus, Eye, EyeOff, 
   Eye as EyeIcon, Database, FileText, AlertCircle, Download, Server
 } from 'lucide-react';
+import { useTeacherIdentity } from '../hooks/useTeacherIdentity';
 import { Teacher, LessonPlan, Assignment } from '../types';
 import { APIService } from '../services/api';
 import { INITIAL_TEACHERS, DEFAULT_TEACHER_PASSWORD } from '../constants';
