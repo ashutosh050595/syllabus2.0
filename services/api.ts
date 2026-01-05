@@ -198,37 +198,36 @@ export const APIService = {
       throw new Error("Failed to remove teacher.");
     }
   },
- async syncInitialTeachers(teachers: Teacher[]): Promise<void> {
-  try {
-    const BATCH_SIZE = 400; // FIXED: Firestore limit is 500
-    let index = 0;
 
-    while (index < teachers.length) {
-      const batch = writeBatch(db);
-      const slice = teachers.slice(index, index + BATCH_SIZE);
+  async syncInitialTeachers(teachers: Teacher[]): Promise<void> {
+    try {
+      const BATCH_SIZE = 400; // FIXED: Firestore limit is 500
+      let index = 0;
 
-      slice.forEach(teacher => {
-        const teacherRef = doc(db, "teachers", teacher.email);
-        batch.set(teacherRef, {
-          ...teacher,
-          id: teacher.email,
-          password: teacher.password || DEFAULT_TEACHER_PASSWORD,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
+      while (index < teachers.length) {
+        const batch = writeBatch(db);
+        const slice = teachers.slice(index, index + BATCH_SIZE);
+
+        slice.forEach(teacher => {
+          const teacherRef = doc(db, "teachers", teacher.email);
+          batch.set(teacherRef, {
+            ...teacher,
+            id: teacher.email,
+            password: teacher.password || DEFAULT_TEACHER_PASSWORD,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
         });
-      });
 
-      await batch.commit(); // FIXED: commit in safe chunks
-      index += BATCH_SIZE;
+        await batch.commit(); // FIXED: commit in safe chunks
+        index += BATCH_SIZE;
+      }
+    } catch (error) {
+      console.error("Error syncing initial teachers:", error);
+      throw new Error("Failed to seed teachers database.");
     }
-  } catch (error) {
-    console.error("Error syncing initial teachers:", error);
-    throw new Error("Failed to seed teachers database.");
-  }
-},
+  },
 
-   
-  
   async getTeacherByEmail(email: string): Promise<Teacher | null> {
     try {
       const normalizedEmail = email.toLowerCase().trim();
