@@ -273,24 +273,46 @@ export const APIService = {
     }
   },
 
-  async getTeacherByEmail(email: string): Promise<Teacher | null> {
-    try {
-      const normalizedEmail = normalizeEmail(email); // ✅ Already fixed
-      const teacherRef = doc(db, "teachers", normalizedEmail);
-      const snap = await getDoc(teacherRef);
-      
-      if (!snap.exists()) return null;
-      
-      const data = snap.data();
+ async getTeacherByEmail(email: string): Promise<Teacher | null> {
+  try {
+    const normalizedEmail = normalizeEmail(email);
+
+    // 🔹 STEP 1: Direct lookup (fast & ideal)
+    const directRef = doc(db, "teachers", normalizedEmail);
+    const directSnap = await getDoc(directRef);
+
+    if (directSnap.exists()) {
+      const data = directSnap.data();
       return {
         ...data,
-        id: snap.id,
-        email: data.email || snap.id,
+        id: directSnap.id,
+        email: data.email || directSnap.id,
         password: data.password || DEFAULT_TEACHER_PASSWORD
       } as Teacher;
-    } catch (error) {
-      console.error("Error getting teacher by email:", error);
-      return null;
     }
+
+    // 🔹 STEP 2: Fallback query (for old / inconsistent data)
+    const q = query(
+      collection(db, "teachers"),
+      where("email", "==", normalizedEmail)
+    );
+
+    const querySnap = await getDocs(q);
+
+    if (querySnap.empty) return null;
+
+    const docSnap = querySnap.docs[0];
+    const data = docSnap.data();
+
+    return {
+      ...data,
+      id: docSnap.id,
+      email: data.email || docSnap.id,
+      password: data.password || DEFAULT_TEACHER_PASSWORD
+    } as Teacher;
+
+  } catch (error) {
+    console.error("Error getting teacher by email:", error);
+    return null;
   }
-};
+}
