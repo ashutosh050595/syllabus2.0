@@ -8,7 +8,7 @@ import { useTeacherIdentity } from '../hooks/useTeacherIdentity';
 import { Teacher, LessonPlan, Assignment } from '../types';
 import { APIService } from '../services/api';
 import { INITIAL_TEACHERS, DEFAULT_TEACHER_PASSWORD } from '../constants';
-import { normalizeEmail } from "../utils/identity";
+import { useTeacherIdentity } from '../hooks/useTeacherIdentity';
 
 
 interface AdminRegistryProps {
@@ -28,6 +28,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
   onRemoveTeacher,
   onRefresh 
 }) => {
+  const { normalizeTeacher, getTeacherId } = useTeacherIdentity();
   const [isSeeding, setIsSeeding] = useState(false);
   const [isSendingAlerts, setIsSendingAlerts] = useState(false);
   const [seedComplete, setSeedComplete] = useState(false);
