@@ -7,6 +7,8 @@ import {
 import { Teacher, LessonPlan, Assignment } from '../types';
 import { APIService } from '../services/api';
 import { INITIAL_TEACHERS, DEFAULT_TEACHER_PASSWORD } from '../constants';
+import { normalizeEmail } from "../utils/identity";
+
 
 interface AdminRegistryProps {
   teachers: Teacher[];
