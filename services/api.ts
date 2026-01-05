@@ -1,5 +1,18 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
-import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, writeBatch, updateDoc } from "firebase/firestore";
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  collection, 
+  getDocs, 
+  writeBatch, 
+  updateDoc,
+  query,
+  where,
+  getDoc,
+  serverTimestamp
+} from "firebase/firestore";
 import { FIREBASE_CONFIG } from "../constants";
 import { LessonPlan, Teacher, LoginLog } from "../types";
 
@@ -13,9 +26,14 @@ export const APIService = {
   async fetchTeachers(): Promise<Teacher[]> {
     try {
       const querySnapshot = await getDocs(collection(db, "teachers"));
-      return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Teacher));
+      const teachers = querySnapshot.docs.map(doc => ({ 
+        ...doc.data(), 
+        id: doc.id 
+      } as Teacher));
+      console.log(`Fetched ${teachers.length} teachers from Firestore`);
+      return teachers;
     } catch (e) {
-      console.warn("Teachers fetch failed, using offline fallback");
+      console.error("Teachers fetch failed:", e);
       return [];
     }
   },
@@ -23,8 +41,14 @@ export const APIService = {
   async fetchLessonPlans(): Promise<LessonPlan[]> {
     try {
       const querySnapshot = await getDocs(collection(db, "lessonPlans"));
-      return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as LessonPlan));
+      const plans = querySnapshot.docs.map(doc => ({ 
+        ...doc.data(), 
+        id: doc.id 
+      } as LessonPlan));
+      console.log(`Fetched ${plans.length} lesson plans from Firestore`);
+      return plans;
     } catch (e) {
+      console.error("Lesson plans fetch failed:", e);
       return [];
     }
   },
@@ -34,15 +58,22 @@ export const APIService = {
       const querySnapshot = await getDocs(collection(db, "loginLogs"));
       return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as LoginLog));
     } catch (e) {
+      console.error("Login logs fetch failed:", e);
       return [];
     }
   },
 
   async submitMultiplePlans(plans: Omit<LessonPlan, 'id' | 'submittedAt'>[]): Promise<void> {
     try {
-      // First, check if any of these plans already exist with 'none' status
-      const existingPlans = await this.fetchLessonPlans();
+      console.log("Starting submission for", plans.length, "plans");
       
+      // Validate input
+      if (!plans || plans.length === 0) {
+        throw new Error("No lesson plans provided for submission.");
+      }
+
+      // Check if any of these plans already exist
+      const existingPlans = await this.fetchLessonPlans();
       const duplicateErrors: string[] = [];
       
       plans.forEach(plan => {
@@ -66,68 +97,63 @@ export const APIService = {
         throw new Error(`DUPLICATE_SUBMISSION: ${duplicateErrors.join(' ')} If modifications are required, please use the "Request Modification" option.`);
       }
       
-      // If we're here, all plans are valid to submit
+      // Prepare batch
       const batch = writeBatch(db);
       const timestamp = new Date().toISOString();
       
       plans.forEach(plan => {
-        // Unique ID to prevent duplication
+        // Create a unique ID for the plan
         const id = `${plan.teacherId}_${plan.className}_${plan.section}_${plan.subject}_${plan.weekStarting}`
           .replace(/[@.]/g, '_')
           .replace(/\s+/g, '');
         
         const planRef = doc(db, "lessonPlans", id);
-        batch.set(planRef, {
+        
+        const planData = {
           ...plan,
           id,
           submittedAt: timestamp,
-          resubmissionStatus: plan.resubmissionStatus || 'none'
-        });
+          resubmissionStatus: plan.resubmissionStatus || 'none',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+        
+        batch.set(planRef, planData);
       });
 
-      await batch.commit();
+      // Commit batch with timeout
+      console.log("Committing batch to Firestore...");
+      await this.withTimeout(batch.commit(), 15000, "Firestore batch commit timeout");
+      console.log("Batch committed successfully");
 
-      // Send email confirmation for each unique teacher
+      // Send email confirmations in background (don't wait for them)
       if (plans.length > 0 && GAS_WORKER_URL && !GAS_WORKER_URL.includes('placeholder')) {
-        const uniqueTeachers = Array.from(new Set(plans.map(p => p.teacherId)));
-        
-        uniqueTeachers.forEach(teacherEmail => {
-          const teacherPlans = plans.filter(p => p.teacherId === teacherEmail);
-          const emailPayload = {
-            action: 'submission_alert',
-            teacherEmail: teacherEmail,
-            teacherName: teacherPlans[0].teacherName,
-            weekRange: teacherPlans[0].weekLabel,
-            summary: teacherPlans.map(p => `${p.className}-${p.section} (${p.subject})`).join(', ')
-          };
-
-          fetch(GAS_WORKER_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(emailPayload)
-          }).catch(() => console.debug("Email background task initiated."));
-        });
+        this.sendEmailConfirmations(plans);
       }
       
-    } catch (error) {
+      console.log("Submission completed successfully");
+      
+    } catch (error: any) {
       console.error("Submission error in submitMultiplePlans:", error);
-      if (error instanceof Error) {
-        // Re-throw with proper error message
-        throw new Error(error.message);
+      if (error.message?.includes('DUPLICATE_SUBMISSION')) {
+        throw error;
       }
-      throw new Error("Failed to submit lesson plans. Please check your connection and try again.");
+      throw new Error(`Failed to submit lesson plans: ${error.message || 'Unknown error'}`);
     }
   },
 
   async requestResubmission(planId: string, teacherEmail: string, teacherName: string, weekRange: string): Promise<void> {
-    if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
+    if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) {
+      console.warn("GAS_WORKER_URL not configured, skipping email notification");
+      return;
+    }
     
     try {
       // Update the plan status in Firebase
       const planRef = doc(db, "lessonPlans", planId);
       await updateDoc(planRef, {
-        resubmissionStatus: 'pending'
+        resubmissionStatus: 'pending',
+        updatedAt: serverTimestamp()
       });
 
       // Send request to GAS for email notifications
@@ -139,12 +165,7 @@ export const APIService = {
         weekRange: weekRange
       };
 
-      fetch(GAS_WORKER_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(resubmitPayload)
-      }).catch(() => console.debug("Resubmission request sent."));
+      this.sendToGAS(resubmitPayload);
     } catch (error) {
       console.error("Error requesting resubmission:", error);
       throw new Error("Failed to submit resubmission request. Please try again.");
@@ -155,7 +176,14 @@ export const APIService = {
     if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
     
     try {
-      // Send approval email to teacher
+      // Update resubmission status to 'approved'
+      const planRef = doc(db, "lessonPlans", planId);
+      await updateDoc(planRef, {
+        resubmissionStatus: 'approved',
+        updatedAt: serverTimestamp()
+      });
+
+      // Send approval email
       const approvePayload = {
         action: 'approve_resubmission',
         teacherEmail: teacherEmail,
@@ -165,18 +193,7 @@ export const APIService = {
         approvalLink: `${window.location.origin}/teacher/submit`
       };
 
-      fetch(GAS_WORKER_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(approvePayload)
-      }).catch(() => console.debug("Approval email sent."));
-
-      // Update resubmission status to 'approved' (don't delete immediately)
-      const planRef = doc(db, "lessonPlans", planId);
-      await updateDoc(planRef, {
-        resubmissionStatus: 'approved'
-      });
+      this.sendToGAS(approvePayload);
     } catch (error) {
       console.error("Error approving resubmission:", error);
       throw new Error("Failed to approve resubmission request.");
@@ -187,7 +204,14 @@ export const APIService = {
     if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
     
     try {
-      // Send decline email to teacher
+      // Update resubmission status back to 'none'
+      const planRef = doc(db, "lessonPlans", planId);
+      await updateDoc(planRef, {
+        resubmissionStatus: 'none',
+        updatedAt: serverTimestamp()
+      });
+
+      // Send decline email
       const declinePayload = {
         action: 'decline_resubmission',
         teacherEmail: teacherEmail,
@@ -196,18 +220,7 @@ export const APIService = {
         planId: planId
       };
 
-      fetch(GAS_WORKER_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(declinePayload)
-      }).catch(() => console.debug("Decline email sent."));
-
-      // Update resubmission status back to 'none'
-      const planRef = doc(db, "lessonPlans", planId);
-      await updateDoc(planRef, {
-        resubmissionStatus: 'none'
-      });
+      this.sendToGAS(declinePayload);
     } catch (error) {
       console.error("Error declining resubmission:", error);
       throw new Error("Failed to decline resubmission request.");
@@ -226,7 +239,10 @@ export const APIService = {
   async updateLessonPlan(planId: string, updates: Partial<LessonPlan>): Promise<void> {
     try {
       const planRef = doc(db, "lessonPlans", planId);
-      await updateDoc(planRef, updates);
+      await updateDoc(planRef, {
+        ...updates,
+        updatedAt: serverTimestamp()
+      });
     } catch (error) {
       console.error("Error updating lesson plan:", error);
       throw new Error("Failed to update lesson plan.");
@@ -234,24 +250,62 @@ export const APIService = {
   },
 
   async addTeacher(teacher: Teacher): Promise<void> {
-    await setDoc(doc(db, "teachers", teacher.email), teacher);
+    try {
+      const teacherRef = doc(db, "teachers", teacher.email);
+      await setDoc(teacherRef, {
+        ...teacher,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      console.log(`Teacher ${teacher.email} added successfully`);
+    } catch (error) {
+      console.error("Error adding teacher:", error);
+      throw new Error("Failed to add teacher.");
+    }
   },
 
   async updateTeacher(id: string, updates: Partial<Teacher>): Promise<void> {
-    await setDoc(doc(db, "teachers", id), updates, { merge: true });
+    try {
+      const teacherRef = doc(db, "teachers", id);
+      await updateDoc(teacherRef, {
+        ...updates,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Error updating teacher:", error);
+      throw new Error("Failed to update teacher.");
+    }
   },
 
   async removeTeacher(id: string): Promise<void> {
-    await deleteDoc(doc(db, "teachers", id));
+    try {
+      await deleteDoc(doc(db, "teachers", id));
+    } catch (error) {
+      console.error("Error removing teacher:", error);
+      throw new Error("Failed to remove teacher.");
+    }
   },
 
   async syncInitialTeachers(teachers: Teacher[]): Promise<void> {
-    const batch = writeBatch(db);
-    teachers.forEach((t) => {
-      const teacherRef = doc(db, "teachers", t.email);
-      batch.set(teacherRef, t);
-    });
-    await batch.commit();
+    try {
+      const batch = writeBatch(db);
+      const timestamp = serverTimestamp();
+      
+      teachers.forEach((t) => {
+        const teacherRef = doc(db, "teachers", t.email);
+        batch.set(teacherRef, {
+          ...t,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        });
+      });
+      
+      await this.withTimeout(batch.commit(), 15000, "Teacher sync timeout");
+      console.log(`Successfully synced ${teachers.length} teachers to Firestore`);
+    } catch (error) {
+      console.error("Error syncing teachers:", error);
+      throw new Error(`Failed to sync teachers: ${error}`);
+    }
   },
 
   async checkDatabaseSeeded(): Promise<boolean> {
@@ -277,12 +331,7 @@ export const APIService = {
         }))
       };
 
-      fetch(GAS_WORKER_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(defaulterPayload)
-      }).catch(() => console.debug("Defaulter reminders sent."));
+      this.sendToGAS(defaulterPayload);
     } catch (error) {
       console.error("Error sending defaulter reminders:", error);
       throw new Error("Failed to send defaulter reminders.");
@@ -292,23 +341,13 @@ export const APIService = {
   async triggerDefaulterReminders(): Promise<void> {
     if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
     
-    fetch(GAS_WORKER_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'trigger_defaulter_warnings' })
-    }).catch(() => {});
+    this.sendToGAS({ action: 'trigger_defaulter_warnings' });
   },
 
   async compileAndSendReports(): Promise<void> {
     if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
     
-    fetch(GAS_WORKER_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'compile_reports' })
-    }).catch(() => {});
+    this.sendToGAS({ action: 'compile_reports' });
   },
 
   async getDefaultersForWeek(weekStarting: string): Promise<Teacher[]> {
@@ -318,14 +357,12 @@ export const APIService = {
         this.fetchLessonPlans()
       ]);
 
-      // Get teachers who have submitted for this week
       const submittedTeachers = new Set(
         lessonPlans
           .filter(plan => plan.weekStarting === weekStarting && plan.resubmissionStatus !== 'pending')
           .map(plan => plan.teacherId)
       );
 
-      // Return teachers who haven't submitted
       return teachers.filter(teacher => !submittedTeachers.has(teacher.email));
     } catch (error) {
       console.error("Error getting defaulters:", error);
@@ -353,12 +390,15 @@ export const APIService = {
         email: user.email,
         name: user.name,
         timestamp,
-        ip: await this.getClientIP()
+        ip: await this.getClientIP(),
+        createdAt: serverTimestamp()
       };
 
       await setDoc(doc(db, "loginLogs", id), logData);
+      console.log(`Logged login activity for ${user.email}`);
     } catch (error) {
       console.error("Error logging login activity:", error);
+      // Don't throw - login logging shouldn't block user login
     }
   },
 
@@ -408,5 +448,47 @@ export const APIService = {
       console.error("Error checking existing submission:", error);
       return null;
     }
+  },
+
+  // Helper method for timeout
+  async withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+    const timeoutPromise = new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    });
+    
+    return Promise.race([promise, timeoutPromise]);
+  },
+
+  // Helper method to send to GAS
+  sendToGAS(payload: any): void {
+    if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
+    
+    fetch(GAS_WORKER_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(error => console.debug("GAS request sent (background):", error));
+  },
+
+  // Helper method to send email confirmations
+  async sendEmailConfirmations(plans: any[]): Promise<void> {
+    if (!GAS_WORKER_URL || GAS_WORKER_URL.includes('placeholder')) return;
+    
+    const uniqueTeachers = Array.from(new Set(plans.map(p => p.teacherId)));
+    
+    uniqueTeachers.forEach(teacherEmail => {
+      const teacherPlans = plans.filter(p => p.teacherId === teacherEmail);
+      const emailPayload = {
+        action: 'submission_alert',
+        teacherEmail: teacherEmail,
+        teacherName: teacherPlans[0].teacherName,
+        weekRange: teacherPlans[0].weekLabel,
+        summary: teacherPlans.map(p => `${p.className}-${p.section} (${p.subject})`).join(', ')
+      };
+
+      // Send in background, don't wait
+      this.sendToGAS(emailPayload);
+    });
   }
 };
