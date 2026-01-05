@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { AppState, LessonPlan, Teacher } from './types';
 import { APIService } from './services/api';
-import { INITIAL_TEACHERS } from './constants';
+import { INITIAL_TEACHERS, DEFAULT_TEACHER_PASSWORD } from './constants';
 import Layout from './components/Layout';
 import AdminRegistry from './components/AdminRegistry';
 import AdminCompiler from './components/AdminCompiler';
@@ -32,7 +32,6 @@ const App: React.FC = () => {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // Check if database is already seeded
   const checkIfSeeded = useCallback(async () => {
     try {
       const teachers = await APIService.fetchTeachers();
@@ -55,7 +54,6 @@ const App: React.FC = () => {
     
     setIsSyncing(true);
     try {
-      // Fetch all data in parallel
       const [teachers, lessonPlans, loginLogs] = await Promise.all([
         APIService.fetchTeachers(),
         APIService.fetchLessonPlans(),
@@ -64,7 +62,6 @@ const App: React.FC = () => {
       
       console.log(`Fetched ${teachers.length} teachers, ${lessonPlans.length} lesson plans`);
       
-      // Auto-seed only if database is completely empty (no teachers)
       if (teachers.length === 0 && (isSeeded === false || isSeeded === null)) {
         console.log("Database is empty. Seeding with initial teachers...");
         try {
@@ -84,7 +81,6 @@ const App: React.FC = () => {
       setLastSynced(new Date());
     } catch (e) {
       console.error("Cloud Sync Error:", e);
-      // Don't crash the app, just show empty state
       setState(prev => ({ ...prev, teachers: [], lessonPlans: [], loginLogs: [] }));
     } finally {
       setIsSyncing(false);
@@ -93,13 +89,10 @@ const App: React.FC = () => {
   }, [state.currentUser, isSeeded]);
 
   useEffect(() => {
-    // Initialize the app
     const init = async () => {
       try {
-        // First, check if database is already seeded
         await checkIfSeeded();
         
-        // Check for saved user
         const savedUser = localStorage.getItem('shs_user');
         if (savedUser && savedUser !== "undefined" && savedUser !== "null") {
           try {
@@ -120,7 +113,6 @@ const App: React.FC = () => {
       }
     };
 
-    // Set a timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
       if (isAuthenticating) {
         console.log("Authentication timeout reached");
@@ -146,7 +138,6 @@ const App: React.FC = () => {
           setState(prev => ({ ...prev, currentUser: user }));
           localStorage.setItem('shs_user', JSON.stringify(user));
           
-          // Log the login activity
           await APIService.logLoginActivity({ email: 'admin', name: 'Administrator' });
           
           await fetchData(user);
@@ -157,7 +148,6 @@ const App: React.FC = () => {
         }
       }
 
-      // For teacher login - always fetch fresh data
       console.log("Fetching teachers for login...");
       const teachers = await APIService.fetchTeachers();
       console.log(`Fetched ${teachers.length} teachers for login verification`);
@@ -165,7 +155,6 @@ const App: React.FC = () => {
       const normalizedEmail = loginEmail.toLowerCase().trim();
       console.log("Looking for teacher with email:", normalizedEmail);
       
-      // Find teacher by email (email is the document ID in Firestore)
       const teacher = teachers.find(t => {
         const teacherEmail = t.email?.toLowerCase().trim();
         return teacherEmail === normalizedEmail;
@@ -183,8 +172,6 @@ const App: React.FC = () => {
         return;
       }
 
-      // Get default password
-      const { DEFAULT_TEACHER_PASSWORD } = await import('./constants');
       const expectedPass = teacher.password || DEFAULT_TEACHER_PASSWORD;
       
       console.log("Password check:", {
@@ -194,12 +181,10 @@ const App: React.FC = () => {
         providedFirst3: loginPassword.substring(0, 3)
       });
 
-      // Check password
       if (loginPassword === expectedPass) {
         setState(prev => ({ ...prev, currentUser: teacher, teachers }));
         localStorage.setItem('shs_user', JSON.stringify(teacher));
         
-        // Log the login activity
         await APIService.logLoginActivity({ 
           email: teacher.email, 
           name: teacher.name 
