@@ -225,7 +225,7 @@ export const APIService = {
     console.error("Error syncing initial teachers:", error);
     throw new Error("Failed to seed teachers database.");
   }
-}
+},
 
    
   
