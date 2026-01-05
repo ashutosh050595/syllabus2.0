@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Loader2, Send, BookOpen, CheckCircle2, CheckSquare, Square, 
   Layers, ChevronRight, AlertCircle, History, AlertTriangle, 
-  Clock, Info, Calendar, Mail, User, Check
+  Clock, Info, Calendar, Mail, User, Check, Wifi, WifiOff
 } from 'lucide-react';
 import { Teacher, LessonPlan, ClassName } from '../types';
 import { APIService } from '../services/api';
@@ -28,55 +28,24 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
   const [canSubmit, setCanSubmit] = useState(true);
   const [existingSubmission, setExistingSubmission] = useState<LessonPlan | null>(null);
   const [showSubmissionInfo, setShowSubmissionInfo] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [submissionTimeout, setSubmissionTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [formData, setFormData] = useState({ chapter: '', topics: '', homework: '' });
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 
-  // Check if teacher has already submitted for this week
+  // Handle online/offline status
   useEffect(() => {
-    const currentWeekStart = upcomingMonday.toISOString();
-    const submission = planHistory.find(plan => 
-      plan.weekStarting === currentWeekStart
-    );
-    
-    if (submission) {
-      setExistingSubmission(submission);
-      
-      // Check if it's a future week (should not be allowed)
-      if (isFutureWeek(upcomingMonday)) {
-        setCanSubmit(false);
-        setErrorMessage("Submission for future weeks is not permitted. You may only submit lesson plans for the upcoming academic week starting Monday.");
-        return;
-      }
-      
-      // Check resubmission status
-      if (submission.resubmissionStatus === 'none') {
-        setSubmittedThisWeek(true);
-        setCanSubmit(false);
-        setErrorMessage("");
-      } else if (submission.resubmissionStatus === 'pending') {
-        setCanSubmit(false);
-        setErrorMessage("A modification request is currently pending approval from the administration. Please await administrative approval before attempting to resubmit.");
-      } else if (submission.resubmissionStatus === 'approved') {
-        setCanSubmit(true);
-        setSubmittedThisWeek(false);
-        setErrorMessage("");
-      } else if (submission.resubmissionStatus === 'resubmitted') {
-        setSubmittedThisWeek(true);
-        setCanSubmit(false);
-        setErrorMessage("You have already resubmitted your lesson plan for this week. No further modifications are permitted.");
-      }
-    } else {
-      // Check if it's a future week
-      if (isFutureWeek(upcomingMonday)) {
-        setCanSubmit(false);
-        setErrorMessage("Submission for future weeks is not permitted. You may only submit lesson plans for the upcoming academic week starting Monday.");
-        return;
-      }
-      
-      setCanSubmit(true);
-      setSubmittedThisWeek(false);
-      setErrorMessage("");
-    }
-  }, [planHistory, upcomingMonday]);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Group assignments by Grade
   const groupedAssignments = teacher.assignments.reduce((acc, asgn) => {
@@ -87,8 +56,60 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
     return acc;
   }, {} as Record<string, { section: string, subject: string }[]>);
 
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
-  const [formData, setFormData] = useState({ chapter: '', topics: '', homework: '' });
+  // Check if teacher has already submitted for this week
+  useEffect(() => {
+    const checkSubmissionStatus = async () => {
+      try {
+        const currentWeekStart = upcomingMonday.toISOString();
+        const submission = planHistory.find(plan => 
+          plan.weekStarting === currentWeekStart
+        );
+        
+        if (submission) {
+          setExistingSubmission(submission);
+          
+          if (isFutureWeek(upcomingMonday)) {
+            setCanSubmit(false);
+            setErrorMessage("Submission for future weeks is not permitted. You may only submit lesson plans for the upcoming academic week starting Monday.");
+            return;
+          }
+          
+          if (submission.resubmissionStatus === 'none') {
+            setSubmittedThisWeek(true);
+            setCanSubmit(false);
+            setErrorMessage("");
+          } else if (submission.resubmissionStatus === 'pending') {
+            setCanSubmit(false);
+            setErrorMessage("A modification request is currently pending approval from the administration. Please await administrative approval before attempting to resubmit.");
+          } else if (submission.resubmissionStatus === 'approved') {
+            setCanSubmit(true);
+            setSubmittedThisWeek(false);
+            setErrorMessage("");
+          } else if (submission.resubmissionStatus === 'resubmitted') {
+            setSubmittedThisWeek(true);
+            setCanSubmit(false);
+            setErrorMessage("You have already resubmitted your lesson plan for this week. No further modifications are permitted.");
+          }
+        } else {
+          if (isFutureWeek(upcomingMonday)) {
+            setCanSubmit(false);
+            setErrorMessage("Submission for future weeks is not permitted. You may only submit lesson plans for the upcoming academic week starting Monday.");
+            return;
+          }
+          
+          setCanSubmit(true);
+          setSubmittedThisWeek(false);
+          setErrorMessage("");
+        }
+      } catch (error) {
+        console.error("Error checking submission status:", error);
+        setCanSubmit(false);
+        setErrorMessage("Unable to check submission status. Please try refreshing the page.");
+      }
+    };
+
+    checkSubmissionStatus();
+  }, [planHistory, upcomingMonday]);
 
   // Auto-select all sections for each grade the teacher teaches
   useEffect(() => {
@@ -114,9 +135,15 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Clear any previous messages
+    // Clear previous messages
     setSuccessMessage('');
     setErrorMessage('');
+    
+    // Check if online
+    if (!isOnline) {
+      alert("✗ You are offline. Please check your internet connection and try again.");
+      return;
+    }
     
     if (!canSubmit) {
       const alertMsg = errorMessage || "Submission is not permitted at this time. Please review the status of your existing submission.";
@@ -152,12 +179,12 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
 
     setIsSubmitting(true);
     
-    // Set timeout to prevent infinite spinner (30 seconds)
+    // Set timeout to prevent infinite spinner (20 seconds)
     const timeoutId = setTimeout(() => {
       setIsSubmitting(false);
       if (submissionTimeout) clearTimeout(submissionTimeout);
       alert("Submission is taking longer than expected. Please check your internet connection and try again. If the problem persists, contact the administration.");
-    }, 30000);
+    }, 20000);
     
     setSubmissionTimeout(timeoutId);
 
@@ -181,6 +208,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
         };
       });
 
+      console.log("Submitting plans:", plans.length);
       await APIService.submitMultiplePlans(plans);
       
       // Clear timeout on success
@@ -203,11 +231,12 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
       clearTimeout(timeoutId);
       
       if (err.message?.includes('DUPLICATE_SUBMISSION:')) {
-        // Extract just the error message without the prefix
         const errorMsg = err.message.replace('DUPLICATE_SUBMISSION:', '').trim();
         alert(`✗ Submission Failed:\n\n${errorMsg}\n\nIf you need to make changes, please use the "Request Modification" option in your submission history.`);
       } else if (err.message?.includes('Failed to submit')) {
         alert(`✗ Submission Failed:\n\n${err.message}\n\nPlease check your internet connection and try again.`);
+      } else if (err.message?.includes('timeout')) {
+        alert("✗ Submission timeout. The server is taking too long to respond. Please try again.");
       } else {
         alert("✗ An unexpected error occurred during submission. Please try again. If the problem persists, contact the administration.");
       }
@@ -477,7 +506,11 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
             <h3 className="text-xl font-black uppercase italic tracking-tight">Weekly Lesson Plan Submission</h3>
             <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em]">{weekRange}</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-1 text-[10px] font-bold ${isOnline ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+              {isOnline ? 'Online' : 'Offline'}
+            </div>
             <button
               onClick={() => setShowSubmissionInfo(!showSubmissionInfo)}
               className="p-2 text-slate-400 hover:text-indigo-600 rounded-xl hover:bg-slate-50 transition-colors"
@@ -519,6 +552,18 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
                     <span>Contact administration for policy exceptions</span>
                   </li>
                 </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!isOnline && (
+          <div className="p-5 bg-rose-50 border border-rose-100 rounded-2xl">
+            <div className="flex items-start gap-3">
+              <WifiOff className="h-5 w-5 text-rose-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-rose-700 text-sm font-bold mb-1">You are offline</p>
+                <p className="text-rose-600 text-xs">Please check your internet connection to submit lesson plans.</p>
               </div>
             </div>
           </div>
@@ -586,6 +631,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
                         type="button" 
                         onClick={() => toggleGrade(grade)}
                         className="text-[9px] font-black text-indigo-600 uppercase hover:underline"
+                        disabled={!canSubmit || isSubmitting}
                       >
                         {allSelected ? 'Deselect All' : 'Select All'}
                       </button>
@@ -600,8 +646,8 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
                           key={i} 
                           type="button" 
                           onClick={() => toggleKey(key)}
-                          disabled={!canSubmit}
-                          className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${active ? 'bg-white border-indigo-300 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400'} ${!canSubmit ? 'opacity-50 cursor-not-allowed' : 'hover:border-indigo-300'}`}
+                          disabled={!canSubmit || isSubmitting}
+                          className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${active ? 'bg-white border-indigo-300 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400'} ${(!canSubmit || isSubmitting) ? 'opacity-50 cursor-not-allowed' : 'hover:border-indigo-300'}`}
                         >
                           {active ? <CheckSquare className="h-4 w-4 text-indigo-600" /> : <Square className="h-4 w-4" />}
                           <div className="flex-1">
@@ -652,7 +698,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
           <div className="pt-4 border-t border-slate-100">
             <button 
               type="submit" 
-              disabled={isSubmitting || !canSubmit || selectedKeys.length === 0} 
+              disabled={isSubmitting || !canSubmit || selectedKeys.length === 0 || !isOnline} 
               className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
             >
               <div className="flex items-center gap-3 relative z-10">
@@ -660,6 +706,11 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Processing Submission...
+                  </>
+                ) : !isOnline ? (
+                  <>
+                    <WifiOff className="h-4 w-4" />
+                    Offline - Cannot Submit
                   </>
                 ) : !canSubmit ? (
                   <>
@@ -682,6 +733,11 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
               <p className="text-[10px] text-slate-400">
                 Note: This submission will apply to {selectedKeys.length} selected class-section{selectedKeys.length !== 1 ? 's' : ''}.
               </p>
+              {!isOnline && (
+                <p className="text-[10px] text-rose-400 font-bold mt-2">
+                  You are offline. Please connect to the internet to submit.
+                </p>
+              )}
               {!canSubmit && (
                 <p className="text-[10px] text-rose-400 font-bold mt-2">
                   Submission not permitted. Please review restrictions above.
