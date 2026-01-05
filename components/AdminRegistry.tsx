@@ -293,7 +293,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
       isClassTeacher: newTeacher.isClassTeacher || false,
       classTeacherOf: newTeacher.classTeacherOf || null,
       assignments: newTeacher.assignments || []
-    };
+    });
 
     try {
       await onAddTeacher(teacherData);
