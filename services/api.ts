@@ -199,6 +199,23 @@ export const APIService = {
     }
   },
 
+async clearTeachersCollection(): Promise<void> {
+  try {
+    const snapshot = await getDocs(collection(db, "teachers"));
+    const batch = writeBatch(db);
+
+    snapshot.docs.forEach(docSnap => {
+      batch.delete(doc(db, "teachers", docSnap.id));
+    });
+
+    await batch.commit();
+  } catch (error) {
+    console.error("Error clearing teachers collection:", error);
+    throw new Error("Failed to clear existing teachers.");
+  }
+},
+
+  
   async syncInitialTeachers(teachers: Teacher[]): Promise<void> {
     try {
       const BATCH_SIZE = 400; // FIXED: Firestore limit is 500
