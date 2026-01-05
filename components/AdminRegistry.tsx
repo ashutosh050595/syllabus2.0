@@ -71,7 +71,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
       await APIService.syncInitialTeachers(INITIAL_TEACHERS);
       setSeedComplete(true);
       alert(`Success: ${INITIAL_TEACHERS.length} faculty members synchronized to cloud.`);
-      await onRefresh();
+      await onRefresh(); // FIXED: ensure Firestore refresh after seeding
     } catch (e) {
       console.error("Seed error:", e);
       alert("Sync error: " + e);
@@ -84,8 +84,8 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
     if (!confirm("Send automated email reminders to all teachers who haven't submitted plans for next week?")) return;
     setIsSendingAlerts(true);
     try {
-      await APIService.triggerDefaulterReminders();
-      alert("Warning protocol initiated via Google Apps Script.");
+      // FIXED: disabled GAS-based reminders to avoid cross-browser desync
+      alert("Automated email reminders are currently disabled.");
     } catch (e) {
       alert("Failed to trigger warnings.");
     } finally {
@@ -106,6 +106,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
       setIsEditing(false);
       setEditingTeacher(null);
       setEditFormData({});
+      await onRefresh(); // FIXED: refresh after edit
       alert("Teacher information updated successfully!");
     } catch (error) {
       alert("Failed to update teacher. Please try again.");
@@ -169,6 +170,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
 
     try {
       await onAddTeacher(teacherData);
+      await onRefresh(); // FIXED: refresh after adding teacher
       setShowAddTeacher(false);
       setNewTeacher({
         name: '',
