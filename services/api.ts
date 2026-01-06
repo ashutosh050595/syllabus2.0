@@ -277,7 +277,7 @@ export const APIService = {
   try {
     const normalizedEmail = normalizeEmail(email);
 
-    // 🔹 STEP 1: Direct lookup (fast & ideal)
+    // 🔹 STEP 1: Direct document lookup (FAST PATH)
     const directRef = doc(db, "teachers", normalizedEmail);
     const directSnap = await getDoc(directRef);
 
@@ -291,23 +291,24 @@ export const APIService = {
       } as Teacher;
     }
 
-    // 🔹 STEP 2: Fallback query (for old / inconsistent data)
-    const q = query(
-      collection(db, "teachers"),
-      where("email", "==", normalizedEmail)
-    );
+    // 🔹 STEP 2: BULLETPROOF fallback (case / space tolerant)
+    const allSnap = await getDocs(collection(db, "teachers"));
 
-    const querySnap = await getDocs(q);
+    if (allSnap.empty) return null;
 
-    if (querySnap.empty) return null;
+    const match = allSnap.docs.find(d => {
+      const storedEmail = (d.data().email || "").toLowerCase().trim();
+      return storedEmail === normalizedEmail;
+    });
 
-    const docSnap = querySnap.docs[0];
-    const data = docSnap.data();
+    if (!match) return null;
+
+    const data = match.data();
 
     return {
       ...data,
-      id: docSnap.id,
-      email: data.email || docSnap.id,
+      id: match.id,
+      email: data.email || match.id,
       password: data.password || DEFAULT_TEACHER_PASSWORD
     } as Teacher;
 
@@ -315,5 +316,5 @@ export const APIService = {
     console.error("Error getting teacher by email:", error);
     return null;
   }
-}
+  }
 };
