@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Printer, Share2, Download, Send, Loader2 } from 'lucide-react';
 import { LessonPlan, Teacher, ClassName, SectionName } from '../types';
 import { getUpcomingMonday } from '../utils';
-import { APIService } from '../services/api';
+import { APIService } from '../services/api-supabase'; // ✅ Fixed import
 import PrintableReport from './PrintableReport';
 
 interface AdminCompilerProps {
