@@ -7,17 +7,18 @@ export const ADMIN_CREDENTIALS = {
 
 export const DEFAULT_TEACHER_PASSWORD = 'shstelaiya@123';
 
-// FIREBASE CONFIGURATION
+// ✅ CORRECT FIREBASE CONFIGURATION (ALL DEVICES USE THIS SAME CONFIG)
 export const FIREBASE_CONFIG = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: "AIzaSyCw3xYRbBdDk1dzOBBU00lGP6XFzyJgJwY",
+  authDomain: "lesson-plan-b4c8e.firebaseapp.com",
+  projectId: "lesson-plan-b4c8e", // ← यही सभी devices में same रहेगा
+  storageBucket: "lesson-plan-b4c8e.firebasestorage.app",
+  messagingSenderId: "988824182644",
+  appId: "1:988824182644:web:efbc9bb135afaabeb9d621",
+  measurementId: "G-Y43N7T13E6"
 };
+
 export const INITIAL_TEACHERS: Teacher[] = [
-// ... existing teachers code ...
   {
     id: "t1",
     name: "Kishor Kunal",
@@ -28,7 +29,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     assignments: [
       { className: 'V', sections: ['A', 'B', 'C'], subject: 'Computer' },
       { className: 'VI', sections: ['A', 'B', 'C', 'D'], subject: 'Computer' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t2",
@@ -40,7 +42,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     assignments: [
       { className: 'V', sections: ['A', 'B', 'C'], subject: 'EVS' },
       { className: 'VI', sections: ['C'], subject: 'Maths' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t3",
@@ -52,7 +55,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     assignments: [
       { className: 'V', sections: ['A', 'B', 'C'], subject: 'Hindi' },
       { className: 'VI', sections: ['A', 'B'], subject: 'Hindi' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t4",
@@ -64,7 +68,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     assignments: [
       { className: 'VI', sections: ['A', 'B'], subject: 'English' },
       { className: 'V', sections: ['A', 'B', 'C'], subject: 'English' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t5",
@@ -75,7 +80,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     classTeacherOf: { className: 'VI', section: 'B' },
     assignments: [
       { className: 'V', sections: ['A', 'B', 'C'], subject: 'Maths' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t6",
@@ -87,7 +93,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     assignments: [
       { className: 'VI', sections: ['C', 'D'], subject: 'Hindi' },
       { className: 'VII', sections: ['A', 'B', 'C', 'D'], subject: 'Hindi' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t7",
@@ -99,7 +106,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     assignments: [
       { className: 'VI', sections: ['D'], subject: 'English' },
       { className: 'VI', sections: ['A', 'B', 'C', 'D'], subject: 'Social Science' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t8",
@@ -111,7 +119,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     assignments: [
       { className: 'VI', sections: ['C'], subject: 'English' },
       { className: 'VII', sections: ['A', 'B', 'C', 'D'], subject: 'English' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t9",
@@ -123,7 +132,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     assignments: [
       { className: 'VI', sections: ['A', 'B', 'C', 'D'], subject: 'Science' },
       { className: 'VII', sections: ['A', 'B'], subject: 'Science' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t10",
@@ -134,7 +144,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     classTeacherOf: { className: 'VII', section: 'C' },
     assignments: [
       { className: 'VII', sections: ['A', 'B', 'C', 'D'], subject: 'Social Science' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t11",
@@ -146,7 +157,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     assignments: [
       { className: 'VII', sections: ['A', 'B', 'C', 'D'], subject: 'Maths' },
       { className: 'VII', sections: ['C', 'D'], subject: 'Science' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t12",
@@ -156,7 +168,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     isClassTeacher: false,
     assignments: [
       { className: 'VI', sections: ['A', 'B', 'D'], subject: 'Maths' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t13",
@@ -168,7 +181,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
       { className: 'V', sections: ['A', 'B', 'C'], subject: 'Sanskrit' },
       { className: 'VI', sections: ['A', 'B', 'C', 'D'], subject: 'Sanskrit' },
       { className: 'VII', sections: ['A', 'B', 'C', 'D'], subject: 'Sanskrit' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   },
   {
     id: "t14",
@@ -178,7 +192,8 @@ export const INITIAL_TEACHERS: Teacher[] = [
     isClassTeacher: false,
     assignments: [
       { className: 'VII', sections: ['A', 'B', 'C', 'D'], subject: 'Computer' }
-    ]
+    ],
+    password: DEFAULT_TEACHER_PASSWORD
   }
 ];
 
@@ -195,4 +210,11 @@ export const CLASS_CONFIG: Partial<Record<ClassName, { sections: SectionName[], 
     sections: ['A', 'B', 'C', 'D'],
     subjects: ['English', 'Hindi', 'Maths', 'Science', 'Social Science', 'Sanskrit', 'Computer']
   }
+};
+
+// ✅ MULTI-DEVICE SUPPORT
+export const SYNC_CONFIG = {
+  syncInterval: 30000, // 30 seconds
+  retryAttempts: 3,
+  offlineSupport: true
 };
