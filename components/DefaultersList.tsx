@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Mail, Clock, Users, Calendar, Send } from 'lucide-react';
+import { AlertTriangle, Mail, Clock, Users, Calendar, Send, CheckCircle2 } from 'lucide-react';
 import { Teacher, LessonPlan } from '../types';
 import { APIService } from '../services/api-supabase'; // ✅ Fixed import
 import { getUpcomingMonday, formatDate } from '../utils';
@@ -9,7 +9,7 @@ interface DefaultersListProps {
   lessonPlans: LessonPlan[];
 }
 
-const DefaultersList: React.FC<DefaultersListProps> = ({ teachers, lessonPlans }) => {
+const DefaultersList: React.FC<DefaultersListPropsProps> = ({ teachers, lessonPlans }) => {
   const [isSendingReminders, setIsSendingReminders] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string>(() => {
     const upcomingMonday = getUpcomingMonday();
@@ -41,8 +41,8 @@ const DefaultersList: React.FC<DefaultersListProps> = ({ teachers, lessonPlans }
     
     setIsSendingReminders(true);
     try {
-      await APIService.sendDefaulterReminders(defaulters, weekLabel);
-      alert(`Reminders sent to ${defaulters.length} teacher(s).`);
+      // Note: Email feature will be added in Phase 3
+      alert("Email feature coming soon in Phase 3");
     } catch (error) {
       console.error("Error sending reminders:", error);
       alert("Failed to send reminders. Please try again.");
