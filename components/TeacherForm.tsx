@@ -5,7 +5,7 @@ import {
   Clock, Info, Calendar, Mail, User, Check, Wifi, WifiOff
 } from 'lucide-react';
 import { Teacher, LessonPlan, ClassName } from '../types';
-import { APIService } from '../services/api';
+import { APIService } from '../services/api-supabase'; // ✅ Fixed import
 import { getUpcomingMonday, formatDate, getNextSaturday, getWeekLabel, isFutureWeek, getWeekRangeLabel } from '../utils';
 
 interface TeacherFormProps {
