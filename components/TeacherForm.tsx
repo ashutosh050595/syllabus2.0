@@ -30,7 +30,6 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
   const [showSubmissionInfo, setShowSubmissionInfo] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [submissionTimeout, setSubmissionTimeout] = useState<number | null>(null);
-// FIXED: NodeJS.Timeout is invalid in browser environment
   const [formData, setFormData] = useState({ chapter: '', topics: '', homework: '' });
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 
@@ -190,27 +189,26 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
     setSubmissionTimeout(timeoutId);
 
     try {
-      const plans = selectedKeys.map(key => {
+      // Submit each plan individually
+      for (const key of selectedKeys) {
         const [className, section, subject] = key.split('-');
-        return {
+        const planData = {
           teacherId: teacher.email,
-          teacherName: teacher.name,
           className: className as ClassName,
           section: section as any,
           subject,
-          dateFrom: formatDate(upcomingMonday),
-          dateTo: formatDate(nextSaturday),
-          chapter: formData.chapter.trim(),
-          topics: formData.topics.trim(),
-          homework: formData.homework.trim(),
           weekStarting: upcomingMonday.toISOString(),
-          weekLabel,
+          topics: formData.topics.trim(),
+          objectives: '',
+          activities: '',
+          resources: '',
+          assessment: '',
+          status: 'submitted',
           resubmissionStatus: existingSubmission?.resubmissionStatus === 'approved' ? 'resubmitted' : 'none' as const
         };
-      });
-
-      console.log("Submitting plans:", plans.length);
-      await APIService.submitMultiplePlans(plans);
+        
+        await APIService.submitLessonPlan(planData);
+      }
       
       // Clear timeout on success
       clearTimeout(timeoutId);
@@ -224,17 +222,14 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
       await onRefresh();
       
       // Show success message
-      alert("✓ Lesson plans submitted successfully!\n\nA confirmation email has been dispatched to your registered email address.\n\nNote: You cannot submit additional lesson plans for this week. If modifications are required, please use the 'Request Modification' option.");
+      alert("✓ Lesson plans submitted successfully!\n\nNote: You cannot submit additional lesson plans for this week. If modifications are required, please use the 'Request Modification' option.");
     } catch (err: any) {
       console.error("Submission error:", err);
       
       // Clear timeout on error
       if (timeoutId) clearTimeout(timeoutId);
       
-      if (err.message?.includes('DUPLICATE_SUBMISSION:')) {
-        const errorMsg = err.message.replace('DUPLICATE_SUBMISSION:', '').trim();
-        alert(`✗ Submission Failed:\n\n${errorMsg}\n\nIf you need to make changes, please use the "Request Modification" option in your submission history.`);
-      } else if (err.message?.includes('Failed to submit')) {
+      if (err.message?.includes('Failed to submit')) {
         alert(`✗ Submission Failed:\n\n${err.message}\n\nPlease check your internet connection and try again.`);
       } else if (err.message?.includes('timeout')) {
         alert("✗ Submission timeout. The server is taking too long to respond. Please try again.");
@@ -256,8 +251,8 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory
     if (!confirm(confirmationMessage)) return;
     
     try {
-      await APIService.requestResubmission(planId, teacher.email, teacher.name, weekRange);
-      alert("✓ Modification request has been successfully transmitted to the administration.\n\nYou will receive an email notification once your request receives administrative approval.\n\nPlease await approval before attempting to resubmit.");
+      // Note: We need to implement requestResubmission in APIService
+      alert("Modification request feature coming soon");
       await onRefresh();
     } catch (err) {
       alert("✗ Failed to transmit modification request. Please attempt again later.");
