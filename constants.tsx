@@ -7,15 +7,10 @@ export const ADMIN_CREDENTIALS = {
 
 export const DEFAULT_TEACHER_PASSWORD = 'shstelaiya@123';
 
-// ✅ CORRECT FIREBASE CONFIGURATION (ALL DEVICES USE THIS SAME CONFIG)
-export const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCw3xYRbBdDk1dzOBBU00lGP6XFzyJgJwY",
-  authDomain: "lesson-plan-b4c8e.firebaseapp.com",
-  projectId: "lesson-plan-b4c8e", // ← यही सभी devices में same रहेगा
-  storageBucket: "lesson-plan-b4c8e.firebasestorage.app",
-  messagingSenderId: "988824182644",
-  appId: "1:988824182644:web:efbc9bb135afaabeb9d621",
-  measurementId: "G-Y43N7T13E6"
+// Supabase Configuration
+export const SUPABASE_CONFIG = {
+  url: 'https://wuefytaaxxnqfepgyxsk.supabase.co',
+  anonKey: 'sb_publishable_T3peGQMwHGeRHNuxdllXAg_zbp9lwbL'
 };
 
 export const INITIAL_TEACHERS: Teacher[] = [
@@ -210,11 +205,4 @@ export const CLASS_CONFIG: Partial<Record<ClassName, { sections: SectionName[], 
     sections: ['A', 'B', 'C', 'D'],
     subjects: ['English', 'Hindi', 'Maths', 'Science', 'Social Science', 'Sanskrit', 'Computer']
   }
-};
-
-// ✅ MULTI-DEVICE SUPPORT
-export const SYNC_CONFIG = {
-  syncInterval: 30000, // 30 seconds
-  retryAttempts: 3,
-  offlineSupport: true
 };
