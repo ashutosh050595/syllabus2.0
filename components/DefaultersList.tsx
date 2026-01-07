@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Mail, Clock, Users, Calendar, Send } from 'lucide-react';
 import { Teacher, LessonPlan } from '../types';
-import { APIService } from '../services/api';
+import { APIService } from '../services/api-supabase'; // ✅ Fixed import
 import { getUpcomingMonday, formatDate } from '../utils';
 
 interface DefaultersListProps {
