@@ -6,7 +6,7 @@ import {
   Database, Wifi, WifiOff, Cloud, CloudOff
 } from 'lucide-react';
 import { AppState, LessonPlan, Teacher } from './types';
-import { APIService } from './services/api';
+import { APIService } from './services/api-supabase';
 import { INITIAL_TEACHERS, DEFAULT_TEACHER_PASSWORD } from './constants';
 import Layout from './components/Layout';
 import { normalizeEmail } from "./utils/identity";
@@ -32,12 +32,12 @@ const App: React.FC = () => {
   const [isSeeded, setIsSeeded] = useState<boolean | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [connectionError, setConnectionError] = useState<string>('');
+  const [databaseStatus, setDatabaseStatus] = useState<{ seeded: boolean; teacherCount: number }>({ seeded: false, teacherCount: 0 });
   
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // 🔄 Online/Offline detection
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => {
@@ -54,58 +54,51 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // ✅ Check database seed status
-  const checkIfSeeded = useCallback(async () => {
+  const checkDatabaseStatus = useCallback(async () => {
     try {
-      console.log("🔍 Checking database seed status...");
-      const teachers = await APIService.fetchTeachers();
-      const seeded = teachers.length > 0;
-      setIsSeeded(seeded);
-      console.log(`✅ Database status: ${seeded ? 'Seeded' : 'Not Seeded'} (${teachers.length} teachers)`);
-      return seeded;
+      console.log("🔍 Checking database status...");
+      const status = await APIService.getDatabaseStatus();
+      setDatabaseStatus(status);
+      setIsSeeded(status.seeded);
+      console.log(`📊 Database: ${status.seeded ? 'Seeded' : 'Not Seeded'} (${status.teacherCount} teachers)`);
+      return status;
     } catch (error) {
-      console.error("❌ Error checking database seed:", error);
+      console.error("Error checking database:", error);
+      const status = { seeded: false, teacherCount: 0 };
+      setDatabaseStatus(status);
       setIsSeeded(false);
-      setConnectionError('Cannot connect to database. Check internet or try again later.');
-      return false;
+      setConnectionError('Cannot connect to database. Check internet connection.');
+      return status;
     }
   }, []);
 
-  // ✅ Emergency manual seed function
   const handleManualSeed = async () => {
     try {
       setIsSyncing(true);
       setLoginError('');
       console.log("🌱 Starting manual database seed...");
       
-      // First check if already seeded
-      const teachers = await APIService.fetchTeachers();
-      if (teachers.length > 0) {
-        setLoginError("Database already seeded. Please try logging in.");
+      const status = await checkDatabaseStatus();
+      if (status.seeded && status.teacherCount > 0) {
+        setLoginError(`Database already has ${status.teacherCount} teachers.`);
         setIsSyncing(false);
         return;
       }
       
-      // Seed the database
       await APIService.syncInitialTeachers(INITIAL_TEACHERS);
       console.log("✅ Database seeded successfully!");
       
-      // Reload teachers
-      await checkIfSeeded();
-      
+      await checkDatabaseStatus();
       setLoginError("✅ Database seeded successfully! Try logging in now.");
-      setTimeout(() => {
-        setLoginError('');
-      }, 3000);
+      setTimeout(() => setLoginError(''), 3000);
     } catch (error: any) {
-      console.error("❌ Manual seed failed:", error);
-      setLoginError(`Seed failed: ${error.message}. Please try again or contact administrator.`);
+      console.error("Manual seed failed:", error);
+      setLoginError(`Seed failed: ${error.message}`);
     } finally {
       setIsSyncing(false);
     }
   };
 
-  // ✅ Fetch all data
   const fetchData = useCallback(async (userOverride?: any) => {
     const user = userOverride || state.currentUser;
     if (!user) {
@@ -115,7 +108,7 @@ const App: React.FC = () => {
     
     setIsSyncing(true);
     try {
-      console.log("📡 Fetching data from Firestore...");
+      console.log("📡 Fetching data from Supabase...");
       
       const [teachers, lessonPlans, loginLogs] = await Promise.all([
         APIService.fetchTeachers(),
@@ -123,61 +116,36 @@ const App: React.FC = () => {
         user === 'admin' ? APIService.fetchLoginLogs() : Promise.resolve([])
       ]);
       
-      console.log(`✅ Fetched: ${teachers.length} teachers, ${lessonPlans.length} lesson plans, ${loginLogs.length} login logs`);
+      console.log(`✅ Fetched: ${teachers.length} teachers, ${lessonPlans.length} lesson plans`);
       
-      // Check if database needs seeding
-      if (teachers.length === 0 && (isSeeded === false || isSeeded === null)) {
-        console.log("⚠️ Database is empty. Seeding needed...");
-        
-        // Only admin can seed automatically
-        if (user === 'admin') {
-          try {
-            console.log("🌱 Admin seeding database...");
-            await APIService.syncInitialTeachers(INITIAL_TEACHERS);
-            const refreshedTeachers = await APIService.fetchTeachers();
-            setState(prev => ({ ...prev, teachers: refreshedTeachers, lessonPlans, loginLogs }));
-            setIsSeeded(true);
-            console.log(`✅ Seeded ${refreshedTeachers.length} teachers successfully`);
-          } catch (seedError) {
-            console.error("❌ Seeding failed:", seedError);
-            setState(prev => ({ ...prev, teachers: [], lessonPlans, loginLogs }));
-          }
-        } else {
-          setState(prev => ({ ...prev, teachers, lessonPlans, loginLogs }));
-        }
-      } else {
-        setState(prev => ({ ...prev, teachers, lessonPlans, loginLogs }));
-      }
+      setState(prev => ({ ...prev, teachers, lessonPlans, loginLogs }));
+      await checkDatabaseStatus();
       
       setLastSynced(new Date());
       setConnectionError('');
     } catch (error: any) {
-      console.error("❌ Cloud Sync Error:", error);
-      setConnectionError(`Sync failed: ${error.message}. Check internet connection.`);
+      console.error("Data fetch error:", error);
+      setConnectionError(`Sync failed: ${error.message}`);
       setState(prev => ({ ...prev, teachers: [], lessonPlans: [], loginLogs: [] }));
     } finally {
       setIsSyncing(false);
       setIsAuthenticating(false);
     }
-  }, [state.currentUser, isSeeded]);
+  }, [state.currentUser, checkDatabaseStatus]);
 
-  // ✅ Initialize app
   useEffect(() => {
     const init = async () => {
       try {
         console.log("🚀 Initializing Sacred Heart Management Hub...");
         
-        // Check online status first
         if (!navigator.onLine) {
-          setConnectionError('No internet connection. Please check your network.');
+          setConnectionError('No internet connection.');
           setIsAuthenticating(false);
           return;
         }
         
-        // Check database seed status
-        await checkIfSeeded();
+        await checkDatabaseStatus();
         
-        // Check for saved user
         const savedUser = localStorage.getItem('shs_user');
         if (savedUser && savedUser !== "undefined" && savedUser !== "null") {
           try {
@@ -186,7 +154,7 @@ const App: React.FC = () => {
             setState(prev => ({ ...prev, currentUser: parsedUser }));
             await fetchData(parsedUser);
           } catch (parseError) {
-            console.error("❌ Error parsing saved user:", parseError);
+            console.error("Error parsing saved user:", parseError);
             localStorage.removeItem('shs_user');
             setIsAuthenticating(false);
           }
@@ -195,16 +163,15 @@ const App: React.FC = () => {
           setIsAuthenticating(false);
         }
       } catch (error) {
-        console.error("❌ Initialization error:", error);
-        setConnectionError('Initialization failed. Please refresh the page.');
+        console.error("Initialization error:", error);
+        setConnectionError('Initialization failed. Please refresh.');
         setIsAuthenticating(false);
       }
     };
 
-    // Set timeout for authentication
     const timeoutId = setTimeout(() => {
       if (isAuthenticating) {
-        console.log("⏰ Authentication timeout reached");
+        console.log("Authentication timeout reached");
         setIsAuthenticating(false);
       }
     }, 10000);
@@ -212,9 +179,8 @@ const App: React.FC = () => {
     init();
 
     return () => clearTimeout(timeoutId);
-  }, [fetchData, checkIfSeeded]);
+  }, [fetchData, checkDatabaseStatus]);
 
-  // ✅ Handle login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -222,23 +188,23 @@ const App: React.FC = () => {
     setIsSyncing(true);
     
     try {
-      // Check internet connection
       if (!isOnline) {
         setLoginError("No internet connection. Please check your network.");
         setIsSyncing(false);
         return;
       }
 
+      console.log(`🔑 Login attempt: ${loginEmail}, Mode: ${loginMode}`);
+
       if (loginMode === 'admin') {
         const { ADMIN_CREDENTIALS } = await import('./constants');
         if (loginEmail === ADMIN_CREDENTIALS.id && loginPassword === ADMIN_CREDENTIALS.password) {
           const user = 'admin' as const;
-          console.log("🔑 Admin login successful");
+          console.log("✅ Admin login successful");
           setState(prev => ({ ...prev, currentUser: user }));
           localStorage.setItem('shs_user', JSON.stringify(user));
           
           await APIService.logLoginActivity({ email: 'admin', name: 'Administrator' });
-          
           await fetchData(user);
           return;
         } else {
@@ -247,56 +213,68 @@ const App: React.FC = () => {
         }
       }
 
-      // Teacher login
-      console.log("🔍 Verifying teacher login...");
-      const teachers = await APIService.fetchTeachers();
-      console.log(`📊 Found ${teachers.length} teachers in database`);
-
-      const normalizedEmail = loginEmail.toLowerCase().trim();
+      console.log("🔍 Verifying teacher credentials...");
+      const normalizedEmail = normalizeEmail(loginEmail);
       
-      // Debug: Log all teacher emails
-      console.log("📧 All teacher emails:", teachers.map(t => t.email));
+      const teacher = await APIService.getTeacherByEmail(normalizedEmail);
       
-      const teacher = teachers.find(t => {
-        const teacherEmail = t.email?.toLowerCase().trim();
-        return teacherEmail === normalizedEmail;
-      });
-      
-      console.log("🔎 Login search result:", { 
+      console.log("🔎 Teacher lookup result:", { 
         searchedEmail: normalizedEmail,
         teacherFound: !!teacher,
-        teacherName: teacher?.name,
-        totalTeachers: teachers.length
+        teacherName: teacher?.name
       });
 
       if (!teacher) {
-        setLoginError(`Teacher not found: ${normalizedEmail}. Please contact administrator.`);
-        return;
-      }
-
-      // Check password
-      const expectedPass = teacher.password || DEFAULT_TEACHER_PASSWORD;
-      
-      if (loginPassword === expectedPass) {
-        console.log(`✅ Login successful for ${teacher.name}`);
-        setState(prev => ({ ...prev, currentUser: teacher, teachers }));
-        localStorage.setItem('shs_user', JSON.stringify(teacher));
+        const allTeachers = await APIService.fetchTeachers();
+        console.log(`📊 Total teachers in database: ${allTeachers.length}`);
         
-        await APIService.logLoginActivity({ 
-          email: teacher.email, 
-          name: teacher.name 
-        });
+        const foundTeacher = allTeachers.find(t => 
+          normalizeEmail(t.email) === normalizedEmail
+        );
         
-        await fetchData(teacher);
+        if (!foundTeacher) {
+          setLoginError(`Teacher not found: ${normalizedEmail}. Please contact administrator.`);
+          return;
+        }
+        
+        const expectedPass = foundTeacher.password || DEFAULT_TEACHER_PASSWORD;
+        
+        if (loginPassword === expectedPass) {
+          console.log(`✅ Login successful for ${foundTeacher.name}`);
+          setState(prev => ({ ...prev, currentUser: foundTeacher, teachers: allTeachers }));
+          localStorage.setItem('shs_user', JSON.stringify(foundTeacher));
+          
+          await APIService.logLoginActivity({ 
+            email: foundTeacher.email, 
+            name: foundTeacher.name 
+          });
+          await fetchData(foundTeacher);
+        } else {
+          setLoginError(`Invalid password. Default password is: ${DEFAULT_TEACHER_PASSWORD}`);
+        }
       } else {
-        setLoginError(`Invalid password. Default password is: ${DEFAULT_TEACHER_PASSWORD}`);
+        const expectedPass = teacher.password || DEFAULT_TEACHER_PASSWORD;
+        
+        if (loginPassword === expectedPass) {
+          console.log(`✅ Login successful for ${teacher.name}`);
+          setState(prev => ({ ...prev, currentUser: teacher }));
+          localStorage.setItem('shs_user', JSON.stringify(teacher));
+          
+          await APIService.logLoginActivity({ 
+            email: teacher.email, 
+            name: teacher.name 
+          });
+          await fetchData(teacher);
+        } else {
+          setLoginError(`Invalid password. Default password is: ${DEFAULT_TEACHER_PASSWORD}`);
+        }
       }
     } catch (err: any) {
-      console.error("❌ Login error:", err);
-      if (err.message?.includes('Failed to fetch')) {
-        setLoginError("Network error. Please check internet connection and try again.");
-      } else if (err.message?.includes('Firestore')) {
-        setLoginError("Database connection failed. Please try again in a moment.");
+      console.error("Login error:", err);
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('Network')) {
+        setLoginError("Network error. Please check internet connection.");
+      } else if (err.message?.includes('database')) {
+        setLoginError("Database connection failed. Please try again.");
       } else {
         setLoginError(err.message || "Login failed. Please try again.");
       }
@@ -305,7 +283,6 @@ const App: React.FC = () => {
     }
   };
 
-  // ✅ Handle logout
   const handleLogout = () => {
     console.log("👋 Logging out...");
     setState({ currentUser: null, teachers: [], lessonPlans: [], loginLogs: [] });
@@ -317,7 +294,6 @@ const App: React.FC = () => {
     setConnectionError('');
   };
 
-  // ✅ Force refresh data
   const handleForceRefresh = async () => {
     setIsSyncing(true);
     try {
@@ -330,7 +306,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Loading screen
   if (isAuthenticating) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -360,12 +335,10 @@ const App: React.FC = () => {
     );
   }
 
-  // Login screen (no user logged in)
   if (!state.currentUser) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-[#f8fafc]">
         <div className="w-full max-w-md animate-in fade-in zoom-in duration-500">
-          {/* Connection Status Banner */}
           {!isOnline && (
             <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
               <WifiOff className="h-4 w-4 text-amber-600" />
@@ -396,16 +369,14 @@ const App: React.FC = () => {
               <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase mb-2">Sacred Heart</h1>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Management Hub</p>
               
-              {/* Database Status */}
               <div className="mt-4 flex items-center gap-2">
-                <Database className={`h-4 w-4 ${isSeeded ? 'text-emerald-500' : 'text-amber-500'}`} />
-                <span className={`text-xs font-bold ${isSeeded ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  {isSeeded === null ? 'Checking...' : isSeeded ? 'Database Ready' : 'Database Not Seeded'}
+                <Database className={`h-4 w-4 ${databaseStatus.seeded ? 'text-emerald-500' : 'text-amber-500'}`} />
+                <span className={`text-xs font-bold ${databaseStatus.seeded ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {databaseStatus.seeded ? `Ready (${databaseStatus.teacherCount} teachers)` : 'Database Not Seeded'}
                 </span>
               </div>
             </div>
 
-            {/* Login Mode Toggle */}
             <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
               <button 
                 onClick={() => {
@@ -427,7 +398,6 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            {/* Login Form */}
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
@@ -461,7 +431,6 @@ const App: React.FC = () => {
                 />
               </div>
 
-              {/* Error Message */}
               {loginError && (
                 <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl">
                   <p className="text-rose-600 text-xs font-bold">{loginError}</p>
@@ -471,7 +440,6 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {/* Login Button */}
               <button 
                 disabled={isSyncing || !isOnline}
                 className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -492,8 +460,7 @@ const App: React.FC = () => {
               </button>
             </form>
 
-            {/* Emergency Seed Button (for admin when not seeded) */}
-            {loginMode === 'admin' && isSeeded === false && (
+            {loginMode === 'admin' && databaseStatus.teacherCount === 0 && (
               <div className="mt-6 pt-6 border-t border-slate-100">
                 <button 
                   onClick={handleManualSeed}
@@ -508,12 +475,11 @@ const App: React.FC = () => {
                   {isSyncing ? 'Seeding Database...' : 'Click to Seed Database'}
                 </button>
                 <p className="text-[9px] text-slate-500 text-center mt-2">
-                  Use this only if database is empty. This will add all teachers.
+                  Use this only if database is empty. This will add 14 teachers.
                 </p>
               </div>
             )}
 
-            {/* Status Footer */}
             <div className="mt-6 pt-6 border-t border-slate-100">
               <div className="flex items-center justify-between text-[10px] text-slate-400">
                 <div className="flex items-center gap-2">
@@ -530,37 +496,24 @@ const App: React.FC = () => {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Cloud className={`h-3 w-3 ${isSeeded ? 'text-emerald-500' : 'text-amber-500'}`} />
+                  <Cloud className={`h-3 w-3 ${databaseStatus.seeded ? 'text-emerald-500' : 'text-amber-500'}`} />
                   <span className="font-bold">
-                    {isSeeded === null ? '...' : isSeeded ? 'Cloud Sync ✓' : 'Not Seeded'}
+                    {databaseStatus.seeded ? 'Cloud Sync ✓' : 'Not Seeded'}
                   </span>
                 </div>
               </div>
               
-              {/* Multi-device note */}
               <p className="text-[8px] text-slate-400 text-center mt-3">
-                This system syncs across all devices. Changes made on one device appear on all.
+                Powered by Supabase • Data syncs across all devices
               </p>
             </div>
           </div>
 
-          {/* Debug Info (visible only in development) */}
           {import.meta.env.DEV && (
             <div className="mt-4 p-3 bg-slate-50 rounded-xl text-center">
               <p className="text-[8px] text-slate-500">
-                Project: lesson-plan-b4c8e | Teachers in DB: {state.teachers.length}
+                Supabase Project: wuefytaaxxnqfepgyxsk
               </p>
-              <button 
-                onClick={() => console.log("Debug Info:", { 
-                  teachers: state.teachers,
-                  isSeeded, 
-                  isOnline,
-                  currentUser: state.currentUser 
-                })}
-                className="text-[8px] text-indigo-500 mt-1"
-              >
-                Show Debug Info
-              </button>
             </div>
           )}
         </div>
@@ -568,7 +521,6 @@ const App: React.FC = () => {
     );
   }
 
-  // Main app layout (user is logged in)
   return (
     <Layout 
       user={state.currentUser} 
@@ -578,7 +530,6 @@ const App: React.FC = () => {
       lastSynced={lastSynced}
       isOnline={isOnline}
     >
-      {/* Connection Status in Main App */}
       {!isOnline && (
         <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
           <div className="flex items-center gap-3">
@@ -593,7 +544,6 @@ const App: React.FC = () => {
       
       {state.currentUser === 'admin' ? (
         <div className="space-y-8">
-          {/* Admin Tabs */}
           <div className="flex justify-center flex-wrap gap-2 print-hidden">
             {[
               { id: 'registry', label: 'Faculty Registry', icon: Users },
@@ -618,7 +568,6 @@ const App: React.FC = () => {
             ))}
           </div>
 
-          {/* Tab Content */}
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
             {activeTab === 'registry' && (
               <AdminRegistry 
