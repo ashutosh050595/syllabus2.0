@@ -108,7 +108,7 @@ export class EmailService {
     requestId: string
   ): EmailTemplate {
     return {
-      to: [teacherEmail, 'admin@sacredheart.edu'], // Send to teacher and admin
+      to: [teacherEmail, 'admin@sacredheartkoderma.org'], // Send to teacher and admin
       subject: `🔄 Resubmission Request - ${weekRange}`,
       html: `
         <!DOCTYPE html>
@@ -374,7 +374,7 @@ export class EmailService {
               <div class="contact-box">
                 <h4>📞 Need Clarification?</h4>
                 <p>If you have questions about this decision, please contact:</p>
-                <p><strong>Administration Office:</strong> admin@sacredheart.edu</p>
+                <p><strong>Administration Office:</strong> admin@sacredheartkoderma.org</p>
                 <p><strong>Phone:</strong> +91-XXX-XXXXXXX</p>
               </div>
               
