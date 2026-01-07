@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useTeacherIdentity } from '../hooks/useTeacherIdentity';
 import { Teacher, LessonPlan, Assignment } from '../types';
-import { APIService } from '../services/api';
+import { APIService } from '../services/api-supabase'; // ✅ Fixed import
 import { INITIAL_TEACHERS, DEFAULT_TEACHER_PASSWORD } from '../constants';
 
 
