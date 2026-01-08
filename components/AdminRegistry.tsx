@@ -15,8 +15,6 @@ import { Teacher, LessonPlan, Assignment, LoginLog } from '../types';
 import { APIService } from '../services/api-supabase';
 import { INITIAL_TEACHERS, DEFAULT_TEACHER_PASSWORD } from '../constants';
 import { getUpcomingMonday, formatDate } from '../utils';
-import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
 
 interface AdminRegistryProps {
   teachers: Teacher[];
@@ -130,93 +128,40 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
     }
   };
 
-  // Download lesson plans as PDF
-  const downloadLessonPlansAsPDF = (teacher: Teacher) => {
+  // Download lesson plans as TEXT (simplified version without xlsx)
+  const downloadLessonPlansAsText = (teacher: Teacher) => {
     const teacherPlans = getTeacherLessonPlans(teacher.email);
     if (teacherPlans.length === 0) {
       alert('No lesson plans found for this teacher');
       return;
     }
 
-    // Create HTML content for PDF
-    let htmlContent = `
-      <html>
-        <head>
-          <title>Lesson Plans - ${teacher.name}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 40px; }
-            h1 { color: #333; }
-            .plan { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
-            .subject { font-weight: bold; color: #2c5282; }
-            .class { color: #4a5568; }
-            .date { color: #718096; font-size: 0.9em; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f7fafc; }
-          </style>
-        </head>
-        <body>
-          <h1>Lesson Plans - ${teacher.name}</h1>
-          <p><strong>Email:</strong> ${teacher.email}</p>
-          <p><strong>Total Plans:</strong> ${teacherPlans.length}</p>
-          <hr>
-    `;
+    let textContent = `Lesson Plans - ${teacher.name}\n`;
+    textContent += `Email: ${teacher.email}\n`;
+    textContent += `Date: ${new Date().toLocaleDateString()}\n`;
+    textContent += '='.repeat(50) + '\n\n';
 
     teacherPlans.forEach((plan, index) => {
-      htmlContent += `
-        <div class="plan">
-          <h3>Plan #${index + 1}</h3>
-          <p class="subject"><strong>Subject:</strong> ${plan.subject}</p>
-          <p class="class"><strong>Class:</strong> ${plan.className}-${plan.section}</p>
-          <p class="date"><strong>Week:</strong> ${new Date(plan.weekStarting).toLocaleDateString()}</p>
-          <p><strong>Topics:</strong> ${plan.topics.join(', ')}</p>
-          <p><strong>Objectives:</strong> ${plan.objectives}</p>
-          <p><strong>Homework:</strong> ${plan.homework}</p>
-        </div>
-      `;
+      textContent += `PLAN #${index + 1}\n`;
+      textContent += `Subject: ${plan.subject}\n`;
+      textContent += `Class: ${plan.className}-${plan.section}\n`;
+      textContent += `Week: ${new Date(plan.weekStarting).toLocaleDateString()}\n`;
+      textContent += `Topics: ${plan.topics.join(', ')}\n`;
+      textContent += `Objectives: ${plan.objectives}\n`;
+      textContent += `Homework: ${plan.homework}\n`;
+      textContent += '-'.repeat(40) + '\n\n';
     });
 
-    htmlContent += '</body></html>';
-
-    // Open print dialog (users can save as PDF)
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-    }
-  };
-
-  // Download lesson plans as Excel
-  const downloadLessonPlansAsExcel = (teacher: Teacher) => {
-    const teacherPlans = getTeacherLessonPlans(teacher.email);
-    if (teacherPlans.length === 0) {
-      alert('No lesson plans found for this teacher');
-      return;
-    }
-
-    const data = teacherPlans.map(plan => ({
-      'Teacher': teacher.name,
-      'Email': teacher.email,
-      'Subject': plan.subject,
-      'Class': `${plan.className}-${plan.section}`,
-      'Week Starting': new Date(plan.weekStarting).toLocaleDateString(),
-      'Topics': plan.topics.join(', '),
-      'Objectives': plan.objectives,
-      'Homework': plan.homework,
-      'Submitted At': new Date(plan.submittedAt).toLocaleString(),
-      'Status': plan.status || 'Submitted'
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Lesson Plans');
-    
-    // Generate Excel file
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `LessonPlans_${teacher.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    // Create and download text file
+    const blob = new Blob([textContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `LessonPlans_${teacher.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Share lesson plans via email (using window.location for mailto)
@@ -244,7 +189,7 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
     body += `\nBest regards,\nSacred Heart School Administration`;
 
     const mailtoLink = `mailto:${teacher.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = mailtoLink;
+    window.open(mailtoLink, '_blank');
   };
 
   // Send email to defaulters
@@ -274,7 +219,7 @@ Sacred Heart School Administration`);
     setShowDefaulterEmailModal(true);
   };
 
-  // Send email using Resend API
+  // Send email using mailto fallback
   const sendBulkEmails = async () => {
     if (!isOnline) {
       alert('Cannot send emails while offline');
@@ -287,6 +232,7 @@ Sacred Heart School Administration`);
     }
 
     setIsSendingEmail(true);
+    
     try {
       // Get teacher details for selected emails
       const recipients = teachers
@@ -296,40 +242,28 @@ Sacred Heart School Administration`);
           name: teacher.name
         }));
 
-      // Send emails via Resend API
-      const response = await fetch('/api/send-emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          recipients,
-          subject: 'Reminder: Pending Lesson Plan Submission',
-          body: emailTemplate
-        })
-      });
-
-      if (response.ok) {
-        alert(`Successfully sent ${recipients.length} reminder emails!`);
-        setShowDefaulterEmailModal(false);
-        setSelectedDefaulters([]);
-        setEmailTemplate('');
+      // If only one recipient, open mailto directly
+      if (recipients.length === 1) {
+        const recipient = recipients[0];
+        const mailtoLink = `mailto:${recipient.email}?subject=Reminder: Pending Lesson Plan Submission&body=${encodeURIComponent(emailTemplate)}`;
+        window.open(mailtoLink, '_blank');
       } else {
-        throw new Error('Failed to send emails');
+        // For multiple recipients, create individual mailto links
+        alert(`Preparing ${recipients.length} email(s). You will need to send them individually.`);
+        
+        // Create first email
+        const firstRecipient = recipients[0];
+        const mailtoLink = `mailto:${firstRecipient.email}?subject=Reminder: Pending Lesson Plan Submission&body=${encodeURIComponent(emailTemplate)}`;
+        window.open(mailtoLink, '_blank');
       }
+      
+      setShowDefaulterEmailModal(false);
+      setSelectedDefaulters([]);
+      setEmailTemplate('');
+      
     } catch (error) {
       console.error('Error sending emails:', error);
       alert('Failed to send emails. Please try again.');
-      
-      // Fallback to mailto links
-      const mailtoLinks = selectedDefaulters.map(email => 
-        `mailto:${email}?subject=Reminder: Pending Lesson Plan Submission&body=${encodeURIComponent(emailTemplate)}`
-      );
-      
-      // Open first email (user can send to others)
-      if (mailtoLinks.length > 0) {
-        window.location.href = mailtoLinks[0];
-      }
     } finally {
       setIsSendingEmail(false);
     }
@@ -341,7 +275,7 @@ Sacred Heart School Administration`);
     setShowLessonPlanPreview(true);
   };
 
-  // Download all lesson plans for a class
+  // Download all lesson plans for a class as TEXT
   const downloadClassLessonPlans = (className: string) => {
     const classPlans = lessonPlans.filter(plan => plan.className === className);
     if (classPlans.length === 0) {
@@ -349,27 +283,34 @@ Sacred Heart School Administration`);
       return;
     }
 
-    const data = classPlans.map(plan => {
+    let textContent = `Class ${className} Lesson Plans\n`;
+    textContent += `Date: ${new Date().toLocaleDateString()}\n`;
+    textContent += '='.repeat(50) + '\n\n';
+
+    classPlans.forEach((plan, index) => {
       const teacher = teachers.find(t => t.email === plan.teacherId);
-      return {
-        'Teacher': teacher?.name || plan.teacherId,
-        'Subject': plan.subject,
-        'Class': `${plan.className}-${plan.section}`,
-        'Week Starting': new Date(plan.weekStarting).toLocaleDateString(),
-        'Topics': plan.topics.join(', '),
-        'Objectives': plan.objectives,
-        'Homework': plan.homework,
-        'Submitted At': new Date(plan.submittedAt).toLocaleString()
-      };
+      textContent += `PLAN #${index + 1}\n`;
+      textContent += `Teacher: ${teacher?.name || plan.teacherId}\n`;
+      textContent += `Subject: ${plan.subject}\n`;
+      textContent += `Class: ${plan.className}-${plan.section}\n`;
+      textContent += `Week: ${new Date(plan.weekStarting).toLocaleDateString()}\n`;
+      textContent += `Topics: ${plan.topics.join(', ')}\n`;
+      textContent += `Objectives: ${plan.objectives}\n`;
+      textContent += `Homework: ${plan.homework}\n`;
+      textContent += `Submitted: ${new Date(plan.submittedAt).toLocaleDateString()}\n`;
+      textContent += '-'.repeat(40) + '\n\n';
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, `Class ${className} Plans`);
-    
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `Class_${className}_Lesson_Plans_${new Date().toISOString().split('T')[0]}.xlsx`);
+    // Create and download text file
+    const blob = new Blob([textContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Class_${className}_Lesson_Plans_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Get class-wise statistics
@@ -488,18 +429,6 @@ Sacred Heart School Administration`);
     }
   };
 
-  const handleSendWarnings = async () => {
-    if (!confirm("Send automated email reminders to all teachers who haven't submitted plans for next week?")) return;
-    setIsSendingAlerts(true);
-    try {
-      alert("Automated email reminders are currently disabled.");
-    } catch (e) {
-      alert("Failed to trigger warnings.");
-    } finally {
-      setIsSendingAlerts(false);
-    }
-  };
-
   const handleEditClick = (teacher: Teacher) => {
     setEditingTeacher(teacher);
     setIsEditing(true);
@@ -525,44 +454,6 @@ Sacred Heart School Administration`);
     } catch (error) {
       alert("Failed to update teacher. Please try again.");
     }
-  };
-
-  const handleAddAssignment = () => {
-    if (!newAssignment.subject.trim() || !newAssignment.sections.trim()) {
-      alert("Please enter both subject and sections.");
-      return;
-    }
-
-    const sectionsArray = newAssignment.sections.split(',').map(s => s.trim()).filter(s => s);
-    
-    const assignment: Assignment = {
-      className: newAssignment.className,
-      subject: newAssignment.subject,
-      sections: sectionsArray
-    };
-
-    setEditFormData(prev => ({
-      ...prev,
-      assignments: [...(prev.assignments || []), assignment]
-    }));
-
-    setNewAssignment({
-      className: '10',
-      subject: '',
-      sections: ''
-    });
-  };
-
-  const handleRemoveAssignment = (index: number) => {
-    if (!editFormData.assignments) return;
-    
-    const updatedAssignments = [...editFormData.assignments];
-    updatedAssignments.splice(index, 1);
-    
-    setEditFormData(prev => ({
-      ...prev,
-      assignments: updatedAssignments
-    }));
   };
 
   const handleAddNewTeacher = async () => {
@@ -831,16 +722,9 @@ Sacred Heart School Administration`);
                           <Eye className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => downloadLessonPlansAsPDF(teacher)}
+                          onClick={() => downloadLessonPlansAsText(teacher)}
                           className="p-2 text-purple-400 hover:text-purple-300 rounded-lg hover:bg-purple-500/10"
-                          title="Download as PDF"
-                        >
-                          <Printer className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => downloadLessonPlansAsExcel(teacher)}
-                          className="p-2 text-emerald-400 hover:text-emerald-300 rounded-lg hover:bg-emerald-500/10"
-                          title="Download as Excel"
+                          title="Download as Text"
                         >
                           <FileDown className="h-4 w-4" />
                         </button>
@@ -908,11 +792,11 @@ Sacred Heart School Administration`);
                               <span className="text-xs font-bold">Preview</span>
                             </button>
                             <button
-                              onClick={() => downloadLessonPlansAsExcel(teacher)}
+                              onClick={() => downloadLessonPlansAsText(teacher)}
                               className="p-3 bg-emerald-500/10 text-emerald-300 rounded-xl hover:bg-emerald-500/20 transition-colors flex items-center justify-center gap-2"
                             >
                               <Download className="h-4 w-4" />
-                              <span className="text-xs font-bold">Excel</span>
+                              <span className="text-xs font-bold">Download</span>
                             </button>
                             <button
                               onClick={() => shareLessonPlansViaEmail(teacher)}
@@ -949,42 +833,6 @@ Sacred Heart School Administration`);
         )}
       </div>
 
-      {/* Recent Activity */}
-      <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-2xl border border-gray-700">
-        <h3 className="text-lg font-black text-white mb-6">Recent Activity</h3>
-        <div className="space-y-4">
-          {recentLogins.map((log, idx) => (
-            <div key={idx} className="flex items-center gap-3 p-3 bg-gray-900/30 rounded-xl">
-              <div className="p-2 bg-indigo-500/20 rounded-lg">
-                <Users className="h-4 w-4 text-indigo-400" />
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-bold text-white truncate">{log.name}</div>
-                <div className="text-xs text-gray-400">
-                  {new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                </div>
-              </div>
-              <ArrowUpRight className="h-4 w-4 text-emerald-400" />
-            </div>
-          ))}
-          
-          {recentSubmissions.map((plan, idx) => (
-            <div key={`sub-${idx}`} className="flex items-center gap-3 p-3 bg-gray-900/30 rounded-xl">
-              <div className="p-2 bg-emerald-500/20 rounded-lg">
-                <BookOpen className="h-4 w-4 text-emerald-400" />
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-bold text-white truncate">{plan.subject}</div>
-                <div className="text-xs text-gray-400">
-                  {plan.className}-{plan.section} • {plan.teacherId.split('@')[0]}
-                </div>
-              </div>
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Quick Actions */}
       <div className="bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-sm p-6 rounded-2xl border border-gray-700">
         <h3 className="text-lg font-black text-white mb-6">Quick Actions</h3>
@@ -1004,28 +852,34 @@ Sacred Heart School Administration`);
           
           <button 
             onClick={() => {
-              // Download all lesson plans
-              const data = lessonPlans.map(plan => {
+              // Download all lesson plans as text
+              let textContent = 'All Lesson Plans\n';
+              textContent += `Date: ${new Date().toLocaleDateString()}\n`;
+              textContent += '='.repeat(50) + '\n\n';
+              
+              lessonPlans.forEach((plan, index) => {
                 const teacher = teachers.find(t => t.email === plan.teacherId);
-                return {
-                  'Teacher': teacher?.name || plan.teacherId,
-                  'Subject': plan.subject,
-                  'Class': `${plan.className}-${plan.section}`,
-                  'Week Starting': new Date(plan.weekStarting).toLocaleDateString(),
-                  'Topics': plan.topics.join(', '),
-                  'Objectives': plan.objectives,
-                  'Homework': plan.homework,
-                  'Submitted At': new Date(plan.submittedAt).toLocaleString()
-                };
+                textContent += `PLAN #${index + 1}\n`;
+                textContent += `Teacher: ${teacher?.name || plan.teacherId}\n`;
+                textContent += `Subject: ${plan.subject}\n`;
+                textContent += `Class: ${plan.className}-${plan.section}\n`;
+                textContent += `Week: ${new Date(plan.weekStarting).toLocaleDateString()}\n`;
+                textContent += `Topics: ${plan.topics.join(', ')}\n`;
+                textContent += `Objectives: ${plan.objectives}\n`;
+                textContent += `Homework: ${plan.homework}\n`;
+                textContent += `Submitted: ${new Date(plan.submittedAt).toLocaleDateString()}\n`;
+                textContent += '-'.repeat(40) + '\n\n';
               });
               
-              const worksheet = XLSX.utils.json_to_sheet(data);
-              const workbook = XLSX.utils.book_new();
-              XLSX.utils.book_append_sheet(workbook, worksheet, 'All Lesson Plans');
-              
-              const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-              const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-              saveAs(blob, `All_Lesson_Plans_${new Date().toISOString().split('T')[0]}.xlsx`);
+              const blob = new Blob([textContent], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `All_Lesson_Plans_${new Date().toISOString().split('T')[0]}.txt`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
             }}
             className="p-4 bg-gradient-to-br from-emerald-600/20 to-teal-600/20 rounded-xl border border-emerald-500/30 hover:border-emerald-400/50 transition-all duration-300 group"
           >
@@ -1033,7 +887,7 @@ Sacred Heart School Administration`);
               <DownloadCloud className="h-5 w-5 text-emerald-400 group-hover:scale-110 transition-transform" />
               <div className="text-left">
                 <div className="text-sm font-bold text-white">Export All Data</div>
-                <div className="text-xs text-gray-400">Download Excel</div>
+                <div className="text-xs text-gray-400">Download Text</div>
               </div>
             </div>
           </button>
@@ -1070,131 +924,6 @@ Sacred Heart School Administration`);
           </button>
         </div>
       </div>
-
-      {/* Lesson Plan Preview Modal */}
-      {showLessonPlanPreview && selectedTeacherForLessonPlans && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800/90 backdrop-blur-xl rounded-3xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700/50 shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h3 className="text-xl font-black text-white">Lesson Plans - {selectedTeacherForLessonPlans.name}</h3>
-                <p className="text-sm text-gray-400">{selectedTeacherForLessonPlans.email}</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => downloadLessonPlansAsPDF(selectedTeacherForLessonPlans)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-xs hover:bg-blue-700 flex items-center gap-2"
-                >
-                  <Printer className="h-4 w-4" />
-                  PDF
-                </button>
-                <button
-                  onClick={() => downloadLessonPlansAsExcel(selectedTeacherForLessonPlans)}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 flex items-center gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Excel
-                </button>
-                <button
-                  onClick={() => setShowLessonPlanPreview(false)}
-                  className="p-2 text-gray-400 hover:text-white rounded-xl"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              {getTeacherLessonPlans(selectedTeacherForLessonPlans.email).length === 0 ? (
-                <div className="text-center py-10">
-                  <BookOpen className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-400 font-bold">No lesson plans found</p>
-                  <p className="text-gray-500 text-sm mt-1">This teacher hasn't submitted any lesson plans yet</p>
-                </div>
-              ) : (
-                getTeacherLessonPlans(selectedTeacherForLessonPlans.email).map((plan, index) => (
-                  <div key={index} className="bg-gray-900/50 p-6 rounded-xl border border-gray-700/50">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h4 className="text-lg font-bold text-white">{plan.subject}</h4>
-                        <p className="text-sm text-gray-400">Class {plan.className}-{plan.section}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-gray-400">Week: {new Date(plan.weekStarting).toLocaleDateString()}</p>
-                        <p className="text-xs text-gray-500">Submitted: {new Date(plan.submittedAt).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <h5 className="text-sm font-bold text-gray-300 mb-2">Topics Covered</h5>
-                        <ul className="space-y-1">
-                          {plan.topics.map((topic, i) => (
-                            <li key={i} className="text-sm text-gray-400 flex items-center gap-2">
-                              <div className="h-1.5 w-1.5 bg-indigo-400 rounded-full"></div>
-                              {topic}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      
-                      <div>
-                        <h5 className="text-sm font-bold text-gray-300 mb-2">Learning Objectives</h5>
-                        <p className="text-sm text-gray-400">{plan.objectives}</p>
-                        
-                        <h5 className="text-sm font-bold text-gray-300 mt-4 mb-2">Homework</h5>
-                        <p className="text-sm text-gray-400">{plan.homework}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6 pt-6 border-t border-gray-700/50 flex justify-end gap-3">
-                      <button
-                        onClick={() => {
-                          const printWindow = window.open('', '_blank');
-                          if (printWindow) {
-                            printWindow.document.write(`
-                              <html>
-                                <head><title>Lesson Plan - ${plan.subject}</title></head>
-                                <body>
-                                  <h1>${plan.subject} - Class ${plan.className}-${plan.section}</h1>
-                                  <p><strong>Teacher:</strong> ${selectedTeacherForLessonPlans.name}</p>
-                                  <p><strong>Week:</strong> ${new Date(plan.weekStarting).toLocaleDateString()}</p>
-                                  <h2>Topics:</h2>
-                                  <ul>${plan.topics.map(topic => `<li>${topic}</li>`).join('')}</ul>
-                                  <h2>Objectives:</h2>
-                                  <p>${plan.objectives}</p>
-                                  <h2>Homework:</h2>
-                                  <p>${plan.homework}</p>
-                                </body>
-                              </html>
-                            `);
-                            printWindow.document.close();
-                            printWindow.focus();
-                            printWindow.print();
-                          }
-                        }}
-                        className="px-4 py-2 bg-blue-600/20 text-blue-300 rounded-lg text-xs font-bold hover:bg-blue-600/30"
-                      >
-                        Print This Plan
-                      </button>
-                      <button
-                        onClick={() => {
-                          const subject = `Lesson Plan: ${plan.subject} - Class ${plan.className}-${plan.section}`;
-                          const body = `Dear ${selectedTeacherForLessonPlans.name},\n\nHere is your lesson plan:\n\nSubject: ${plan.subject}\nClass: ${plan.className}-${plan.section}\nWeek: ${new Date(plan.weekStarting).toLocaleDateString()}\nTopics: ${plan.topics.join(', ')}\nObjectives: ${plan.objectives}\nHomework: ${plan.homework}\n\nBest regards,\nSacred Heart School`;
-                          window.location.href = `mailto:${selectedTeacherForLessonPlans.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-                        }}
-                        className="px-4 py-2 bg-amber-600/20 text-amber-300 rounded-lg text-xs font-bold hover:bg-amber-600/30"
-                      >
-                        Email This Plan
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Defaulter Email Modal */}
       {showDefaulterEmailModal && (
@@ -1272,12 +1001,6 @@ Sacred Heart School Administration`);
                 Cancel
               </button>
             </div>
-            
-            <div className="mt-6 pt-6 border-t border-gray-700/50">
-              <p className="text-xs text-gray-500">
-                <strong>Note:</strong> Emails will be sent via Resend API. Make sure you have configured your RESEND_API_KEY.
-              </p>
-            </div>
           </div>
         </div>
       )}
@@ -1322,25 +1045,6 @@ Sacred Heart School Administration`);
                   className="w-full bg-gray-900/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                   placeholder="+91 9876543210"
                 />
-              </div>
-              <div>
-                <label className="text-sm font-bold text-gray-300 mb-2 block">Password</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={newTeacher.password}
-                    onChange={(e) => setNewTeacher({...newTeacher, password: e.target.value})}
-                    className="w-full bg-gray-900/70 border border-gray-700 rounded-xl px-4 py-3 text-white pr-12"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Default: {DEFAULT_TEACHER_PASSWORD}</p>
               </div>
               <div className="flex gap-4 pt-4">
                 <button
