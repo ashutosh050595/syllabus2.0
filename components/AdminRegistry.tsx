@@ -9,7 +9,7 @@ import {
   MessageSquare, Send, Bell, Shield, Lock, Unlock,
   GraduationCap, Book, DownloadCloud, UploadCloud,
   CheckCircle, XCircle, Clock as ClockIcon, Star,
-  User, FileText as FileTextIcon, FileSpreadsheet, FilePdf,
+  User, FileText as FileTextIcon, FileSpreadsheet,
   Layers, Layout
 } from 'lucide-react';
 import { useTeacherIdentity } from '../hooks/useTeacherIdentity';
@@ -1282,7 +1282,7 @@ Sacred Heart School Administration`);
                     className="p-4 bg-gradient-to-br from-rose-600/20 to-pink-600/20 rounded-xl border border-rose-500/30 hover:border-rose-400/50 transition-all duration-300 group"
                   >
                     <div className="flex items-center gap-3">
-                      <FilePdf className="h-5 w-5 text-rose-400 group-hover:scale-110 transition-transform" />
+                      <FileTextIcon className="h-5 w-5 text-rose-400 group-hover:scale-110 transition-transform" />
                       <div className="text-left">
                         <div className="text-sm font-bold text-white">Export as PDF</div>
                         <div className="text-xs text-gray-400">Print-friendly format</div>
