@@ -10,668 +10,7 @@ import {
   GraduationCap, Book, DownloadCloud, UploadCloud,
   CheckCircle, XCircle, Clock as ClockIcon, Star,
   User, FileText as FileTextIcon, FileSpreadsheet, FilePdf,
-  Compass, Layers, Grid, Layout, Package, Box, Archive,
-  HardDrive, Cloud, CloudOff, Cpu, Zap, Battery,
-  Wifi, WifiOff, Activity, PieChart, LineChart,
-  Target, Flag, Trophy, Medal, Crown, Coffee,
-  Music, Video, Image, Camera, Mic, Headphones,
-  Smartphone, Tablet, Monitor, Tv, Watch,
-  Home, Building, School, Church, Castle,
-  Globe, Map, Navigation, Compass as CompassIcon,
-  Sun, Moon, CloudRain, CloudSnow, Wind,
-  Umbrella, Droplets, Thermometer, Sunrise, Sunset,
-  MoonStar, Star as StarIcon, Heart, ThumbsUp,
-  MessageCircle, Phone, Voicemail, Video as VideoIcon,
-  Mail as MailIcon, Inbox, Bell as BellIcon,
-  Settings, Menu, MoreHorizontal, MoreVertical,
-  ChevronLeft, ChevronRight, ChevronsUp, ChevronsDown,
-  ChevronsLeft, ChevronsRight, Maximize2, Minimize2,
-  RotateCcw, RotateCw, ZoomIn, ZoomOut, Move,
-  Type, Bold, Italic, Underline, Link, Paperclip,
-  Scissors, Copy, Clipboard, CheckSquare, MinusSquare,
-  PlusSquare, XSquare, Hash, AtSign, DollarSign,
-  Percent, Key, Terminal, Code, Brackets, Braces,
-  Parentheses, Slash, Backslash, Equal, Plus as PlusIcon,
-  Minus, Divide, Multiply, Hash as HashIcon, Infinity,
-  Pi, Sigma, Omega, Alpha, Beta, Gamma, Delta,
-  Lambda, Pi as PiIcon, Function, Variable, X as XIcon,
-  Y, Z, A, B, C, D, E, F, G, H, I, J, K, L,
-  M, N, O, P, Q, R, S, T, U, V, W, X as XLetter,
-  Y as YLetter, Z as ZLetter, Hash as Hash2,
-  Asterisk, Copyright, Registered, Trademark,
-  Check as CheckIcon, X as XIcon2, HelpCircle,
-  QuestionMark, AlertOctagon, AlertTriangle as AlertTriangleIcon,
-  Info, Lightbulb, Zap as ZapIcon, BatteryCharging,
-  Battery as BatteryIcon, Radio, Bluetooth, Wifi as WifiIcon,
-  Signal, SignalHigh, SignalLow, SignalZero,
-  Airplay, Cast, Chrome, Chrome as ChromeIcon,
-  Codepen, Codesandbox, Figma, GitBranch, GitCommit,
-  GitMerge, GitPullRequest, Github, Gitlab, Instagram,
-  Linkedin, Twitter, Youtube, Facebook, Twitch,
-  Dribbble, Behance, Pinterest, Reddit, Snapchat,
-  TikTok, Tiktok as TiktokIcon, WhatsApp, Messenger,
-  Slack, Skype, Zoom, Zoom as ZoomIcon, Vimeo,
-  Vk, Wechat, Weibo, Xing, Youtube as YoutubeIcon,
-  Chrome as ChromeIcon2, Amazon, Alibaba, Alipay,
-  Android, Apple, Windows, Linux, Ubuntu, Debian,
-  Centos, Fedora, Redhat, Slackware, Suse, Archlinux,
-  Freebsd, Openbsd, Netbsd, Dragonflybsd, Gentoo,
-  Mint, Elementary, Zorin, PopOS, Manjaro, Antergos,
-  Artix, Endeavouros, Garuda, RebornOS, ArcoLinux,
-  Archlabs, Archman, Bluestar, Chakra, Condres,
-  Obarun, Parabola, Swagarch, ArchMerge, ArchStrike,
-  Blackarch, ArchAssault, ArchLabs, ArchLabsB,
-  ArchLabsD, ArchLabsH, ArchLabsM, ArchLabsP,
-  ArchLabsR, ArchLabsS, ArchLabsT, ArchLabsV,
-  ArchLabsW, ArchLabsX, ArchLabsY, ArchLabsZ,
-  ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
-  ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight,
-  CornerDownLeft, CornerDownRight, CornerLeftDown,
-  CornerLeftUp, CornerRightDown, CornerRightUp,
-  CornerUpLeft, CornerUpRight, SkipBack, SkipForward,
-  FastForward, Rewind, Play, Pause, Stop, Volume,
-  Volume1, Volume2, VolumeX, Volume as VolumeIcon,
-  Music as MusicIcon, Headphones as HeadphonesIcon,
-  Mic as MicIcon, Video as VideoIcon2, Camera as CameraIcon,
-  Image as ImageIcon, Film, Tv as TvIcon, Radio as RadioIcon,
-  Phone as PhoneIcon, PhoneCall, PhoneForwarded,
-  PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing,
-  Voicemail as VoicemailIcon, Mail as MailIcon2,
-  Inbox as InboxIcon, Bell as BellIcon2, BellOff,
-  BellRing, MessageSquare as MessageSquareIcon,
-  MessageCircle as MessageCircleIcon, MessageCircleDashed,
-  MessageCircleHeart, MessageCircleMore, MessageCircleOff,
-  MessageCirclePlus, MessageCircleQuestion, MessageCircleReply,
-  MessageCircleWarning, MessageCircleX, MessageSquareDashed,
-  MessageSquareHeart, MessageSquareMore, MessageSquareOff,
-  MessageSquarePlus, MessageSquareQuote, MessageSquareReply,
-  MessageSquareShare, MessageSquareText, MessageSquareWarning,
-  MessageSquareX, MessagesSquare, Newspaper, Bookmark,
-  BookmarkCheck, BookmarkMinus, BookmarkPlus, BookmarkX,
-  Calendar as CalendarIcon, CalendarCheck, CalendarClock,
-  CalendarDays, CalendarHeart, CalendarMinus, CalendarOff,
-  CalendarPlus, CalendarRange, CalendarSearch, CalendarX,
-  Clock as ClockIcon2, Clock1, Clock10, Clock11, Clock12,
-  Clock2, Clock3, Clock4, Clock5, Clock6, Clock7, Clock8,
-  Clock9, Timer, TimerOff, TimerReset, AlarmClock,
-  AlarmClockCheck, AlarmClockMinus, AlarmClockOff,
-  AlarmClockPlus, AlarmClock as AlarmClockIcon,
-  Hourglass, Timer as TimerIcon, Watch as WatchIcon,
-  Globe as GlobeIcon, Map as MapIcon, Navigation as NavigationIcon,
-  Compass as CompassIcon2, Flag as FlagIcon, FlagTriangleLeft,
-  FlagTriangleRight, Home as HomeIcon, Building as BuildingIcon,
-  School as SchoolIcon, Church as ChurchIcon, Castle as CastleIcon,
-  Factory, Hotel, Store, Building2, Warehouse, Bank,
-  Hospital, Police, FireExtinguisher, Ambulance, Rocket as RocketIcon,
-  Plane, Ship, Car, Bike, Bus, Train, Truck, Tram,
-  Subway, Helicopter, Drone, Satellite, Wrench, Screwdriver,
-  Hammer, Wrench as WrenchIcon, Nut, Bolt, Cog, Settings as SettingsIcon,
-  Sliders, ToggleLeft, ToggleRight, Power, PowerOff,
-  Battery as BatteryIcon2, BatteryCharging as BatteryChargingIcon,
-  BatteryFull, BatteryLow, BatteryMedium, BatteryWarning,
-  Cpu as CpuIcon, MemoryStick, HardDrive as HardDriveIcon,
-  Database as DatabaseIcon, Server as ServerIcon, Router,
-  Cloud as CloudIcon, CloudOff as CloudOffIcon, CloudRain as CloudRainIcon,
-  CloudSnow as CloudSnowIcon, CloudLightning, CloudDrizzle,
-  CloudFog, CloudHail, CloudMoon, CloudSun, Cloudy,
-  Sun as SunIcon, Moon as MoonIcon, Star as StarIcon2,
-  Sunrise as SunriseIcon, Sunset as SunsetIcon, Thermometer as ThermometerIcon,
-  Droplets as DropletsIcon, Umbrella as UmbrellaIcon, Wind as WindIcon,
-  Snowflake, Flame, Droplet, Waves, Tree, Leaf, Flower,
-  Sprout, Cactus, Mountain, MountainSnow, Waves as WavesIcon,
-  Ship as ShipIcon, Anchor, Sailboat, Fish, Whale, Bird,
-  Rabbit, Cat, Dog, Cow, Pig, Sheep, Horse, Chicken,
-  Bird as BirdIcon, Bee, Bug, Spider, Butterfly, Snail,
-  Turtle, Crab, Octopus, Shark, Dolphin, Crocodile,
-  Dinosaur, Dragon, Ghost, Skull, Alien, Robot, Smile,
-  Frown, Meh, Laugh, Heart as HeartIcon, HeartCrack,
-  HeartHandshake, HeartPulse, Heart as HeartIcon2,
-  ThumbsUp as ThumbsUpIcon, ThumbsDown, Star as StarIcon3,
-  Award as AwardIcon, Trophy as TrophyIcon, Medal as MedalIcon,
-  Crown as CrownIcon, Gem, Diamond, Coins, CreditCard,
-  Banknote, Wallet, ShoppingCart, ShoppingBag, Gift,
-  Package as PackageIcon, Box as BoxIcon, Archive as ArchiveIcon,
-  Layers as LayersIcon, Grid as GridIcon, Layout as LayoutIcon,
-  Compass as CompassIcon3, MapPin, MapPinCheck, MapPinHouse,
-  MapPinMinus, MapPinPlus, MapPinX, Navigation as NavigationIcon2,
-  Globe as GlobeIcon2, Map as MapIcon2, MapPinned,
-  Compass as CompassIcon4, Navigation as NavigationIcon3,
-  Radar, Satellite as SatelliteIcon, Smartphone as SmartphoneIcon,
-  Tablet as TabletIcon, Monitor as MonitorIcon, Tv as TvIcon2,
-  Watch as WatchIcon2, Camera as CameraIcon2, Video as VideoIcon3,
-  Headphones as HeadphonesIcon2, Mic as MicIcon2, Music as MusicIcon2,
-  Radio as RadioIcon2, Speaker, Volume as VolumeIcon2,
-  Volume1 as Volume1Icon, Volume2 as Volume2Icon, VolumeX as VolumeXIcon,
-  Phone as PhoneIcon2, PhoneCall as PhoneCallIcon, PhoneForwarded as PhoneForwardedIcon,
-  PhoneIncoming as PhoneIncomingIcon, PhoneMissed as PhoneMissedIcon,
-  PhoneOff as PhoneOffIcon, PhoneOutgoing as PhoneOutgoingIcon,
-  Voicemail as VoicemailIcon2, Mail as MailIcon3, Inbox as InboxIcon2,
-  Bell as BellIcon3, BellOff as BellOffIcon, BellRing as BellRingIcon,
-  MessageSquare as MessageSquareIcon2, MessageCircle as MessageCircleIcon2,
-  Newspaper as NewspaperIcon, Bookmark as BookmarkIcon,
-  BookmarkCheck as BookmarkCheckIcon, BookmarkMinus as BookmarkMinusIcon,
-  BookmarkPlus as BookmarkPlusIcon, BookmarkX as BookmarkXIcon,
-  Calendar as CalendarIcon2, Clock as ClockIcon3, Timer as TimerIcon2,
-  AlarmClock as AlarmClockIcon2, Hourglass as HourglassIcon,
-  Watch as WatchIcon3, Globe as GlobeIcon3, Map as MapIcon3,
-  Navigation as NavigationIcon4, Compass as CompassIcon5,
-  Flag as FlagIcon2, Home as HomeIcon2, Building as BuildingIcon2,
-  School as SchoolIcon2, Church as ChurchIcon2, Castle as CastleIcon2,
-  Factory as FactoryIcon, Hotel as HotelIcon, Store as StoreIcon,
-  Building2 as Building2Icon, Warehouse as WarehouseIcon, Bank as BankIcon,
-  Hospital as HospitalIcon, Police as PoliceIcon, FireExtinguisher as FireExtinguisherIcon,
-  Ambulance as AmbulanceIcon, Rocket as RocketIcon2, Plane as PlaneIcon,
-  Ship as ShipIcon2, Car as CarIcon, Bike as BikeIcon, Bus as BusIcon,
-  Train as TrainIcon, Truck as TruckIcon, Tram as TramIcon,
-  Subway as SubwayIcon, Helicopter as HelicopterIcon, Drone as DroneIcon,
-  Satellite as SatelliteIcon2, Wrench as WrenchIcon2, Screwdriver as ScrewdriverIcon,
-  Hammer as HammerIcon, Nut as NutIcon, Bolt as BoltIcon, Cog as CogIcon,
-  Settings as SettingsIcon2, Sliders as SlidersIcon, ToggleLeft as ToggleLeftIcon,
-  ToggleRight as ToggleRightIcon, Power as PowerIcon, PowerOff as PowerOffIcon,
-  Battery as BatteryIcon3, BatteryCharging as BatteryChargingIcon2,
-  BatteryFull as BatteryFullIcon, BatteryLow as BatteryLowIcon,
-  BatteryMedium as BatteryMediumIcon, BatteryWarning as BatteryWarningIcon,
-  Cpu as CpuIcon2, MemoryStick as MemoryStickIcon, HardDrive as HardDriveIcon2,
-  Database as DatabaseIcon2, Server as ServerIcon2, Router as RouterIcon,
-  Cloud as CloudIcon2, CloudOff as CloudOffIcon2, CloudRain as CloudRainIcon2,
-  CloudSnow as CloudSnowIcon2, CloudLightning as CloudLightningIcon,
-  CloudDrizzle as CloudDrizzleIcon, CloudFog as CloudFogIcon, CloudHail as CloudHailIcon,
-  CloudMoon as CloudMoonIcon, CloudSun as CloudSunIcon, Cloudy as CloudyIcon,
-  Sun as SunIcon2, Moon as MoonIcon2, Star as StarIcon4,
-  Sunrise as SunriseIcon2, Sunset as SunsetIcon2, Thermometer as ThermometerIcon2,
-  Droplets as DropletsIcon2, Umbrella as UmbrellaIcon2, Wind as WindIcon2,
-  Snowflake as SnowflakeIcon, Flame as FlameIcon, Droplet as DropletIcon,
-  Waves as WavesIcon2, Tree as TreeIcon, Leaf as LeafIcon, Flower as FlowerIcon,
-  Sprout as SproutIcon, Cactus as CactusIcon, Mountain as MountainIcon,
-  MountainSnow as MountainSnowIcon, Ship as ShipIcon3, Anchor as AnchorIcon,
-  Sailboat as SailboatIcon, Fish as FishIcon, Whale as WhaleIcon, Bird as BirdIcon2,
-  Rabbit as RabbitIcon, Cat as CatIcon, Dog as DogIcon, Cow as CowIcon,
-  Pig as PigIcon, Sheep as SheepIcon, Horse as HorseIcon, Chicken as ChickenIcon,
-  Bee as BeeIcon, Bug as BugIcon, Spider as SpiderIcon, Butterfly as ButterflyIcon,
-  Snail as SnailIcon, Turtle as TurtleIcon, Crab as CrabIcon, Octopus as OctopusIcon,
-  Shark as SharkIcon, Dolphin as DolphinIcon, Crocodile as CrocodileIcon,
-  Dinosaur as DinosaurIcon, Dragon as DragonIcon, Ghost as GhostIcon,
-  Skull as SkullIcon, Alien as AlienIcon, Robot as RobotIcon, Smile as SmileIcon,
-  Frown as FrownIcon, Meh as MehIcon, Laugh as LaughIcon, Heart as HeartIcon3,
-  HeartCrack as HeartCrackIcon, HeartHandshake as HeartHandshakeIcon,
-  HeartPulse as HeartPulseIcon, ThumbsUp as ThumbsUpIcon2, ThumbsDown as ThumbsDownIcon,
-  Star as StarIcon5, Award as AwardIcon2, Trophy as TrophyIcon2, Medal as MedalIcon2,
-  Crown as CrownIcon2, Gem as GemIcon, Diamond as DiamondIcon, Coins as CoinsIcon,
-  CreditCard as CreditCardIcon, Banknote as BanknoteIcon, Wallet as WalletIcon,
-  ShoppingCart as ShoppingCartIcon, ShoppingBag as ShoppingBagIcon, Gift as GiftIcon,
-  Package as PackageIcon2, Box as BoxIcon2, Archive as ArchiveIcon2,
-  Layers as LayersIcon2, Grid as GridIcon2, Layout as LayoutIcon2,
-  Compass as CompassIcon6, MapPin as MapPinIcon, Navigation as NavigationIcon5,
-  Globe as GlobeIcon4, Map as MapIcon4, Compass as CompassIcon7,
-  Navigation as NavigationIcon6, Radar as RadarIcon, Satellite as SatelliteIcon3,
-  Smartphone as SmartphoneIcon2, Tablet as TabletIcon2, Monitor as MonitorIcon2,
-  Tv as TvIcon3, Watch as WatchIcon4, Camera as CameraIcon3, Video as VideoIcon4,
-  Headphones as HeadphonesIcon3, Mic as MicIcon3, Music as MusicIcon3,
-  Radio as RadioIcon3, Speaker as SpeakerIcon, Volume as VolumeIcon3,
-  Phone as PhoneIcon3, Mail as MailIcon4, Bell as BellIcon4,
-  MessageSquare as MessageSquareIcon3, Calendar as CalendarIcon3,
-  Clock as ClockIcon4, Globe as GlobeIcon5, Map as MapIcon5,
-  Navigation as NavigationIcon7, Home as HomeIcon3, Building as BuildingIcon3,
-  School as SchoolIcon3, Rocket as RocketIcon3, Plane as PlaneIcon2,
-  Car as CarIcon2, Bike as BikeIcon2, Ship as ShipIcon4, Train as TrainIcon2,
-  Wrench as WrenchIcon3, Settings as SettingsIcon3, Power as PowerIcon2,
-  Battery as BatteryIcon4, Cpu as CpuIcon3, Database as DatabaseIcon3,
-  Server as ServerIcon3, Cloud as CloudIcon3, Sun as SunIcon3,
-  Moon as MoonIcon3, Star as StarIcon6, Thermometer as ThermometerIcon3,
-  Tree as TreeIcon2, Heart as HeartIcon4, ThumbsUp as ThumbsUpIcon3,
-  Award as AwardIcon3, Crown as CrownIcon3, Gem as GemIcon2,
-  ShoppingCart as ShoppingCartIcon2, Gift as GiftIcon2,
-  Layers as LayersIcon3, Compass as CompassIcon8, Smartphone as SmartphoneIcon3,
-  Camera as CameraIcon4, Headphones as HeadphonesIcon4, Phone as PhoneIcon4,
-  Mail as MailIcon5, Bell as BellIcon5, Calendar as CalendarIcon4,
-  Clock as ClockIcon5, Home as HomeIcon4, Rocket as RocketIcon4,
-  Settings as SettingsIcon4, Power as PowerIcon3, Battery as BatteryIcon5,
-  Cloud as CloudIcon4, Star as StarIcon7, Heart as HeartIcon5,
-  Award as AwardIcon4, Crown as CrownIcon4, ShoppingCart as ShoppingCartIcon3,
-  Compass as CompassIcon9, Camera as CameraIcon5, Phone as PhoneIcon5,
-  Mail as MailIcon6, Calendar as CalendarIcon5, Clock as ClockIcon6,
-  Home as HomeIcon5, Settings as SettingsIcon5, Power as PowerIcon4,
-  Cloud as CloudIcon5, Star as StarIcon8, Heart as HeartIcon6,
-  Award as AwardIcon5, Crown as CrownIcon5, Compass as CompassIcon10,
-  Camera as CameraIcon6, Phone as PhoneIcon6, Mail as MailIcon7,
-  Calendar as CalendarIcon6, Clock as ClockIcon7, Home as HomeIcon6,
-  Settings as SettingsIcon6, Power as PowerIcon5, Cloud as CloudIcon6,
-  Star as StarIcon9, Heart as HeartIcon7, Award as AwardIcon6,
-  Crown as CrownIcon6, Compass as CompassIcon11, Camera as CameraIcon7,
-  Phone as PhoneIcon7, Mail as MailIcon8, Calendar as CalendarIcon7,
-  Clock as ClockIcon8, Home as HomeIcon7, Settings as SettingsIcon7,
-  Power as PowerIcon6, Cloud as CloudIcon7, Star as StarIcon10,
-  Heart as HeartIcon8, Award as AwardIcon7, Crown as CrownIcon7,
-  Compass as CompassIcon12, Camera as CameraIcon8, Phone as PhoneIcon8,
-  Mail as MailIcon9, Calendar as CalendarIcon8, Clock as ClockIcon9,
-  Home as HomeIcon8, Settings as SettingsIcon8, Power as PowerIcon7,
-  Cloud as CloudIcon8, Star as StarIcon11, Heart as HeartIcon9,
-  Award as AwardIcon8, Crown as CrownIcon8, Compass as CompassIcon13,
-  Camera as CameraIcon9, Phone as PhoneIcon9, Mail as MailIcon10,
-  Calendar as CalendarIcon9, Clock as ClockIcon10, Home as HomeIcon9,
-  Settings as SettingsIcon9, Power as PowerIcon8, Cloud as CloudIcon9,
-  Star as StarIcon12, Heart as HeartIcon10, Award as AwardIcon9,
-  Crown as CrownIcon9, Compass as CompassIcon14, Camera as CameraIcon10,
-  Phone as PhoneIcon10, Mail as MailIcon11, Calendar as CalendarIcon10,
-  Clock as ClockIcon11, Home as HomeIcon10, Settings as SettingsIcon10,
-  Power as PowerIcon9, Cloud as CloudIcon10, Star as StarIcon13,
-  Heart as HeartIcon11, Award as AwardIcon10, Crown as CrownIcon10,
-  Compass as CompassIcon15, Camera as CameraIcon11, Phone as PhoneIcon11,
-  Mail as MailIcon12, Calendar as CalendarIcon11, Clock as ClockIcon12,
-  Home as HomeIcon11, Settings as SettingsIcon11, Power as PowerIcon10,
-  Cloud as CloudIcon11, Star as StarIcon14, Heart as HeartIcon12,
-  Award as AwardIcon11, Crown as CrownIcon11, Compass as CompassIcon16,
-  Camera as CameraIcon12, Phone as PhoneIcon12, Mail as MailIcon13,
-  Calendar as CalendarIcon12, Clock as ClockIcon13, Home as HomeIcon12,
-  Settings as SettingsIcon12, Power as PowerIcon11, Cloud as CloudIcon12,
-  Star as StarIcon15, Heart as HeartIcon13, Award as AwardIcon12,
-  Crown as CrownIcon12, Compass as CompassIcon17, Camera as CameraIcon13,
-  Phone as PhoneIcon13, Mail as MailIcon14, Calendar as CalendarIcon13,
-  Clock as ClockIcon14, Home as HomeIcon13, Settings as SettingsIcon13,
-  Power as PowerIcon12, Cloud as CloudIcon13, Star as StarIcon16,
-  Heart as HeartIcon14, Award as AwardIcon13, Crown as CrownIcon13,
-  Compass as CompassIcon18, Camera as CameraIcon14, Phone as PhoneIcon14,
-  Mail as MailIcon15, Calendar as CalendarIcon14, Clock as ClockIcon15,
-  Home as HomeIcon14, Settings as SettingsIcon14, Power as PowerIcon13,
-  Cloud as CloudIcon14, Star as StarIcon17, Heart as HeartIcon15,
-  Award as AwardIcon14, Crown as CrownIcon14, Compass as CompassIcon19,
-  Camera as CameraIcon15, Phone as PhoneIcon15, Mail as MailIcon16,
-  Calendar as CalendarIcon15, Clock as ClockIcon16, Home as HomeIcon15,
-  Settings as SettingsIcon15, Power as PowerIcon14, Cloud as CloudIcon15,
-  Star as StarIcon18, Heart as HeartIcon16, Award as AwardIcon15,
-  Crown as CrownIcon15, Compass as CompassIcon20, Camera as CameraIcon16,
-  Phone as PhoneIcon16, Mail as MailIcon17, Calendar as CalendarIcon16,
-  Clock as ClockIcon17, Home as HomeIcon16, Settings as SettingsIcon16,
-  Power as PowerIcon15, Cloud as CloudIcon16, Star as StarIcon19,
-  Heart as HeartIcon17, Award as AwardIcon16, Crown as CrownIcon16,
-  Compass as CompassIcon21, Camera as CameraIcon17, Phone as PhoneIcon17,
-  Mail as MailIcon18, Calendar as CalendarIcon17, Clock as ClockIcon18,
-  Home as HomeIcon17, Settings as SettingsIcon17, Power as PowerIcon16,
-  Cloud as CloudIcon17, Star as StarIcon20, Heart as HeartIcon18,
-  Award as AwardIcon17, Crown as CrownIcon17, Compass as CompassIcon22,
-  Camera as CameraIcon18, Phone as PhoneIcon18, Mail as MailIcon19,
-  Calendar as CalendarIcon18, Clock as ClockIcon19, Home as HomeIcon18,
-  Settings as SettingsIcon18, Power as PowerIcon17, Cloud as CloudIcon18,
-  Star as StarIcon21, Heart as HeartIcon19, Award as AwardIcon18,
-  Crown as CrownIcon18, Compass as CompassIcon23, Camera as CameraIcon19,
-  Phone as PhoneIcon19, Mail as MailIcon20, Calendar as CalendarIcon19,
-  Clock as ClockIcon20, Home as HomeIcon19, Settings as SettingsIcon19,
-  Power as PowerIcon18, Cloud as CloudIcon19, Star as StarIcon22,
-  Heart as HeartIcon20, Award as AwardIcon19, Crown as CrownIcon19,
-  Compass as CompassIcon24, Camera as CameraIcon20, Phone as PhoneIcon20,
-  Mail as MailIcon21, Calendar as CalendarIcon20, Clock as ClockIcon21,
-  Home as HomeIcon20, Settings as SettingsIcon20, Power as PowerIcon19,
-  Cloud as CloudIcon20, Star as StarIcon23, Heart as HeartIcon21,
-  Award as AwardIcon20, Crown as CrownIcon20, Compass as CompassIcon25,
-  Camera as CameraIcon21, Phone as PhoneIcon21, Mail as MailIcon22,
-  Calendar as CalendarIcon21, Clock as ClockIcon22, Home as HomeIcon21,
-  Settings as SettingsIcon21, Power as PowerIcon20, Cloud as CloudIcon21,
-  Star as StarIcon24, Heart as HeartIcon22, Award as AwardIcon21,
-  Crown as CrownIcon21, Compass as CompassIcon26, Camera as CameraIcon22,
-  Phone as PhoneIcon22, Mail as MailIcon23, Calendar as CalendarIcon22,
-  Clock as ClockIcon23, Home as HomeIcon22, Settings as SettingsIcon22,
-  Power as PowerIcon21, Cloud as CloudIcon22, Star as StarIcon25,
-  Heart as HeartIcon23, Award as AwardIcon22, Crown as CrownIcon22,
-  Compass as CompassIcon27, Camera as CameraIcon23, Phone as PhoneIcon23,
-  Mail as MailIcon24, Calendar as CalendarIcon23, Clock as ClockIcon24,
-  Home as HomeIcon23, Settings as SettingsIcon23, Power as PowerIcon22,
-  Cloud as CloudIcon23, Star as StarIcon26, Heart as HeartIcon24,
-  Award as AwardIcon23, Crown as CrownIcon23, Compass as CompassIcon28,
-  Camera as CameraIcon24, Phone as PhoneIcon24, Mail as MailIcon25,
-  Calendar as CalendarIcon24, Clock as ClockIcon25, Home as HomeIcon24,
-  Settings as SettingsIcon24, Power as PowerIcon23, Cloud as CloudIcon24,
-  Star as StarIcon27, Heart as HeartIcon25, Award as AwardIcon24,
-  Crown as CrownIcon24, Compass as CompassIcon29, Camera as CameraIcon25,
-  Phone as PhoneIcon25, Mail as MailIcon26, Calendar as CalendarIcon25,
-  Clock as ClockIcon26, Home as HomeIcon25, Settings as SettingsIcon25,
-  Power as PowerIcon24, Cloud as CloudIcon25, Star as StarIcon28,
-  Heart as HeartIcon26, Award as AwardIcon25, Crown as CrownIcon25,
-  Compass as CompassIcon30, Camera as CameraIcon26, Phone as PhoneIcon26,
-  Mail as MailIcon27, Calendar as CalendarIcon26, Clock as ClockIcon27,
-  Home as HomeIcon26, Settings as SettingsIcon26, Power as PowerIcon25,
-  Cloud as CloudIcon26, Star as StarIcon29, Heart as HeartIcon27,
-  Award as AwardIcon26, Crown as CrownIcon26, Compass as CompassIcon31,
-  Camera as CameraIcon27, Phone as PhoneIcon27, Mail as MailIcon28,
-  Calendar as CalendarIcon27, Clock as ClockIcon28, Home as HomeIcon27,
-  Settings as SettingsIcon27, Power as PowerIcon26, Cloud as CloudIcon27,
-  Star as StarIcon30, Heart as HeartIcon28, Award as AwardIcon27,
-  Crown as CrownIcon27, Compass as CompassIcon32, Camera as CameraIcon28,
-  Phone as PhoneIcon28, Mail as MailIcon29, Calendar as CalendarIcon28,
-  Clock as ClockIcon29, Home as HomeIcon28, Settings as SettingsIcon28,
-  Power as PowerIcon27, Cloud as CloudIcon28, Star as StarIcon31,
-  Heart as HeartIcon29, Award as AwardIcon28, Crown as CrownIcon28,
-  Compass as CompassIcon33, Camera as CameraIcon29, Phone as PhoneIcon29,
-  Mail as MailIcon30, Calendar as CalendarIcon29, Clock as ClockIcon30,
-  Home as HomeIcon29, Settings as SettingsIcon29, Power as PowerIcon28,
-  Cloud as CloudIcon29, Star as StarIcon32, Heart as HeartIcon30,
-  Award as AwardIcon29, Crown as CrownIcon29, Compass as CompassIcon34,
-  Camera as CameraIcon30, Phone as PhoneIcon30, Mail as MailIcon31,
-  Calendar as CalendarIcon30, Clock as ClockIcon31, Home as HomeIcon30,
-  Settings as SettingsIcon30, Power as PowerIcon29, Cloud as CloudIcon30,
-  Star as StarIcon33, Heart as HeartIcon31, Award as AwardIcon30,
-  Crown as CrownIcon30, Compass as CompassIcon35, Camera as CameraIcon31,
-  Phone as PhoneIcon31, Mail as MailIcon32, Calendar as CalendarIcon31,
-  Clock as ClockIcon32, Home as HomeIcon31, Settings as SettingsIcon31,
-  Power as PowerIcon30, Cloud as CloudIcon31, Star as StarIcon34,
-  Heart as HeartIcon32, Award as AwardIcon31, Crown as CrownIcon31,
-  Compass as CompassIcon36, Camera as CameraIcon32, Phone as PhoneIcon32,
-  Mail as MailIcon33, Calendar as CalendarIcon32, Clock as ClockIcon33,
-  Home as HomeIcon32, Settings as SettingsIcon32, Power as PowerIcon31,
-  Cloud as CloudIcon32, Star as StarIcon35, Heart as HeartIcon33,
-  Award as AwardIcon32, Crown as CrownIcon32, Compass as CompassIcon37,
-  Camera as CameraIcon33, Phone as PhoneIcon33, Mail as MailIcon34,
-  Calendar as CalendarIcon33, Clock as ClockIcon34, Home as HomeIcon33,
-  Settings as SettingsIcon33, Power as PowerIcon32, Cloud as CloudIcon33,
-  Star as StarIcon36, Heart as HeartIcon34, Award as AwardIcon33,
-  Crown as CrownIcon33, Compass as CompassIcon38, Camera as CameraIcon34,
-  Phone as PhoneIcon34, Mail as MailIcon35, Calendar as CalendarIcon34,
-  Clock as ClockIcon35, Home as HomeIcon34, Settings as SettingsIcon34,
-  Power as PowerIcon33, Cloud as CloudIcon34, Star as StarIcon37,
-  Heart as HeartIcon35, Award as AwardIcon34, Crown as CrownIcon34,
-  Compass as CompassIcon39, Camera as CameraIcon35, Phone as PhoneIcon35,
-  Mail as MailIcon36, Calendar as CalendarIcon35, Clock as ClockIcon36,
-  Home as HomeIcon35, Settings as SettingsIcon35, Power as PowerIcon34,
-  Cloud as CloudIcon35, Star as StarIcon38, Heart as HeartIcon36,
-  Award as AwardIcon35, Crown as CrownIcon35, Compass as CompassIcon40,
-  Camera as CameraIcon36, Phone as PhoneIcon36, Mail as MailIcon37,
-  Calendar as CalendarIcon36, Clock as ClockIcon37, Home as HomeIcon36,
-  Settings as SettingsIcon36, Power as PowerIcon35, Cloud as CloudIcon36,
-  Star as StarIcon39, Heart as HeartIcon37, Award as AwardIcon36,
-  Crown as CrownIcon36, Compass as CompassIcon41, Camera as CameraIcon37,
-  Phone as PhoneIcon37, Mail as MailIcon38, Calendar as CalendarIcon37,
-  Clock as ClockIcon38, Home as HomeIcon37, Settings as SettingsIcon37,
-  Power as PowerIcon36, Cloud as CloudIcon37, Star as StarIcon40,
-  Heart as HeartIcon38, Award as AwardIcon37, Crown as CrownIcon37,
-  Compass as CompassIcon42, Camera as CameraIcon38, Phone as PhoneIcon38,
-  Mail as MailIcon39, Calendar as CalendarIcon38, Clock as ClockIcon39,
-  Home as HomeIcon38, Settings as SettingsIcon38, Power as PowerIcon37,
-  Cloud as CloudIcon38, Star as StarIcon41, Heart as HeartIcon39,
-  Award as AwardIcon38, Crown as CrownIcon38, Compass as CompassIcon43,
-  Camera as CameraIcon39, Phone as PhoneIcon39, Mail as MailIcon40,
-  Calendar as CalendarIcon39, Clock as ClockIcon40, Home as HomeIcon39,
-  Settings as SettingsIcon39, Power as PowerIcon38, Cloud as CloudIcon39,
-  Star as StarIcon42, Heart as HeartIcon40, Award as AwardIcon39,
-  Crown as CrownIcon39, Compass as CompassIcon44, Camera as CameraIcon40,
-  Phone as PhoneIcon40, Mail as MailIcon41, Calendar as CalendarIcon40,
-  Clock as ClockIcon41, Home as HomeIcon40, Settings as SettingsIcon40,
-  Power as PowerIcon39, Cloud as CloudIcon40, Star as StarIcon43,
-  Heart as HeartIcon41, Award as AwardIcon40, Crown as CrownIcon40,
-  Compass as CompassIcon45, Camera as CameraIcon41, Phone as PhoneIcon41,
-  Mail as MailIcon42, Calendar as CalendarIcon41, Clock as ClockIcon42,
-  Home as HomeIcon41, Settings as SettingsIcon41, Power as PowerIcon40,
-  Cloud as CloudIcon41, Star as StarIcon44, Heart as HeartIcon42,
-  Award as AwardIcon41, Crown as CrownIcon41, Compass as CompassIcon46,
-  Camera as CameraIcon42, Phone as PhoneIcon42, Mail as MailIcon43,
-  Calendar as CalendarIcon42, Clock as ClockIcon43, Home as HomeIcon42,
-  Settings as SettingsIcon42, Power as PowerIcon41, Cloud as CloudIcon42,
-  Star as StarIcon45, Heart as HeartIcon43, Award as AwardIcon42,
-  Crown as CrownIcon42, Compass as CompassIcon47, Camera as CameraIcon43,
-  Phone as PhoneIcon43, Mail as MailIcon44, Calendar as CalendarIcon43,
-  Clock as ClockIcon44, Home as HomeIcon43, Settings as SettingsIcon43,
-  Power as PowerIcon42, Cloud as CloudIcon43, Star as StarIcon46,
-  Heart as HeartIcon44, Award as AwardIcon43, Crown as CrownIcon43,
-  Compass as CompassIcon48, Camera as CameraIcon44, Phone as PhoneIcon44,
-  Mail as MailIcon45, Calendar as CalendarIcon44, Clock as ClockIcon45,
-  Home as HomeIcon44, Settings as SettingsIcon44, Power as PowerIcon43,
-  Cloud as CloudIcon44, Star as StarIcon47, Heart as HeartIcon45,
-  Award as AwardIcon44, Crown as CrownIcon44, Compass as CompassIcon49,
-  Camera as CameraIcon45, Phone as PhoneIcon45, Mail as MailIcon46,
-  Calendar as CalendarIcon45, Clock as ClockIcon46, Home as HomeIcon45,
-  Settings as SettingsIcon45, Power as PowerIcon44, Cloud as CloudIcon45,
-  Star as StarIcon48, Heart as HeartIcon46, Award as AwardIcon45,
-  Crown as CrownIcon45, Compass as CompassIcon50, Camera as CameraIcon46,
-  Phone as PhoneIcon46, Mail as MailIcon47, Calendar as CalendarIcon46,
-  Clock as ClockIcon47, Home as HomeIcon46, Settings as SettingsIcon46,
-  Power as PowerIcon45, Cloud as CloudIcon46, Star as StarIcon49,
-  Heart as HeartIcon47, Award as AwardIcon46, Crown as CrownIcon46,
-  Compass as CompassIcon51, Camera as CameraIcon47, Phone as PhoneIcon47,
-  Mail as MailIcon48, Calendar as CalendarIcon47, Clock as ClockIcon48,
-  Home as HomeIcon47, Settings as SettingsIcon47, Power as PowerIcon46,
-  Cloud as CloudIcon47, Star as StarIcon50, Heart as HeartIcon48,
-  Award as AwardIcon47, Crown as CrownIcon47, Compass as CompassIcon52,
-  Camera as CameraIcon48, Phone as PhoneIcon48, Mail as MailIcon49,
-  Calendar as CalendarIcon48, Clock as ClockIcon49, Home as HomeIcon48,
-  Settings as SettingsIcon48, Power as PowerIcon47, Cloud as CloudIcon48,
-  Star as StarIcon51, Heart as HeartIcon49, Award as AwardIcon48,
-  Crown as CrownIcon48, Compass as CompassIcon53, Camera as CameraIcon49,
-  Phone as PhoneIcon49, Mail as MailIcon50, Calendar as CalendarIcon49,
-  Clock as ClockIcon50, Home as HomeIcon49, Settings as SettingsIcon49,
-  Power as PowerIcon48, Cloud as CloudIcon49, Star as StarIcon52,
-  Heart as HeartIcon50, Award as AwardIcon49, Crown as CrownIcon49,
-  Compass as CompassIcon54, Camera as CameraIcon50, Phone as PhoneIcon50,
-  Mail as MailIcon51, Calendar as CalendarIcon50, Clock as ClockIcon51,
-  Home as HomeIcon50, Settings as SettingsIcon50, Power as PowerIcon49,
-  Cloud as CloudIcon50, Star as StarIcon53, Heart as HeartIcon51,
-  Award as AwardIcon50, Crown as CrownIcon50, Compass as CompassIcon55,
-  Camera as CameraIcon51, Phone as PhoneIcon51, Mail as MailIcon52,
-  Calendar as CalendarIcon51, Clock as ClockIcon52, Home as HomeIcon51,
-  Settings as SettingsIcon51, Power as PowerIcon50, Cloud as CloudIcon51,
-  Star as StarIcon54, Heart as HeartIcon52, Award as AwardIcon51,
-  Crown as CrownIcon51, Compass as CompassIcon56, Camera as CameraIcon52,
-  Phone as PhoneIcon52, Mail as MailIcon53, Calendar as CalendarIcon52,
-  Clock as ClockIcon53, Home as HomeIcon52, Settings as SettingsIcon52,
-  Power as PowerIcon51, Cloud as CloudIcon52, Star as StarIcon55,
-  Heart as HeartIcon53, Award as AwardIcon52, Crown as CrownIcon52,
-  Compass as CompassIcon57, Camera as CameraIcon53, Phone as PhoneIcon53,
-  Mail as MailIcon54, Calendar as CalendarIcon53, Clock as ClockIcon54,
-  Home as HomeIcon53, Settings as SettingsIcon53, Power as PowerIcon52,
-  Cloud as CloudIcon53, Star as StarIcon56, Heart as HeartIcon54,
-  Award as AwardIcon53, Crown as CrownIcon53, Compass as CompassIcon58,
-  Camera as CameraIcon54, Phone as PhoneIcon54, Mail as MailIcon55,
-  Calendar as CalendarIcon54, Clock as ClockIcon55, Home as HomeIcon54,
-  Settings as SettingsIcon54, Power as PowerIcon53, Cloud as CloudIcon54,
-  Star as StarIcon57, Heart as HeartIcon55, Award as AwardIcon54,
-  Crown as CrownIcon54, Compass as CompassIcon59, Camera as CameraIcon55,
-  Phone as PhoneIcon55, Mail as MailIcon56, Calendar as CalendarIcon55,
-  Clock as ClockIcon56, Home as HomeIcon55, Settings as SettingsIcon55,
-  Power as PowerIcon54, Cloud as CloudIcon55, Star as StarIcon58,
-  Heart as HeartIcon56, Award as AwardIcon55, Crown as CrownIcon55,
-  Compass as CompassIcon60, Camera as CameraIcon56, Phone as PhoneIcon56,
-  Mail as MailIcon57, Calendar as CalendarIcon56, Clock as ClockIcon57,
-  Home as HomeIcon56, Settings as SettingsIcon56, Power as PowerIcon55,
-  Cloud as CloudIcon56, Star as StarIcon59, Heart as HeartIcon57,
-  Award as AwardIcon56, Crown as CrownIcon56, Compass as CompassIcon61,
-  Camera as CameraIcon57, Phone as PhoneIcon57, Mail as MailIcon58,
-  Calendar as CalendarIcon57, Clock as ClockIcon58, Home as HomeIcon57,
-  Settings as SettingsIcon57, Power as PowerIcon56, Cloud as CloudIcon57,
-  Star as StarIcon60, Heart as HeartIcon58, Award as AwardIcon57,
-  Crown as CrownIcon57, Compass as CompassIcon62, Camera as CameraIcon58,
-  Phone as PhoneIcon58, Mail as MailIcon59, Calendar as CalendarIcon58,
-  Clock as ClockIcon59, Home as HomeIcon58, Settings as SettingsIcon58,
-  Power as PowerIcon57, Cloud as CloudIcon58, Star as StarIcon61,
-  Heart as HeartIcon59, Award as AwardIcon58, Crown as CrownIcon58,
-  Compass as CompassIcon63, Camera as CameraIcon59, Phone as PhoneIcon59,
-  Mail as MailIcon60, Calendar as CalendarIcon59, Clock as ClockIcon60,
-  Home as HomeIcon59, Settings as SettingsIcon59, Power as PowerIcon58,
-  Cloud as CloudIcon59, Star as StarIcon62, Heart as HeartIcon60,
-  Award as AwardIcon59, Crown as CrownIcon59, Compass as CompassIcon64,
-  Camera as CameraIcon60, Phone as PhoneIcon60, Mail as MailIcon61,
-  Calendar as CalendarIcon60, Clock as ClockIcon61, Home as HomeIcon60,
-  Settings as SettingsIcon60, Power as PowerIcon59, Cloud as CloudIcon60,
-  Star as StarIcon63, Heart as HeartIcon61, Award as AwardIcon60,
-  Crown as CrownIcon60, Compass as CompassIcon65, Camera as CameraIcon61,
-  Phone as PhoneIcon61, Mail as MailIcon62, Calendar as CalendarIcon61,
-  Clock as ClockIcon62, Home as HomeIcon61, Settings as SettingsIcon61,
-  Power as PowerIcon60, Cloud as CloudIcon61, Star as StarIcon64,
-  Heart as HeartIcon62, Award as AwardIcon61, Crown as CrownIcon61,
-  Compass as CompassIcon66, Camera as CameraIcon62, Phone as PhoneIcon62,
-  Mail as MailIcon63, Calendar as CalendarIcon62, Clock as ClockIcon63,
-  Home as HomeIcon62, Settings as SettingsIcon62, Power as PowerIcon61,
-  Cloud as CloudIcon62, Star as StarIcon65, Heart as HeartIcon63,
-  Award as AwardIcon62, Crown as CrownIcon62, Compass as CompassIcon67,
-  Camera as CameraIcon63, Phone as PhoneIcon63, Mail as MailIcon64,
-  Calendar as CalendarIcon63, Clock as ClockIcon64, Home as HomeIcon63,
-  Settings as SettingsIcon63, Power as PowerIcon62, Cloud as CloudIcon63,
-  Star as StarIcon66, Heart as HeartIcon64, Award as AwardIcon63,
-  Crown as CrownIcon63, Compass as CompassIcon68, Camera as CameraIcon64,
-  Phone as PhoneIcon64, Mail as MailIcon65, Calendar as CalendarIcon64,
-  Clock as ClockIcon65, Home as HomeIcon64, Settings as SettingsIcon64,
-  Power as PowerIcon63, Cloud as CloudIcon64, Star as StarIcon67,
-  Heart as HeartIcon65, Award as AwardIcon64, Crown as CrownIcon64,
-  Compass as CompassIcon69, Camera as CameraIcon65, Phone as PhoneIcon65,
-  Mail as MailIcon66, Calendar as CalendarIcon65, Clock as ClockIcon66,
-  Home as HomeIcon65, Settings as SettingsIcon65, Power as PowerIcon64,
-  Cloud as CloudIcon65, Star as StarIcon68, Heart as HeartIcon66,
-  Award as AwardIcon65, Crown as CrownIcon65, Compass as CompassIcon70,
-  Camera as CameraIcon66, Phone as PhoneIcon66, Mail as MailIcon67,
-  Calendar as CalendarIcon66, Clock as ClockIcon67, Home as HomeIcon66,
-  Settings as SettingsIcon66, Power as PowerIcon65, Cloud as CloudIcon66,
-  Star as StarIcon69, Heart as HeartIcon67, Award as AwardIcon66,
-  Crown as CrownIcon66, Compass as CompassIcon71, Camera as CameraIcon67,
-  Phone as PhoneIcon67, Mail as MailIcon68, Calendar as CalendarIcon67,
-  Clock as ClockIcon68, Home as HomeIcon67, Settings as SettingsIcon67,
-  Power as PowerIcon66, Cloud as CloudIcon67, Star as StarIcon70,
-  Heart as HeartIcon68, Award as AwardIcon67, Crown as CrownIcon67,
-  Compass as CompassIcon72, Camera as CameraIcon68, Phone as PhoneIcon68,
-  Mail as MailIcon69, Calendar as CalendarIcon68, Clock as ClockIcon69,
-  Home as HomeIcon68, Settings as SettingsIcon68, Power as PowerIcon67,
-  Cloud as CloudIcon68, Star as StarIcon71, Heart as HeartIcon69,
-  Award as AwardIcon68, Crown as CrownIcon68, Compass as CompassIcon73,
-  Camera as CameraIcon69, Phone as PhoneIcon69, Mail as MailIcon70,
-  Calendar as CalendarIcon69, Clock as ClockIcon70, Home as HomeIcon69,
-  Settings as SettingsIcon69, Power as PowerIcon68, Cloud as CloudIcon69,
-  Star as StarIcon72, Heart as HeartIcon70, Award as AwardIcon69,
-  Crown as CrownIcon69, Compass as CompassIcon74, Camera as CameraIcon70,
-  Phone as PhoneIcon70, Mail as MailIcon71, Calendar as CalendarIcon70,
-  Clock as ClockIcon71, Home as HomeIcon70, Settings as SettingsIcon70,
-  Power as PowerIcon69, Cloud as CloudIcon70, Star as StarIcon73,
-  Heart as HeartIcon71, Award as AwardIcon70, Crown as CrownIcon70,
-  Compass as CompassIcon75, Camera as CameraIcon71, Phone as PhoneIcon71,
-  Mail as MailIcon72, Calendar as CalendarIcon71, Clock as ClockIcon72,
-  Home as HomeIcon71, Settings as SettingsIcon71, Power as PowerIcon70,
-  Cloud as CloudIcon71, Star as StarIcon74, Heart as HeartIcon72,
-  Award as AwardIcon71, Crown as CrownIcon71, Compass as CompassIcon76,
-  Camera as CameraIcon72, Phone as PhoneIcon72, Mail as MailIcon73,
-  Calendar as CalendarIcon72, Clock as ClockIcon73, Home as HomeIcon72,
-  Settings as SettingsIcon72, Power as PowerIcon71, Cloud as CloudIcon72,
-  Star as StarIcon75, Heart as HeartIcon73, Award as AwardIcon72,
-  Crown as CrownIcon72, Compass as CompassIcon77, Camera as CameraIcon73,
-  Phone as PhoneIcon73, Mail as MailIcon74, Calendar as CalendarIcon73,
-  Clock as ClockIcon74, Home as HomeIcon73, Settings as SettingsIcon73,
-  Power as PowerIcon72, Cloud as CloudIcon73, Star as StarIcon76,
-  Heart as HeartIcon74, Award as AwardIcon73, Crown as CrownIcon73,
-  Compass as CompassIcon78, Camera as CameraIcon74, Phone as PhoneIcon74,
-  Mail as MailIcon75, Calendar as CalendarIcon74, Clock as ClockIcon75,
-  Home as HomeIcon74, Settings as SettingsIcon74, Power as PowerIcon73,
-  Cloud as CloudIcon74, Star as StarIcon77, Heart as HeartIcon75,
-  Award as AwardIcon74, Crown as CrownIcon74, Compass as CompassIcon79,
-  Camera as CameraIcon75, Phone as PhoneIcon75, Mail as MailIcon76,
-  Calendar as CalendarIcon75, Clock as ClockIcon76, Home as HomeIcon75,
-  Settings as SettingsIcon75, Power as PowerIcon74, Cloud as CloudIcon75,
-  Star as StarIcon78, Heart as HeartIcon76, Award as AwardIcon75,
-  Crown as CrownIcon75, Compass as CompassIcon80, Camera as CameraIcon76,
-  Phone as PhoneIcon76, Mail as MailIcon77, Calendar as CalendarIcon76,
-  Clock as ClockIcon77, Home as HomeIcon76, Settings as SettingsIcon76,
-  Power as PowerIcon75, Cloud as CloudIcon76, Star as StarIcon79,
-  Heart as HeartIcon77, Award as AwardIcon76, Crown as CrownIcon76,
-  Compass as CompassIcon81, Camera as CameraIcon77, Phone as PhoneIcon77,
-  Mail as MailIcon78, Calendar as CalendarIcon77, Clock as ClockIcon78,
-  Home as HomeIcon77, Settings as SettingsIcon77, Power as PowerIcon76,
-  Cloud as CloudIcon77, Star as StarIcon80, Heart as HeartIcon78,
-  Award as AwardIcon77, Crown as CrownIcon77, Compass as CompassIcon82,
-  Camera as CameraIcon78, Phone as PhoneIcon78, Mail as MailIcon79,
-  Calendar as CalendarIcon78, Clock as ClockIcon79, Home as HomeIcon78,
-  Settings as SettingsIcon78, Power as PowerIcon77, Cloud as CloudIcon78,
-  Star as StarIcon81, Heart as HeartIcon79, Award as AwardIcon78,
-  Crown as CrownIcon78, Compass as CompassIcon83, Camera as CameraIcon79,
-  Phone as PhoneIcon79, Mail as MailIcon80, Calendar as CalendarIcon79,
-  Clock as ClockIcon80, Home as HomeIcon79, Settings as SettingsIcon79,
-  Power as PowerIcon78, Cloud as CloudIcon79, Star as StarIcon82,
-  Heart as HeartIcon80, Award as AwardIcon79, Crown as CrownIcon79,
-  Compass as CompassIcon84, Camera as CameraIcon80, Phone as PhoneIcon80,
-  Mail as MailIcon81, Calendar as CalendarIcon80, Clock as ClockIcon81,
-  Home as HomeIcon80, Settings as SettingsIcon80, Power as PowerIcon79,
-  Cloud as CloudIcon80, Star as StarIcon83, Heart as HeartIcon81,
-  Award as AwardIcon80, Crown as CrownIcon80, Compass as CompassIcon85,
-  Camera as CameraIcon81, Phone as PhoneIcon81, Mail as MailIcon82,
-  Calendar as CalendarIcon81, Clock as ClockIcon82, Home as HomeIcon81,
-  Settings as SettingsIcon81, Power as PowerIcon80, Cloud as CloudIcon81,
-  Star as StarIcon84, Heart as HeartIcon82, Award as AwardIcon81,
-  Crown as CrownIcon81, Compass as CompassIcon86, Camera as CameraIcon82,
-  Phone as PhoneIcon82, Mail as MailIcon83, Calendar as CalendarIcon82,
-  Clock as ClockIcon83, Home as HomeIcon82, Settings as SettingsIcon82,
-  Power as PowerIcon81, Cloud as CloudIcon82, Star as StarIcon85,
-  Heart as HeartIcon83, Award as AwardIcon82, Crown as CrownIcon82,
-  Compass as CompassIcon87, Camera as CameraIcon83, Phone as PhoneIcon83,
-  Mail as MailIcon84, Calendar as CalendarIcon83, Clock as ClockIcon84,
-  Home as HomeIcon83, Settings as SettingsIcon83, Power as PowerIcon82,
-  Cloud as CloudIcon83, Star as StarIcon86, Heart as HeartIcon84,
-  Award as AwardIcon83, Crown as CrownIcon83, Compass as CompassIcon88,
-  Camera as CameraIcon84, Phone as PhoneIcon84, Mail as MailIcon85,
-  Calendar as CalendarIcon84, Clock as ClockIcon85, Home as HomeIcon84,
-  Settings as SettingsIcon84, Power as PowerIcon83, Cloud as CloudIcon84,
-  Star as StarIcon87, Heart as HeartIcon85, Award as AwardIcon84,
-  Crown as CrownIcon84, Compass as CompassIcon89, Camera as CameraIcon85,
-  Phone as PhoneIcon85, Mail as MailIcon86, Calendar as CalendarIcon85,
-  Clock as ClockIcon86, Home as HomeIcon85, Settings as SettingsIcon85,
-  Power as PowerIcon84, Cloud as CloudIcon85, Star as StarIcon88,
-  Heart as HeartIcon86, Award as AwardIcon85, Crown as CrownIcon85,
-  Compass as CompassIcon90, Camera as CameraIcon86, Phone as PhoneIcon86,
-  Mail as MailIcon87, Calendar as CalendarIcon86, Clock as ClockIcon87,
-  Home as HomeIcon86, Settings as SettingsIcon86, Power as PowerIcon85,
-  Cloud as CloudIcon86, Star as StarIcon89, Heart as HeartIcon87,
-  Award as AwardIcon86, Crown as CrownIcon86, Compass as CompassIcon91,
-  Camera as CameraIcon87, Phone as PhoneIcon87, Mail as MailIcon88,
-  Calendar as CalendarIcon87, Clock as ClockIcon88, Home as HomeIcon87,
-  Settings as SettingsIcon87, Power as PowerIcon86, Cloud as CloudIcon87,
-  Star as StarIcon90, Heart as HeartIcon88, Award as AwardIcon87,
-  Crown as CrownIcon87, Compass as CompassIcon92, Camera as CameraIcon88,
-  Phone as PhoneIcon88, Mail as MailIcon89, Calendar as CalendarIcon88,
-  Clock as ClockIcon89, Home as HomeIcon88, Settings as SettingsIcon88,
-  Power as PowerIcon87, Cloud as CloudIcon88, Star as StarIcon91,
-  Heart as HeartIcon89, Award as AwardIcon88, Crown as CrownIcon88,
-  Compass as CompassIcon93, Camera as CameraIcon89, Phone as PhoneIcon89,
-  Mail as MailIcon90, Calendar as CalendarIcon89, Clock as ClockIcon90,
-  Home as HomeIcon89, Settings as SettingsIcon89, Power as PowerIcon88,
-  Cloud as CloudIcon89, Star as StarIcon92, Heart as HeartIcon90,
-  Award as AwardIcon89, Crown as CrownIcon89, Compass as CompassIcon94,
-  Camera as CameraIcon90, Phone as PhoneIcon90, Mail as MailIcon91,
-  Calendar as CalendarIcon90, Clock as ClockIcon91, Home as HomeIcon90,
-  Settings as SettingsIcon90, Power as PowerIcon89, Cloud as CloudIcon90,
-  Star as StarIcon93, Heart as HeartIcon91, Award as AwardIcon90,
-  Crown as CrownIcon90, Compass as CompassIcon95, Camera as CameraIcon91,
-  Phone as PhoneIcon91, Mail as MailIcon92, Calendar as CalendarIcon91,
-  Clock as ClockIcon92, Home as HomeIcon91, Settings as SettingsIcon91,
-  Power as PowerIcon90, Cloud as CloudIcon91, Star as StarIcon94,
-  Heart as HeartIcon92, Award as AwardIcon91, Crown as CrownIcon91,
-  Compass as CompassIcon96, Camera as CameraIcon92, Phone as PhoneIcon92,
-  Mail as MailIcon93, Calendar as CalendarIcon92, Clock as ClockIcon93,
-  Home as HomeIcon92, Settings as SettingsIcon92, Power as PowerIcon91,
-  Cloud as CloudIcon92, Star as StarIcon95, Heart as HeartIcon93,
-  Award as AwardIcon92, Crown as CrownIcon92, Compass as CompassIcon97,
-  Camera as CameraIcon93, Phone as PhoneIcon93, Mail as MailIcon94,
-  Calendar as CalendarIcon93, Clock as ClockIcon94, Home as HomeIcon93,
-  Settings as SettingsIcon93, Power as PowerIcon92, Cloud as CloudIcon93,
-  Star as StarIcon96, Heart as HeartIcon94, Award as AwardIcon93,
-  Crown as CrownIcon93, Compass as CompassIcon98, Camera as CameraIcon94,
-  Phone as PhoneIcon94, Mail as MailIcon95, Calendar as CalendarIcon94,
-  Clock as ClockIcon95, Home as HomeIcon94, Settings as SettingsIcon94,
-  Power as PowerIcon93, Cloud as CloudIcon94, Star as StarIcon97,
-  Heart as HeartIcon95, Award as AwardIcon94, Crown as CrownIcon94,
-  Compass as CompassIcon99, Camera as CameraIcon95, Phone as PhoneIcon95,
-  Mail as MailIcon96, Calendar as CalendarIcon95, Clock as ClockIcon96,
-  Home as HomeIcon95, Settings as SettingsIcon95, Power as PowerIcon94,
-  Cloud as CloudIcon95, Star as StarIcon98, Heart as HeartIcon96,
-  Award as AwardIcon95, Crown as CrownIcon95, Compass as CompassIcon100,
-  Camera as CameraIcon96, Phone as PhoneIcon96, Mail as MailIcon97,
-  Calendar as CalendarIcon96, Clock as ClockIcon97, Home as HomeIcon96,
-  Settings as SettingsIcon96, Power as PowerIcon95, Cloud as CloudIcon96,
-  Star as StarIcon99, Heart as HeartIcon97, Award as AwardIcon96,
-  Crown as CrownIcon96, Compass as CompassIcon101, Camera as CameraIcon97,
-  Phone as PhoneIcon97, Mail as MailIcon98, Calendar as CalendarIcon97,
-  Clock as ClockIcon98, Home as HomeIcon97, Settings as SettingsIcon97,
-  Power as PowerIcon96, Cloud as CloudIcon97, Star as StarIcon100,
-  Heart as HeartIcon98, Award as AwardIcon97, Crown as CrownIcon97,
-  Compass as CompassIcon102, Camera as CameraIcon98, Phone as PhoneIcon98,
-  Mail as MailIcon99, Calendar as CalendarIcon98, Clock as ClockIcon99,
-  Home as HomeIcon98, Settings as SettingsIcon98, Power as PowerIcon97,
-  Cloud as CloudIcon98, Star as StarIcon101, Heart as HeartIcon99,
-  Award as AwardIcon98, Crown as CrownIcon98, Compass as CompassIcon103,
-  Camera as CameraIcon99, Phone as PhoneIcon99, Mail as MailIcon100,
-  Calendar as CalendarIcon99, Clock as ClockIcon100, Home as HomeIcon99,
-  Settings as SettingsIcon99, Power as PowerIcon98, Cloud as CloudIcon99,
-  Star as StarIcon102, Heart as HeartIcon100, Award as AwardIcon99,
-  Crown as CrownIcon99
+  Layers, Layout
 } from 'lucide-react';
 import { useTeacherIdentity } from '../hooks/useTeacherIdentity';
 import { Teacher, LessonPlan, Assignment, LoginLog } from '../types';
@@ -726,9 +65,9 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [showSeedPreview, setShowSeedPreview] = useState(false);
-  const [showFirebaseData, setShowFirebaseData] = useState(false);
-  const [firebaseTeachers, setFirebaseTeachers] = useState<Teacher[]>([]);
-  const [isLoadingFirebase, setIsLoadingFirebase] = useState(false);
+  const [showDatabaseData, setShowDatabaseData] = useState(false);
+  const [databaseTeachers, setDatabaseTeachers] = useState<Teacher[]>([]);
+  const [isLoadingDatabase, setIsLoadingDatabase] = useState(false);
   const [selectedTeacherForLessonPlans, setSelectedTeacherForLessonPlans] = useState<Teacher | null>(null);
   const [showLessonPlanPreview, setShowLessonPlanPreview] = useState(false);
   const [showDefaulterEmailModal, setShowDefaulterEmailModal] = useState(false);
@@ -741,7 +80,6 @@ const AdminRegistry: React.FC<AdminRegistryProps> = ({
   const [activeTab, setActiveTab] = useState<'dashboard' | 'registry' | 'compile'>('dashboard');
   const [compiledPlans, setCompiledPlans] = useState<{className: string, section: string, plans: LessonPlan[]}[]>([]);
   const [showCompilePreview, setShowCompilePreview] = useState(false);
-  const [compileFormat, setCompileFormat] = useState<'pdf' | 'text' | 'excel'>('pdf');
   const [isCompiling, setIsCompiling] = useState(false);
 
   // Dashboard Stats Calculations
@@ -1041,7 +379,7 @@ Sacred Heart School Administration`);
   };
 
   // Download compiled plans
-  const downloadCompiledPlans = (format: 'pdf' | 'text' | 'excel') => {
+  const downloadCompiledPlans = (format: 'pdf' | 'text') => {
     if (compiledPlans.length === 0) {
       alert('No plans to compile');
       return;
@@ -1129,7 +467,7 @@ Sacred Heart School Administration`);
     }
   };
 
-  // Firebase functions
+  // Supabase functions
   const handleSeed = async () => {
     if (isSeeding) {
       console.log("Seed operation already in progress, ignoring duplicate call");
@@ -1157,6 +495,7 @@ Sacred Heart School Administration`);
           return;
         }
 
+        // Clear teachers collection in Supabase
         await APIService.clearTeachersCollection();
       }
 
@@ -1173,22 +512,22 @@ Sacred Heart School Administration`);
     }
   };
 
-  const handleViewFirebaseData = async () => {
-    setIsLoadingFirebase(true);
+  const handleViewDatabaseData = async () => {
+    setIsLoadingDatabase(true);
     try {
-      const currentFirebaseTeachers = await APIService.fetchTeachers();
+      const currentDatabaseTeachers = await APIService.fetchTeachers();
       
-      if (currentFirebaseTeachers.length > 0) {
-        setFirebaseTeachers(currentFirebaseTeachers);
-        setShowFirebaseData(true);
+      if (currentDatabaseTeachers.length > 0) {
+        setDatabaseTeachers(currentDatabaseTeachers);
+        setShowDatabaseData(true);
       } else {
-        alert("Firebase database is currently empty. Click 'Seed Database' to add initial teachers.");
+        alert("Database is currently empty. Click 'Seed Database' to add initial teachers.");
       }
     } catch (error) {
-      console.error("Error viewing Firebase data:", error);
-      alert("Failed to fetch data from Firebase.");
+      console.error("Error viewing database data:", error);
+      alert("Failed to fetch data from database.");
     } finally {
-      setIsLoadingFirebase(false);
+      setIsLoadingDatabase(false);
     }
   };
 
@@ -1197,17 +536,17 @@ Sacred Heart School Administration`);
     
     setIsSeeding(true);
     try {
-      const currentFirebaseTeachers = await APIService.fetchTeachers();
+      const currentDatabaseTeachers = await APIService.fetchTeachers();
       
-      if (currentFirebaseTeachers.length > 0) {
-        setFirebaseTeachers(currentFirebaseTeachers);
-        setShowFirebaseData(true);
-        alert(`⚠️ Firebase already contains ${currentFirebaseTeachers.length} teachers. Showing current data instead.`);
+      if (currentDatabaseTeachers.length > 0) {
+        setDatabaseTeachers(currentDatabaseTeachers);
+        setShowDatabaseData(true);
+        alert(`⚠️ Database already contains ${currentDatabaseTeachers.length} teachers. Showing current data instead.`);
       } else {
         await APIService.syncInitialTeachers(INITIAL_TEACHERS);
         const seededTeachers = await APIService.fetchTeachers();
-        setFirebaseTeachers(seededTeachers);
-        setShowFirebaseData(true);
+        setDatabaseTeachers(seededTeachers);
+        setShowDatabaseData(true);
         await onRefresh();
         alert(`✅ Successfully seeded ${INITIAL_TEACHERS.length} teachers to empty database`);
       }
@@ -1574,16 +913,16 @@ Sacred Heart School Administration`);
                   Refresh
                 </button>
                 <button 
-                  onClick={handleViewFirebaseData}
-                  disabled={isLoadingFirebase}
+                  onClick={handleViewDatabaseData}
+                  disabled={isLoadingDatabase}
                   className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50"
                 >
-                  {isLoadingFirebase ? (
+                  {isLoadingDatabase ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Server className="h-4 w-4" />
+                    <Database className="h-4 w-4" />
                   )}
-                  {isLoadingFirebase ? 'Loading...' : 'View Firebase'}
+                  {isLoadingDatabase ? 'Loading...' : 'View Database'}
                 </button>
               </div>
             </div>
@@ -1604,16 +943,16 @@ Sacred Heart School Administration`);
                     Add Teacher
                   </button>
                   <button 
-                    onClick={handleViewFirebaseData}
-                    disabled={isLoadingFirebase}
+                    onClick={handleViewDatabaseData}
+                    disabled={isLoadingDatabase}
                     className="px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 disabled:opacity-50"
                   >
-                    {isLoadingFirebase ? (
+                    {isLoadingDatabase ? (
                       <Loader2 className="h-4 w-4 inline mr-2 animate-spin" />
                     ) : (
-                      <Server className="h-4 w-4 inline mr-2" />
+                      <Database className="h-4 w-4 inline mr-2" />
                     )}
-                    {isLoadingFirebase ? 'Loading...' : 'Check Firebase'}
+                    {isLoadingDatabase ? 'Loading...' : 'Check Database'}
                   </button>
                   <button 
                     onClick={handleSmartSeed}
@@ -2229,18 +1568,18 @@ Sacred Heart School Administration`);
         </div>
       )}
 
-      {/* Firebase Data Preview Modal */}
-      {showFirebaseData && (
+      {/* Database Data Preview Modal */}
+      {showDatabaseData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800/90 backdrop-blur-xl rounded-3xl p-8 max-w-6xl w-full max-h-[90vh] overflow-y-auto border border-gray-700/50 shadow-2xl">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-xl font-black uppercase italic text-white flex items-center gap-2">
-                  <Server className="h-6 w-6 text-blue-400" />
-                  Live Firebase Data
+                  <Database className="h-6 w-6 text-blue-400" />
+                  Live Supabase Data
                 </h3>
                 <p className="text-sm text-blue-400 font-black uppercase tracking-[0.2em] mt-1">
-                  {firebaseTeachers.length} teachers in Firebase Cloud
+                  {databaseTeachers.length} teachers in Supabase Database
                 </p>
               </div>
               <div className="flex gap-2">
@@ -2252,7 +1591,7 @@ Sacred Heart School Administration`);
                   Refresh
                 </button>
                 <button 
-                  onClick={() => setShowFirebaseData(false)}
+                  onClick={() => setShowDatabaseData(false)}
                   className="p-2 text-gray-400 hover:text-rose-400 rounded-xl"
                 >
                   <X className="h-5 w-5" />
@@ -2272,7 +1611,7 @@ Sacred Heart School Administration`);
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-blue-500/10">
-                  {firebaseTeachers.map(teacher => (
+                  {databaseTeachers.map(teacher => (
                     <tr key={teacher.id} className="group hover:bg-blue-500/5 transition-colors">
                       <td className="py-5 px-4">
                         <div className="font-black text-white italic">{teacher.name}</div>
@@ -2308,7 +1647,7 @@ Sacred Heart School Administration`);
                             onClick={() => {
                               setEditingTeacher(teacher);
                               setIsEditing(true);
-                              setShowFirebaseData(false);
+                              setShowDatabaseData(false);
                             }}
                             className="p-2 text-gray-400 hover:text-indigo-400 rounded-lg transition-colors hover:bg-indigo-500/10"
                             title="Edit teacher"
@@ -2319,7 +1658,7 @@ Sacred Heart School Administration`);
                             onClick={() => {
                               if (confirm(`Remove ${teacher.name} from database?`)) {
                                 onRemoveTeacher(getTeacherId(teacher.email)).then(() => {
-                                  setFirebaseTeachers(prev => prev.filter(t => t.id !== teacher.id));
+                                  setDatabaseTeachers(prev => prev.filter(t => t.id !== teacher.id));
                                   onRefresh();
                                 });
                               }
@@ -2339,7 +1678,7 @@ Sacred Heart School Administration`);
 
             <div className="mt-6 pt-6 border-t border-blue-500/30 flex justify-between items-center">
               <p className="text-xs text-blue-400">
-                Live data from Firebase • Last fetched: {new Date().toLocaleTimeString()}
+                Live data from Supabase • Last fetched: {new Date().toLocaleTimeString()}
               </p>
               <div className="flex gap-2">
                 <button 
@@ -2355,7 +1694,7 @@ Sacred Heart School Administration`);
                   {isSeeding ? 'Processing...' : 'Seed Only If Empty'}
                 </button>
                 <button 
-                  onClick={() => setShowFirebaseData(false)}
+                  onClick={() => setShowDatabaseData(false)}
                   className="px-6 py-3 bg-gray-700 text-gray-300 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-600"
                 >
                   Close
