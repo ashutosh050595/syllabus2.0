@@ -8,7 +8,7 @@ import {
   Search, Filter, ExternalLink, ChevronDown, ChevronUp,
   MessageSquare, Send, Bell, Shield, Lock, Unlock,
   GraduationCap, Book, DownloadCloud, UploadCloud,
-  CheckCircle, XCircle, Clock as ClockIcon, Star
+  CheckCircle, XCircle, Clock as ClockIcon, Star, User
 } from 'lucide-react';
 import { useTeacherIdentity } from '../hooks/useTeacherIdentity';
 import { Teacher, LessonPlan, Assignment, LoginLog } from '../types';
