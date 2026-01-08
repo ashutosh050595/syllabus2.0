@@ -439,42 +439,55 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Login Mode Toggle - FIXED with proper click handlers */}
-            <div className="flex bg-gray-900/50 p-1.5 rounded-2xl mb-8 border border-gray-700">
+
+            {/* Login Mode Toggle - COMPLETELY FIXED VERSION */}
+            <div className="flex bg-gray-900/50 p-1.5 rounded-2xl mb-8 border border-gray-700" style={{ position: 'relative', zIndex: 10 }}>
               <button 
                 onClick={() => {
-                  if (!isOnline) return;
-                  setLoginMode('teacher');
-                  setLoginError('');
+                  if (isOnline) {
+                    setLoginMode('teacher');
+                    setLoginError('');
+                  }
                 }}
-                className={`flex-1 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                className={`flex-1 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 ${
                   loginMode === 'teacher' 
                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg' 
                     : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
-                } ${!isOnline ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                style={{ cursor: isOnline ? 'pointer' : 'not-allowed' }}
+                } ${!isOnline ? 'opacity-50' : ''}`}
+                style={{ 
+                  position: 'relative',
+                  zIndex: 11,
+                  cursor: isOnline ? 'pointer' : 'not-allowed',
+                  pointerEvents: isOnline ? 'auto' : 'none'
+                }}
               >
                 <User className="h-4 w-4" />
                 Teacher
               </button>
               <button 
                 onClick={() => {
-                  if (!isOnline) return;
-                  setLoginMode('admin');
-                  setLoginError('');
+                  if (isOnline) {
+                    setLoginMode('admin');
+                    setLoginError('');
+                  }
                 }}
-                className={`flex-1 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                className={`flex-1 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 ${
                   loginMode === 'admin' 
                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg' 
                     : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
-                } ${!isOnline ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                style={{ cursor: isOnline ? 'pointer' : 'not-allowed' }}
+                } ${!isOnline ? 'opacity-50' : ''}`}
+                style={{ 
+                  position: 'relative',
+                  zIndex: 11,
+                  cursor: isOnline ? 'pointer' : 'not-allowed',
+                  pointerEvents: isOnline ? 'auto' : 'none'
+                }}
               >
                 <Shield className="h-4 w-4" />
                 Admin
               </button>
             </div>
-
+            
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="relative group">
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-300"></div>
