@@ -6,7 +6,7 @@ import {
   Database, Wifi, WifiOff, Cloud, CloudOff, Sparkles,
   BookOpen, Bell, Settings, BarChart, Calendar,
   ChevronRight, Shield, Rocket, Star, Award,
-  Eye, EyeOff // Added missing imports
+  Eye, EyeOff
 } from 'lucide-react';
 import { AppState, LessonPlan, Teacher } from './types';
 import { APIService } from './services/api-supabase';
@@ -20,7 +20,6 @@ import SubmissionHistory from './components/SubmissionHistory';
 import DefaultersList from './components/DefaultersList';
 import TeacherLoginHistory from './components/TeacherLoginHistory';
 import ResubmissionRequests from './components/ResubmissionRequests';
-import DashboardStats from './components/DashboardStats';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({ 
@@ -440,31 +439,39 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Login Mode Toggle */}
+            {/* Login Mode Toggle - FIXED with proper click handlers */}
             <div className="flex bg-gray-900/50 p-1.5 rounded-2xl mb-8 border border-gray-700">
               <button 
                 onClick={() => {
+                  if (!isOnline) return;
                   setLoginMode('teacher');
                   setLoginError('');
                 }}
-                className={`flex-1 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 ${loginMode === 'teacher' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-200'}`}
+                className={`flex-1 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                  loginMode === 'teacher' 
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg' 
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
+                } ${!isOnline ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                style={{ cursor: isOnline ? 'pointer' : 'not-allowed' }}
               >
-                <div className="flex items-center justify-center gap-2">
-                  <User className="h-4 w-4" />
-                  Teacher
-                </div>
+                <User className="h-4 w-4" />
+                Teacher
               </button>
               <button 
                 onClick={() => {
+                  if (!isOnline) return;
                   setLoginMode('admin');
                   setLoginError('');
                 }}
-                className={`flex-1 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 ${loginMode === 'admin' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-200'}`}
+                className={`flex-1 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                  loginMode === 'admin' 
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg' 
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
+                } ${!isOnline ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                style={{ cursor: isOnline ? 'pointer' : 'not-allowed' }}
               >
-                <div className="flex items-center justify-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Admin
-                </div>
+                <Shield className="h-4 w-4" />
+                Admin
               </button>
             </div>
 
@@ -508,6 +515,7 @@ const App: React.FC = () => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-400"
+                    disabled={!isOnline}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -657,19 +665,11 @@ const App: React.FC = () => {
       {state.currentUser === 'admin' ? (
         <div className="space-y-8">
           {activeTab === 'dashboard' && (
-            <DashboardStats 
+            <AdminRegistry 
               teachers={state.teachers}
               lessonPlans={state.lessonPlans}
               loginLogs={state.loginLogs}
               resubmissionRequests={state.resubmissionRequests}
-              onRefresh={handleForceRefresh}
-            />
-          )}
-          
-          {activeTab === 'registry' && (
-            <AdminRegistry 
-              teachers={state.teachers}
-              lessonPlans={state.lessonPlans}
               onAddTeacher={async (t) => { 
                 await APIService.addTeacher(t); 
                 await fetchData(); 
@@ -682,7 +682,30 @@ const App: React.FC = () => {
                 await APIService.removeTeacher(id); 
                 await fetchData(); 
               }}
-              onRefresh={() => fetchData()}
+              onRefresh={handleForceRefresh}
+              isOnline={isOnline}
+            />
+          )}
+          
+          {activeTab === 'registry' && (
+            <AdminRegistry 
+              teachers={state.teachers}
+              lessonPlans={state.lessonPlans}
+              loginLogs={state.loginLogs}
+              resubmissionRequests={state.resubmissionRequests}
+              onAddTeacher={async (t) => { 
+                await APIService.addTeacher(t); 
+                await fetchData(); 
+              }}
+              onUpdateTeacher={async (id, upd) => { 
+                await APIService.updateTeacher(id, upd); 
+                await fetchData(); 
+              }}
+              onRemoveTeacher={async (id) => { 
+                await APIService.removeTeacher(id); 
+                await fetchData(); 
+              }}
+              onRefresh={handleForceRefresh}
               isOnline={isOnline}
             />
           )}
