@@ -3,10 +3,7 @@ import {
   Zap, AlertCircle, Users, Printer, History, Key, 
   ShieldCheck, X, CheckCircle2, RefreshCw, Lock, Mail, 
   GraduationCap, FileText, User, Clock, AlertTriangle,
-  Database, Wifi, WifiOff, Cloud, CloudOff, Sparkles,
-  BookOpen, Bell, Settings, BarChart, Calendar,
-  ChevronRight, Shield, Rocket, Star, Award,
-  Eye, EyeOff
+  Database, Wifi, WifiOff, Cloud, CloudOff
 } from 'lucide-react';
 import { AppState, LessonPlan, Teacher } from './types';
 import { APIService } from './services/api-supabase';
@@ -19,17 +16,15 @@ import TeacherForm from './components/TeacherForm';
 import SubmissionHistory from './components/SubmissionHistory';
 import DefaultersList from './components/DefaultersList';
 import TeacherLoginHistory from './components/TeacherLoginHistory';
-import ResubmissionRequests from './components/ResubmissionRequests';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({ 
     currentUser: null, 
     teachers: [], 
     lessonPlans: [], 
-    loginLogs: [],
-    resubmissionRequests: []
+    loginLogs: [] 
   });
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'registry' | 'submissions' | 'defaulters' | 'teacher-logins' | 'compile' | 'logins' | 'resubmissions'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'registry' | 'submissions' | 'defaulters' | 'teacher-logins' | 'compile' | 'logins'>('registry');
   const [loginMode, setLoginMode] = useState<'teacher' | 'admin'>('teacher');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(true);
@@ -42,14 +37,6 @@ const App: React.FC = () => {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Clear email when switching tabs
-  useEffect(() => {
-    setLoginEmail('');
-    setLoginPassword('');
-    setLoginError('');
-  }, [loginMode]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -123,22 +110,15 @@ const App: React.FC = () => {
     try {
       console.log("📡 Fetching data from Supabase...");
       
-      const [teachers, lessonPlans, loginLogs, resubmissionRequests] = await Promise.all([
+      const [teachers, lessonPlans, loginLogs] = await Promise.all([
         APIService.fetchTeachers(),
         APIService.fetchLessonPlans(),
-        user === 'admin' ? APIService.fetchLoginLogs() : Promise.resolve([]),
-        user === 'admin' ? APIService.getPendingResubmissions() : Promise.resolve([])
+        user === 'admin' ? APIService.fetchLoginLogs() : Promise.resolve([])
       ]);
       
       console.log(`✅ Fetched: ${teachers.length} teachers, ${lessonPlans.length} lesson plans`);
       
-      setState(prev => ({ 
-        ...prev, 
-        teachers, 
-        lessonPlans, 
-        loginLogs,
-        resubmissionRequests 
-      }));
+      setState(prev => ({ ...prev, teachers, lessonPlans, loginLogs }));
       await checkDatabaseStatus();
       
       setLastSynced(new Date());
@@ -146,13 +126,7 @@ const App: React.FC = () => {
     } catch (error: any) {
       console.error("Data fetch error:", error);
       setConnectionError(`Sync failed: ${error.message}`);
-      setState(prev => ({ 
-        ...prev, 
-        teachers: [], 
-        lessonPlans: [], 
-        loginLogs: [],
-        resubmissionRequests: [] 
-      }));
+      setState(prev => ({ ...prev, teachers: [], lessonPlans: [], loginLogs: [] }));
     } finally {
       setIsSyncing(false);
       setIsAuthenticating(false);
@@ -311,7 +285,7 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     console.log("👋 Logging out...");
-    setState({ currentUser: null, teachers: [], lessonPlans: [], loginLogs: [], resubmissionRequests: [] });
+    setState({ currentUser: null, teachers: [], lessonPlans: [], loginLogs: [] });
     localStorage.removeItem('shs_user');
     setLastSynced(null);
     setLoginEmail('');
@@ -334,33 +308,24 @@ const App: React.FC = () => {
 
   if (isAuthenticating) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-        <div className="flex flex-col items-center gap-8">
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-6">
           <div className="relative">
-            <div className="h-24 w-24 border-[6px] border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-16 w-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center animate-pulse">
-                <GraduationCap className="h-8 w-8 text-white" />
-              </div>
-            </div>
+            <div className="h-16 w-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+            <GraduationCap className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-indigo-600" />
           </div>
-          <div className="text-center space-y-3">
-            <div className="flex items-center justify-center gap-3">
-              <div className="h-1.5 w-1.5 bg-indigo-400 rounded-full animate-pulse"></div>
-              <div className="h-1.5 w-1.5 bg-indigo-400 rounded-full animate-pulse delay-75"></div>
-              <div className="h-1.5 w-1.5 bg-indigo-400 rounded-full animate-pulse delay-150"></div>
-            </div>
-            <p className="text-sm font-black uppercase tracking-[0.3em] text-indigo-600/80">Initializing Portal</p>
+          <div className="text-center space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Initializing System</p>
             <div className="flex items-center justify-center gap-2">
               {isOnline ? (
                 <>
-                  <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                  <span className="text-xs text-emerald-600 font-bold">Connected</span>
+                  <Wifi className="h-3 w-3 text-emerald-500" />
+                  <span className="text-[8px] text-emerald-600 font-bold">Online</span>
                 </>
               ) : (
                 <>
-                  <div className="h-2 w-2 bg-rose-500 rounded-full animate-pulse"></div>
-                  <span className="text-xs text-rose-600 font-bold">Offline</span>
+                  <WifiOff className="h-3 w-3 text-rose-500" />
+                  <span className="text-[8px] text-rose-600 font-bold">Offline</span>
                 </>
               )}
             </div>
@@ -371,280 +336,186 @@ const App: React.FC = () => {
   }
 
   if (!state.currentUser) {
-    // Fixed SVG data URL - removed quote escaping issues
-    const gridPattern = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`;
-
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
-        {/* Animated background elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-4000"></div>
-        </div>
-
-        {/* Grid pattern overlay - FIXED */}
-        <div 
-          className="absolute inset-0 opacity-20"
-          style={{ backgroundImage: gridPattern }}
-        ></div>
-
-        <div className="w-full max-w-md animate-in fade-in zoom-in duration-700 relative z-10">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-[#f8fafc]">
+        <div className="w-full max-w-md animate-in fade-in zoom-in duration-500">
           {!isOnline && (
-            <div className="mb-6 p-4 bg-amber-500/10 backdrop-blur-sm border border-amber-500/30 rounded-2xl flex items-center gap-3 animate-shake">
-              <WifiOff className="h-5 w-5 text-amber-400" />
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
+              <WifiOff className="h-4 w-4 text-amber-600" />
               <div>
-                <p className="text-amber-200 text-sm font-bold">You are offline</p>
-                <p className="text-amber-400/80 text-xs">Please check your internet connection</p>
+                <p className="text-amber-800 text-xs font-bold">You are offline</p>
+                <p className="text-amber-600 text-[10px]">Please check your internet connection</p>
               </div>
             </div>
           )}
           
           {connectionError && (
-            <div className="mb-6 p-4 bg-rose-500/10 backdrop-blur-sm border border-rose-500/30 rounded-2xl flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-rose-400" />
+            <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3">
+              <AlertCircle className="h-4 w-4 text-rose-600" />
               <div>
-                <p className="text-rose-200 text-sm font-bold">Connection Error</p>
-                <p className="text-rose-400/80 text-xs">{connectionError}</p>
+                <p className="text-rose-800 text-xs font-bold">Connection Error</p>
+                <p className="text-rose-600 text-[10px]">{connectionError}</p>
               </div>
             </div>
           )}
 
-          <div className="bg-gray-800/50 backdrop-blur-xl rounded-3xl p-8 md:p-10 shadow-2xl shadow-black/30 border border-gray-700/50 relative overflow-hidden">
-            {/* Glowing border */}
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-3xl"></div>
+          <div className="bg-white rounded-[3rem] p-8 md:p-10 shadow-2xl shadow-indigo-100 border border-slate-100 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
             
-            {/* Top accent line */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
-            
-            <div className="flex flex-col items-center mb-10 text-center relative z-10">
-              <div className="mb-6 relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur-xl opacity-50"></div>
-                <div className="relative bg-gradient-to-br from-indigo-600 to-purple-700 p-5 rounded-2xl shadow-2xl">
-                  <ShieldCheck className="h-10 w-10 text-white" />
-                </div>
+            <div className="flex flex-col items-center mb-8 text-center">
+              <div className="bg-indigo-600 p-4 rounded-2xl shadow-xl shadow-indigo-100 mb-6">
+                <ShieldCheck className="h-8 w-8 text-white" />
               </div>
+              <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase mb-2">Sacred Heart</h1>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Management Hub</p>
               
-              <h1 className="text-3xl md:text-4xl font-black italic bg-gradient-to-r from-white via-indigo-100 to-white bg-clip-text text-transparent mb-2">
-                Sacred Heart
-              </h1>
-              <p className="text-sm font-black text-gray-400 uppercase tracking-[0.4em] mb-6">Academic Portal</p>
-              
-              <div className="flex items-center gap-3 bg-gray-900/50 rounded-xl px-4 py-2 border border-gray-700">
-                <Database className={`h-4 w-4 ${databaseStatus.seeded ? 'text-emerald-400' : 'text-amber-400'}`} />
-                <span className={`text-xs font-bold ${databaseStatus.seeded ? 'text-emerald-300' : 'text-amber-300'}`}>
+              <div className="mt-4 flex items-center gap-2">
+                <Database className={`h-4 w-4 ${databaseStatus.seeded ? 'text-emerald-500' : 'text-amber-500'}`} />
+                <span className={`text-xs font-bold ${databaseStatus.seeded ? 'text-emerald-600' : 'text-amber-600'}`}>
                   {databaseStatus.seeded ? `Ready (${databaseStatus.teacherCount} teachers)` : 'Database Not Seeded'}
                 </span>
-                <Sparkles className="h-3 w-3 text-purple-400" />
               </div>
             </div>
 
-
-            {/* Login Mode Toggle - COMPLETELY FIXED VERSION */}
-            <div className="flex bg-gray-900/50 p-1.5 rounded-2xl mb-8 border border-gray-700" style={{ position: 'relative', zIndex: 10 }}>
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
               <button 
                 onClick={() => {
-                  if (isOnline) {
-                    setLoginMode('teacher');
-                    setLoginError('');
-                  }
+                  setLoginMode('teacher');
+                  setLoginError('');
                 }}
-                className={`flex-1 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 ${
-                  loginMode === 'teacher' 
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
-                } ${!isOnline ? 'opacity-50' : ''}`}
-                style={{ 
-                  position: 'relative',
-                  zIndex: 11,
-                  cursor: isOnline ? 'pointer' : 'not-allowed',
-                  pointerEvents: isOnline ? 'auto' : 'none'
-                }}
+                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${loginMode === 'teacher' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
               >
-                <User className="h-4 w-4" />
-                Teacher
+                Teacher Login
               </button>
               <button 
                 onClick={() => {
-                  if (isOnline) {
-                    setLoginMode('admin');
-                    setLoginError('');
-                  }
+                  setLoginMode('admin');
+                  setLoginError('');
                 }}
-                className={`flex-1 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 ${
-                  loginMode === 'admin' 
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
-                } ${!isOnline ? 'opacity-50' : ''}`}
-                style={{ 
-                  position: 'relative',
-                  zIndex: 11,
-                  cursor: isOnline ? 'pointer' : 'not-allowed',
-                  pointerEvents: isOnline ? 'auto' : 'none'
-                }}
+                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${loginMode === 'admin' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
               >
-                <Shield className="h-4 w-4" />
-                Admin
+                Admin Login
               </button>
             </div>
-            
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-300"></div>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input 
-                    required
-                    type="email"
-                    placeholder="Official Email"
-                    className="w-full pl-11 pr-4 py-4 bg-gray-900/70 border border-gray-700 rounded-2xl font-bold text-white placeholder-gray-400 outline-none focus:border-indigo-500 transition-all duration-300 text-sm backdrop-blur-sm"
-                    value={loginEmail}
-                    onChange={e => {
-                      setLoginEmail(e.target.value);
-                      setLoginError('');
-                    }}
-                    disabled={!isOnline}
-                  />
-                </div>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
+                <input 
+                  required
+                  type="email"
+                  placeholder="Official Email"
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-all text-sm"
+                  value={loginEmail}
+                  onChange={e => {
+                    setLoginEmail(e.target.value);
+                    setLoginError('');
+                  }}
+                  disabled={!isOnline}
+                />
               </div>
 
-              <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-300"></div>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input 
-                    required
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Access Password"
-                    className="w-full pl-11 pr-12 py-4 bg-gray-900/70 border border-gray-700 rounded-2xl font-bold text-white placeholder-gray-400 outline-none focus:border-indigo-500 transition-all duration-300 text-sm tracking-widest backdrop-blur-sm"
-                    value={loginPassword}
-                    onChange={e => {
-                      setLoginPassword(e.target.value);
-                      setLoginError('');
-                    }}
-                    disabled={!isOnline}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-400"
-                    disabled={!isOnline}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
+                <input 
+                  required
+                  type="password"
+                  placeholder="Access Password"
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-all text-sm tracking-widest"
+                  value={loginPassword}
+                  onChange={e => {
+                    setLoginPassword(e.target.value);
+                    setLoginError('');
+                  }}
+                  disabled={!isOnline}
+                />
               </div>
 
               {loginError && (
-                <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl animate-pulse">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-rose-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-rose-200 text-sm font-bold">{loginError}</p>
-                      {loginError.includes('Default password') && (
-                        <p className="text-rose-400/80 text-xs mt-1">Contact admin if you forgot your password</p>
-                      )}
-                    </div>
-                  </div>
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl">
+                  <p className="text-rose-600 text-xs font-bold">{loginError}</p>
+                  {loginError.includes('Default password') && (
+                    <p className="text-rose-500 text-[10px] mt-1">Contact admin if you forgot your password</p>
+                  )}
                 </div>
               )}
 
-              <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-300"></div>
-                <button 
-                  disabled={isSyncing || !isOnline}
-                  className="relative w-full bg-gradient-to-r from-indigo-700 to-purple-700 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group"
-                >
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <span className="relative z-10">
-                    {isSyncing ? (
-                      <>
-                        <RefreshCw className="h-5 w-5 animate-spin inline mr-2" />
-                        Authenticating...
-                      </>
-                    ) : !isOnline ? (
-                      <>
-                        <WifiOff className="h-5 w-5 inline mr-2" />
-                        No Internet
-                      </>
-                    ) : (
-                      <>
-                        <Rocket className="h-5 w-5 inline mr-2" />
-                        Authorize Entry
-                      </>
-                    )}
-                  </span>
-                </button>
-              </div>
+              <button 
+                disabled={isSyncing || !isOnline}
+                className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSyncing ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Authenticating...
+                  </>
+                ) : !isOnline ? (
+                  <>
+                    <WifiOff className="h-4 w-4" />
+                    No Internet
+                  </>
+                ) : (
+                  "Authorize Entry"
+                )}
+              </button>
             </form>
 
             {loginMode === 'admin' && databaseStatus.teacherCount === 0 && (
-              <div className="mt-8 pt-8 border-t border-gray-700/50">
+              <div className="mt-6 pt-6 border-t border-slate-100">
                 <button 
                   onClick={handleManualSeed}
                   disabled={isSyncing || !isOnline}
-                  className="w-full bg-gradient-to-r from-amber-600 to-orange-600 text-white py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest hover:from-amber-500 hover:to-orange-500 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 group relative"
+                  className="w-full bg-amber-500 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-amber-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <span className="relative z-10">
-                    {isSyncing ? (
-                      <RefreshCw className="h-4 w-4 animate-spin inline mr-2" />
-                    ) : (
-                      <Database className="h-4 w-4 inline mr-2" />
-                    )}
-                    {isSyncing ? 'Seeding Database...' : 'Click to Seed Database'}
-                  </span>
+                  {isSyncing ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Database className="h-4 w-4" />
+                  )}
+                  {isSyncing ? 'Seeding Database...' : 'Click to Seed Database'}
                 </button>
-                <p className="text-xs text-gray-400 text-center mt-3">
-                  Use this only if database is empty. This will add {INITIAL_TEACHERS.length} teachers.
+                <p className="text-[9px] text-slate-500 text-center mt-2">
+                  Use this only if database is empty. This will add 14 teachers.
                 </p>
               </div>
             )}
 
-            <div className="mt-8 pt-8 border-t border-gray-700/50">
-              <div className="flex items-center justify-between text-xs text-gray-400">
+            <div className="mt-6 pt-6 border-t border-slate-100">
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
                 <div className="flex items-center gap-2">
                   {isOnline ? (
                     <>
-                      <div className="h-2 w-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                      <span className="text-emerald-300 font-bold">Online</span>
+                      <Wifi className="h-3 w-3 text-emerald-500" />
+                      <span className="text-emerald-600 font-bold">Online</span>
                     </>
                   ) : (
                     <>
-                      <div className="h-2 w-2 bg-rose-400 rounded-full animate-pulse"></div>
-                      <span className="text-rose-300 font-bold">Offline</span>
+                      <WifiOff className="h-3 w-3 text-rose-500" />
+                      <span className="text-rose-600 font-bold">Offline</span>
                     </>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Cloud className={`h-4 w-4 ${databaseStatus.seeded ? 'text-emerald-400' : 'text-amber-400'}`} />
+                  <Cloud className={`h-3 w-3 ${databaseStatus.seeded ? 'text-emerald-500' : 'text-amber-500'}`} />
                   <span className="font-bold">
                     {databaseStatus.seeded ? 'Cloud Sync ✓' : 'Not Seeded'}
                   </span>
                 </div>
               </div>
               
-              <p className="text-xs text-gray-500 text-center mt-4">
-                Powered by Supabase • Secure Cloud Database • Real-time Sync
+              <p className="text-[8px] text-slate-400 text-center mt-3">
+                Powered by Supabase • Data syncs across all devices
               </p>
             </div>
           </div>
 
-          {/* Floating particles effect */}
-          <div className="absolute -z-10 inset-0 overflow-hidden">
-            {[...Array(20)].map((_, i) => (
-              <div
-                key={i}
-                className="absolute w-1 h-1 bg-indigo-500/30 rounded-full"
-                style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 100}%`,
-                  animation: `float ${3 + Math.random() * 4}s infinite ease-in-out`,
-                  animationDelay: `${Math.random() * 2}s`
-                }}
-              />
-            ))}
-          </div>
+          {import.meta.env.DEV && (
+            <div className="mt-4 p-3 bg-slate-50 rounded-xl text-center">
+              <p className="text-[8px] text-slate-500">
+                Supabase Project: wuefytaaxxnqfepgyxsk
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -658,18 +529,14 @@ const App: React.FC = () => {
       isSyncing={isSyncing}
       lastSynced={lastSynced}
       isOnline={isOnline}
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
     >
       {!isOnline && (
-        <div className="mb-6 p-5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 backdrop-blur-sm border border-amber-500/30 rounded-2xl animate-pulse">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-amber-500/20 rounded-xl">
-              <WifiOff className="h-6 w-6 text-amber-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-amber-100 text-sm font-bold">Working in Offline Mode</p>
-              <p className="text-amber-300/80 text-xs">Some features may be limited. Data will sync automatically when back online.</p>
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+          <div className="flex items-center gap-3">
+            <WifiOff className="h-5 w-5 text-amber-600" />
+            <div>
+              <p className="text-amber-800 text-sm font-bold">Working Offline</p>
+              <p className="text-amber-600 text-xs">Some features may be limited. Data will sync when back online.</p>
             </div>
           </div>
         </div>
@@ -677,154 +544,125 @@ const App: React.FC = () => {
       
       {state.currentUser === 'admin' ? (
         <div className="space-y-8">
-          {activeTab === 'dashboard' && (
-            <AdminRegistry 
-              teachers={state.teachers}
-              lessonPlans={state.lessonPlans}
-              loginLogs={state.loginLogs}
-              resubmissionRequests={state.resubmissionRequests}
-              onAddTeacher={async (t) => { 
-                await APIService.addTeacher(t); 
-                await fetchData(); 
-              }}
-              onUpdateTeacher={async (id, upd) => { 
-                await APIService.updateTeacher(id, upd); 
-                await fetchData(); 
-              }}
-              onRemoveTeacher={async (id) => { 
-                await APIService.removeTeacher(id); 
-                await fetchData(); 
-              }}
-              onRefresh={handleForceRefresh}
-              isOnline={isOnline}
-            />
-          )}
-          
-          {activeTab === 'registry' && (
-            <AdminRegistry 
-              teachers={state.teachers}
-              lessonPlans={state.lessonPlans}
-              loginLogs={state.loginLogs}
-              resubmissionRequests={state.resubmissionRequests}
-              onAddTeacher={async (t) => { 
-                await APIService.addTeacher(t); 
-                await fetchData(); 
-              }}
-              onUpdateTeacher={async (id, upd) => { 
-                await APIService.updateTeacher(id, upd); 
-                await fetchData(); 
-              }}
-              onRemoveTeacher={async (id) => { 
-                await APIService.removeTeacher(id); 
-                await fetchData(); 
-              }}
-              onRefresh={handleForceRefresh}
-              isOnline={isOnline}
-            />
-          )}
-          
-          {activeTab === 'submissions' && (
-            <SubmissionHistory 
-              lessonPlans={state.lessonPlans} 
-              teachers={state.teachers} 
-            />
-          )}
-          
-          {activeTab === 'defaulters' && (
-            <DefaultersList 
-              teachers={state.teachers} 
-              lessonPlans={state.lessonPlans} 
-            />
-          )}
-          
-          {activeTab === 'teacher-logins' && (
-            <TeacherLoginHistory 
-              loginLogs={state.loginLogs.filter(log => log.email !== 'admin')}
-            />
-          )}
-          
-          {activeTab === 'compile' && (
-            <AdminCompiler 
-              lessonPlans={state.lessonPlans} 
-              teachers={state.teachers} 
-            />
-          )}
-          
-          {activeTab === 'resubmissions' && (
-            <ResubmissionRequests 
-              requests={state.resubmissionRequests}
-              onApprove={async (requestId) => {
-                await APIService.approveResubmission(requestId);
-                await fetchData();
-              }}
-              onDecline={async (requestId, reason) => {
-                await APIService.declineResubmission(requestId, reason);
-                await fetchData();
-              }}
-            />
-          )}
-          
-          {activeTab === 'logins' && (
-            <div className="bg-gray-800/50 backdrop-blur-xl p-8 rounded-3xl border border-gray-700/50 shadow-2xl">
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h3 className="text-2xl font-black uppercase italic bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">Recent Access Logs</h3>
-                  <p className="text-sm text-indigo-400 font-black uppercase tracking-[0.2em] mt-2">
-                    All login activities
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-sm font-black text-gray-400 bg-gray-900/50 px-4 py-2 rounded-xl">
+          <div className="flex justify-center flex-wrap gap-2 print-hidden">
+            {[
+              { id: 'registry', label: 'Faculty Registry', icon: Users },
+              { id: 'submissions', label: 'Submissions', icon: FileText },
+              { id: 'defaulters', label: 'Defaulters', icon: AlertTriangle },
+              { id: 'teacher-logins', label: 'Teacher Logins', icon: Clock },
+              { id: 'compile', label: 'PDF Compilation', icon: Printer },
+              { id: 'logins', label: 'All Logs', icon: Key }
+            ].map(tab => (
+              <button 
+                key={tab.id} 
+                onClick={() => setActiveTab(tab.id as any)} 
+                className={`px-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200 hover:text-indigo-600'}`}
+                disabled={!isOnline && tab.id !== 'registry'}
+              >
+                <tab.icon className="h-3.5 w-3.5" /> 
+                {tab.label}
+                {!isOnline && tab.id !== 'registry' && (
+                  <span className="text-[6px] text-amber-500">(Offline)</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {activeTab === 'registry' && (
+              <AdminRegistry 
+                teachers={state.teachers}
+                lessonPlans={state.lessonPlans}
+                onAddTeacher={async (t) => { 
+                  await APIService.addTeacher(t); 
+                  await fetchData(); 
+                }}
+                onUpdateTeacher={async (id, upd) => { 
+                  await APIService.updateTeacher(id, upd); 
+                  await fetchData(); 
+                }}
+                onRemoveTeacher={async (id) => { 
+                  await APIService.removeTeacher(id); 
+                  await fetchData(); 
+                }}
+                onRefresh={() => fetchData()}
+                isOnline={isOnline}
+              />
+            )}
+            
+            {activeTab === 'submissions' && (
+              <SubmissionHistory 
+                lessonPlans={state.lessonPlans} 
+                teachers={state.teachers} 
+              />
+            )}
+            
+            {activeTab === 'defaulters' && (
+              <DefaultersList 
+                teachers={state.teachers} 
+                lessonPlans={state.lessonPlans} 
+              />
+            )}
+            
+            {activeTab === 'teacher-logins' && (
+              <TeacherLoginHistory 
+                loginLogs={state.loginLogs.filter(log => log.email !== 'admin')}
+              />
+            )}
+            
+            {activeTab === 'compile' && (
+              <AdminCompiler 
+                lessonPlans={state.lessonPlans} 
+                teachers={state.teachers} 
+              />
+            )}
+            
+            {activeTab === 'logins' && (
+              <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg md:text-xl font-black uppercase italic tracking-tight">Recent Access Logs</h3>
+                    <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em] mt-1">
+                      All login activities
+                    </p>
+                  </div>
+                  <div className="text-[10px] font-black text-slate-400">
                     Total: {state.loginLogs.length}
                   </div>
-                  <button 
-                    onClick={handleForceRefresh}
-                    className="p-2.5 bg-gray-700/50 hover:bg-gray-700 rounded-xl transition-colors"
-                  >
-                    <RefreshCw className="h-4 w-4 text-gray-300" />
-                  </button>
+                </div>
+                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                  {state.loginLogs.length === 0 ? (
+                    <div className="text-center py-10 border-2 border-dashed border-slate-100 rounded-2xl">
+                      <Key className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+                      <p className="text-slate-400 font-bold text-sm">No login records found</p>
+                    </div>
+                  ) : (
+                    state.loginLogs.slice(0, 50).map((log, i) => (
+                      <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl border border-slate-100 hover:bg-white transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${log.email === 'admin' ? 'bg-purple-50' : 'bg-indigo-50'}`}>
+                            <User className={`h-4 w-4 ${log.email === 'admin' ? 'text-purple-600' : 'text-indigo-600'}`} />
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-black uppercase text-slate-800">{log.name}</div>
+                            <div className="text-[9px] font-bold text-slate-500">{log.email}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[9px] font-black text-slate-400">
+                            {new Date(log.timestamp).toLocaleDateString()}
+                          </div>
+                          <div className="text-[8px] text-slate-300 font-bold">
+                            {new Date(log.timestamp).toLocaleTimeString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                {state.loginLogs.length === 0 ? (
-                  <div className="text-center py-16 border-2 border-dashed border-gray-700 rounded-2xl">
-                    <Key className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-                    <p className="text-gray-400 font-bold text-sm">No login records found</p>
-                    <p className="text-gray-500 text-xs mt-1">Login activities will appear here</p>
-                  </div>
-                ) : (
-                  state.loginLogs.slice(0, 50).map((log, i) => (
-                    <div key={i} className="flex justify-between items-center p-4 bg-gray-900/30 rounded-2xl border border-gray-700/50 hover:bg-gray-800/50 transition-all duration-300 group">
-                      <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-xl ${log.email === 'admin' ? 'bg-gradient-to-br from-purple-600/20 to-pink-600/20' : 'bg-gradient-to-br from-indigo-600/20 to-blue-600/20'} group-hover:scale-105 transition-transform duration-300`}>
-                          <User className={`h-5 w-5 ${log.email === 'admin' ? 'text-purple-400' : 'text-indigo-400'}`} />
-                        </div>
-                        <div>
-                          <div className="text-sm font-black text-white">{log.name}</div>
-                          <div className="text-xs font-bold text-gray-400">{log.email}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs font-black text-gray-300">
-                          {new Date(log.timestamp).toLocaleDateString('en-IN', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </div>
-                        <div className="text-[10px] text-gray-500 font-bold">
-                          {new Date(log.timestamp).toLocaleTimeString('en-IN', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       ) : (
         <TeacherForm 
