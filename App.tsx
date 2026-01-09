@@ -556,7 +556,7 @@ const App: React.FC = () => {
               { id: 'teacher-logins', label: 'Teacher Logins', icon: Clock },
               { id: 'compile', label: 'PDF Compilation', icon: Printer },
               { id: 'auto-send', label: 'Auto Send', icon: Zap }, // ✅ YEH LINE ADD KARNA HAI
-              { id: 'logins', label: 'All Logs', icon: Key }
+              { id: 'logins', label: 'All Logs', icon: Key },
               { id: 'resubmissions', label: 'Resubmission Requests', icon: RefreshCw },
             ].map(tab => (
               <button 
