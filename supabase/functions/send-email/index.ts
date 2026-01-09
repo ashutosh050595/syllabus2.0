@@ -12,17 +12,29 @@ serve(async (req) => {
   }
 
   try {
-    const { to, subject, html, text } = await req.json()
+    const { to, subject, html, text, attachments } = await req.json()
     
     const resend = new Resend(Deno.env.get('RESEND_API_KEY'))
     
-    const { data, error } = await resend.emails.send({
+    const emailData: any = {
       from: 'Sacred Heart <portal@sacredheart.edu>',
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
       text,
-    })
+    }
+
+    // ✅ ATTACHMENTS HANDLING ADDED
+    if (attachments && Array.isArray(attachments)) {
+      emailData.attachments = attachments.map(att => ({
+        filename: att.filename,
+        content: att.content,
+        content_type: att.content_type,
+        disposition: att.disposition || 'attachment'
+      }));
+    }
+
+    const { data, error } = await resend.emails.send(emailData)
 
     if (error) {
       throw error
