@@ -17,6 +17,9 @@ import SubmissionHistory from './components/SubmissionHistory';
 import AutoSendDashboard from './components/AutoSendDashboard';
 import DefaultersList from './components/DefaultersList';
 import TeacherLoginHistory from './components/TeacherLoginHistory';
+// Existing imports ke baad yeh add kar:
+import AdminResubmissionRequests from './components/AdminResubmissionRequests';
+import TeacherModificationRequest from './components/TeacherModificationRequest';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({ 
@@ -554,6 +557,7 @@ const App: React.FC = () => {
               { id: 'compile', label: 'PDF Compilation', icon: Printer },
               { id: 'auto-send', label: 'Auto Send', icon: Zap }, // ✅ YEH LINE ADD KARNA HAI
               { id: 'logins', label: 'All Logs', icon: Key }
+              { id: 'resubmissions', label: 'Resubmission Requests', icon: RefreshCw },
             ].map(tab => (
               <button 
                 key={tab.id} 
@@ -628,6 +632,13 @@ const App: React.FC = () => {
             )}
 
 
+            // Line 470 ke aas paas, Admin tabs ke switch statement mein yeh add kar:
+            {activeTab === 'resubmissions' && (
+              <AdminResubmissionRequests 
+                onRefresh={() => fetchData()}
+                isOnline={isOnline}
+              />
+            )}
             
             {activeTab === 'logins' && (
               <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
