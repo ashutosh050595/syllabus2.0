@@ -1,743 +1,690 @@
-import { supabase } from './supabase';
-import { Teacher, LessonPlan, LoginLog, ResubmissionRequest } from '../types';
-import { DEFAULT_TEACHER_PASSWORD } from '../constants';
-import { EmailService } from './email-service';
+import { createClient } from '@supabase/supabase-js';
 
-// Email normalization helper
-const normalizeEmail = (email: string): string => {
-  return email.toLowerCase().trim();
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+console.log('🔧 Initializing Supabase client...');
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ Missing Supabase environment variables');
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { persistSession: true, autoRefreshToken: true },
+  db: { schema: 'public' }
+});
+
+// Helper function to format date to DD-Mon-YYYY format
+const formatDate = (dateString: string): string => {
+  try {
+    // Try multiple date formats
+    let date: Date;
+    
+    if (dateString.includes('T')) {
+      // ISO format: 2024-01-01T00:00:00.000Z
+      date = new Date(dateString);
+    } else if (dateString.includes('-')) {
+      // Try different dash formats
+      const parts = dateString.split('-');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          // YYYY-MM-DD
+          date = new Date(`${parts[0]}-${parts[1]}-${parts[2]}`);
+        } else {
+          // DD-MM-YYYY or DD-Mon-YYYY
+          date = new Date(dateString);
+        }
+      } else {
+        date = new Date(dateString);
+      }
+    } else {
+      date = new Date(dateString);
+    }
+    
+    if (isNaN(date.getTime())) {
+      // If still invalid, return current date
+      date = new Date();
+    }
+    
+    // Format to DD-Mon-YYYY
+    const day = date.getDate().toString().padStart(2, '0');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[date.getMonth()];
+    const year = date.getFullYear();
+    
+    return `${day}-${month}-${year}`;
+  } catch (error) {
+    console.error('Error formatting date:', dateString, error);
+    const today = new Date();
+    const day = today.getDate().toString().padStart(2, '0');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[today.getMonth()];
+    const year = today.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
 };
 
-export const APIService = {
-  // Fetch all teachers
-  async fetchTeachers(): Promise<Teacher[]> {
+// Helper function to create week range from a date
+const createWeekRange = (dateString: string): string => {
+  try {
+    const startDate = formatDate(dateString);
+    const startDateObj = new Date(startDate);
+    
+    // Add 6 days for end date
+    const endDateObj = new Date(startDateObj);
+    endDateObj.setDate(endDateObj.getDate() + 6);
+    
+    const endDay = endDateObj.getDate().toString().padStart(2, '0');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const endMonth = monthNames[endDateObj.getMonth()];
+    const endYear = endDateObj.getFullYear();
+    const endDate = `${endDay}-${endMonth}-${endYear}`;
+    
+    return `${startDate} to ${endDate}`;
+  } catch (error) {
+    console.error('Error creating week range:', dateString, error);
+    return `${formatDate(new Date().toString())} to ${formatDate(new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toString())}`;
+  }
+};
+
+// Helper functions to convert between database and frontend formats
+const convertTeacherToFrontend = (dbTeacher: any) => ({
+  id: dbTeacher.id,
+  name: dbTeacher.name,
+  email: dbTeacher.email,
+  phone: dbTeacher.phone || '',
+  password: dbTeacher.password,
+  isClassTeacher: dbTeacher.is_class_teacher || false,
+  classTeacherOf: dbTeacher.class_teacher_of || null,
+  assignments: dbTeacher.assignments || []
+});
+
+const convertTeacherToDatabase = (frontendTeacher: any) => ({
+  name: frontendTeacher.name,
+  email: frontendTeacher.email,
+  phone: frontendTeacher.phone || '',
+  password: frontendTeacher.password,
+  is_class_teacher: frontendTeacher.isClassTeacher || false,
+  class_teacher_of: frontendTeacher.classTeacherOf || null,
+  assignments: frontendTeacher.assignments || []
+});
+
+const convertLessonPlanToFrontend = (dbPlan: any) => {
+  // Create week range from week_starting
+  const weekRange = dbPlan.week_range || createWeekRange(dbPlan.week_starting || new Date().toString());
+  
+  return {
+    id: dbPlan.id,
+    teacherId: dbPlan.teacher_id,
+    className: dbPlan.class_name || 'Class',
+    section: dbPlan.section || '',
+    subject: dbPlan.subject || 'Subject',
+    weekRange: weekRange,
+    topics: dbPlan.topics,
+    objectives: dbPlan.objectives,
+    activities: dbPlan.activities,
+    resources: dbPlan.resources,
+    assessment: dbPlan.assessment,
+    status: dbPlan.status || 'submitted',
+    resubmissionStatus: dbPlan.resubmission_status || 'none',
+    submittedAt: dbPlan.submitted_at || dbPlan.created_at,
+    createdAt: dbPlan.created_at,
+    updatedAt: dbPlan.updated_at
+  };
+};
+
+const convertLessonPlanToDatabase = (frontendPlan: any) => {
+  // Extract start date from weekRange (first part before " to ")
+  const weekRangeParts = frontendPlan.weekRange?.split(' to ') || [];
+  const weekStarting = weekRangeParts[0] || formatDate(new Date().toString());
+  
+  return {
+    teacher_id: frontendPlan.teacherId,
+    class_name: frontendPlan.className,
+    section: frontendPlan.section,
+    subject: frontendPlan.subject,
+    week_starting: weekStarting,
+    week_range: frontendPlan.weekRange,
+    topics: frontendPlan.topics,
+    objectives: frontendPlan.objectives,
+    activities: frontendPlan.activities,
+    resources: frontendPlan.resources,
+    assessment: frontendPlan.assessment,
+    status: frontendPlan.status || 'submitted',
+    resubmission_status: frontendPlan.resubmissionStatus || 'none',
+    submitted_at: frontendPlan.submittedAt || new Date().toISOString()
+  };
+};
+
+export const testSupabaseConnection = async (): Promise<boolean> => {
+  try {
+    console.log('🧪 Testing Supabase connection...');
+    const { data, error } = await supabase
+      .from('teachers')
+      .select('count', { count: 'exact', head: true });
+    
+    if (error) {
+      console.error('❌ Supabase connection test failed:', error.message);
+      return false;
+    }
+    
+    console.log('✅ Supabase connection successful');
+    return true;
+  } catch (error) {
+    console.error('❌ Supabase connection error:', error);
+    return false;
+  }
+};
+
+export class APIService {
+  // ===================== TEACHER METHODS =====================
+  static async fetchTeachers(): Promise<any[]> {
+    console.log('👨‍🏫 Fetching teachers...');
+    const { data, error } = await supabase
+      .from('teachers')
+      .select('*')
+      .order('name');
+    
+    if (error) {
+      console.error('❌ Error fetching teachers:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Fetched ${data?.length || 0} teachers`);
+    return (data || []).map(convertTeacherToFrontend);
+  }
+
+  static async getTeacherByEmail(email: string): Promise<any | null> {
+    console.log('🔍 Finding teacher by email:', email);
+    const { data, error } = await supabase
+      .from('teachers')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('❌ Error finding teacher:', error);
+      throw error;
+    }
+    
+    return data ? convertTeacherToFrontend(data) : null;
+  }
+
+  static async addTeacher(teacher: any): Promise<any> {
+    console.log('➕ Adding teacher:', teacher.name);
+    const dbTeacher = convertTeacherToDatabase(teacher);
+    
+    const { data, error } = await supabase
+      .from('teachers')
+      .insert([dbTeacher])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error adding teacher:', error);
+      throw error;
+    }
+    
+    console.log('✅ Teacher added:', data.id);
+    return convertTeacherToFrontend(data);
+  }
+
+  static async updateTeacher(id: string, updates: any): Promise<any> {
+    console.log('✏️ Updating teacher:', id);
+    const dbUpdates = convertTeacherToDatabase(updates);
+    
+    const { data, error } = await supabase
+      .from('teachers')
+      .update(dbUpdates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error updating teacher:', error);
+      throw error;
+    }
+    
+    console.log('✅ Teacher updated');
+    return convertTeacherToFrontend(data);
+  }
+
+  static async removeTeacher(id: string): Promise<void> {
+    console.log('🗑️ Removing teacher:', id);
+    const { error } = await supabase
+      .from('teachers')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('❌ Error removing teacher:', error);
+      throw error;
+    }
+    
+    console.log('✅ Teacher removed');
+  }
+
+  static async syncInitialTeachers(teachers: any[]): Promise<void> {
+    console.log('🔄 Syncing initial teachers...');
+    const dbTeachers = teachers.map(convertTeacherToDatabase);
+    
+    const { error } = await supabase
+      .from('teachers')
+      .upsert(dbTeachers, { onConflict: 'email' });
+    
+    if (error) {
+      console.error('❌ Error syncing teachers:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Synced ${teachers.length} teachers`);
+  }
+
+  static async clearTeachersCollection(): Promise<void> {
+    console.log('🧹 Clearing teachers collection...');
+    const { error } = await supabase
+      .from('teachers')
+      .delete()
+      .neq('id', '0');
+    
+    if (error) {
+      console.error('❌ Error clearing teachers:', error);
+      throw error;
+    }
+    
+    console.log('✅ Teachers collection cleared');
+  }
+
+  // ===================== LESSON PLAN METHODS =====================
+  static async fetchLessonPlans(): Promise<any[]> {
+    console.log('📚 Fetching lesson plans...');
+    const { data, error } = await supabase
+      .from('lesson_plans')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('❌ Error fetching lesson plans:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Fetched ${data?.length || 0} lesson plans`);
+    return (data || []).map(convertLessonPlanToFrontend);
+  }
+
+  static async submitLessonPlan(plan: any): Promise<any> {
+    console.log('📝 Submitting lesson plan...');
+    const dbPlan = convertLessonPlanToDatabase({
+      ...plan,
+      submittedAt: new Date().toISOString(),
+      status: 'submitted'
+    });
+    
+    const { data, error } = await supabase
+      .from('lesson_plans')
+      .insert([dbPlan])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error submitting lesson plan:', error);
+      throw error;
+    }
+    
+    console.log('✅ Lesson plan submitted:', data.id);
+    return convertLessonPlanToFrontend(data);
+  }
+
+  // ===================== LOGIN LOGS =====================
+  static async fetchLoginLogs(): Promise<any[]> {
+    console.log('🔐 Fetching login logs...');
+    const { data, error } = await supabase
+      .from('login_logs')
+      .select('*')
+      .order('timestamp', { ascending: false });
+    
+    if (error) {
+      console.error('❌ Error fetching login logs:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Fetched ${data?.length || 0} login logs`);
+    return data || [];
+  }
+
+  static async logLoginActivity(user: { email: string; name: string }): Promise<void> {
+    console.log('📝 Logging login activity:', user.email);
+    const { error } = await supabase
+      .from('login_logs')
+      .insert([{
+        email: user.email,
+        name: user.name,
+        timestamp: new Date().toISOString()
+      }]);
+    
+    if (error) {
+      console.error('❌ Error logging login activity:', error);
+    } else {
+      console.log('✅ Login activity logged');
+    }
+  }
+
+  // ===================== DATABASE STATUS =====================
+  static async getDatabaseStatus(): Promise<{ seeded: boolean; teacherCount: number }> {
+    console.log('📊 Checking database status...');
     try {
-      console.log('📡 Fetching teachers from Supabase...');
-      const { data, error } = await supabase
+      const { count, error } = await supabase
         .from('teachers')
-        .select('*')
-        .order('name');
+        .select('*', { count: 'exact', head: true });
       
       if (error) {
-        console.error('Error fetching teachers:', error);
-        throw error;
+        console.error('❌ Error checking database status:', error);
+        return { seeded: false, teacherCount: 0 };
       }
       
-      console.log(`✅ Fetched ${data?.length || 0} teachers`);
+      const seeded = (count || 0) > 0;
+      console.log(`📊 Database: ${seeded ? 'Seeded' : 'Not Seeded'} (${count} teachers)`);
       
-      return (data || []).map(teacher => ({
-        id: teacher.email,
-        email: teacher.email,
-        name: teacher.name,
-        phone: teacher.phone || '',
-        password: teacher.password || DEFAULT_TEACHER_PASSWORD,
-        isClassTeacher: teacher.is_class_teacher || false,
-        classTeacherOf: teacher.class_teacher_of || null,
-        assignments: teacher.assignments || []
-      } as Teacher));
+      return { seeded, teacherCount: count || 0 };
     } catch (error) {
-      console.error('Failed to fetch teachers:', error);
-      return [];
-    }
-  },
-
-  // Fetch lesson plans
-  async fetchLessonPlans(): Promise<LessonPlan[]> {
-    try {
-      const { data, error } = await supabase
-        .from('lesson_plans')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
-      return (data || []).map(plan => ({
-        id: plan.id,
-        teacherId: plan.teacher_id,
-        className: plan.class_name,
-        section: plan.section,
-        subject: plan.subject,
-        weekStarting: plan.week_starting,
-        topics: plan.topics || '',
-        objectives: plan.objectives || '',
-        activities: plan.activities || '',
-        resources: plan.resources || '',
-        assessment: plan.assessment || '',
-        status: plan.status || 'draft',
-        resubmissionStatus: plan.resubmission_status || 'none',
-        submittedAt: plan.submitted_at,
-        createdAt: plan.created_at,
-        updatedAt: plan.updated_at
-      } as LessonPlan));
-    } catch (error) {
-      console.error('Error fetching lesson plans:', error);
-      return [];
-    }
-  },
-
-  // Fetch login logs
-  async fetchLoginLogs(): Promise<LoginLog[]> {
-    try {
-      const { data, error } = await supabase
-        .from('login_logs')
-        .select('*')
-        .order('timestamp', { ascending: false });
-      
-      if (error) throw error;
-      
-      return (data || []).map(log => ({
-        id: log.id,
-        email: log.email,
-        name: log.name,
-        timestamp: log.timestamp,
-        deviceInfo: log.device_info
-      } as LoginLog));
-    } catch (error) {
-      console.error('Error fetching login logs:', error);
-      return [];
-    }
-  },
-
-  // Add teacher
-  async addTeacher(teacher: Teacher): Promise<void> {
-    try {
-      const normalizedEmail = normalizeEmail(teacher.email);
-      
-      const { error } = await supabase
-        .from('teachers')
-        .upsert({
-          email: normalizedEmail,
-          name: teacher.name,
-          phone: teacher.phone,
-          password: teacher.password || DEFAULT_TEACHER_PASSWORD,
-          is_class_teacher: teacher.isClassTeacher,
-          class_teacher_of: teacher.classTeacherOf,
-          assignments: teacher.assignments || [],
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'email'
-        });
-      
-      if (error) throw error;
-      console.log(`✅ Added teacher: ${teacher.name}`);
-    } catch (error) {
-      console.error('Error adding teacher:', error);
-      throw new Error('Failed to add teacher');
-    }
-  },
-
-  // Update teacher
-  async updateTeacher(email: string, updates: Partial<Teacher>): Promise<void> {
-    try {
-      const normalizedEmail = normalizeEmail(email);
-      
-      const updateData: any = {
-        updated_at: new Date().toISOString()
-      };
-      
-      if ('name' in updates) updateData.name = updates.name;
-      if ('phone' in updates) updateData.phone = updates.phone;
-      if ('password' in updates) updateData.password = updates.password;
-      if ('isClassTeacher' in updates) updateData.is_class_teacher = updates.isClassTeacher;
-      if ('classTeacherOf' in updates) updateData.class_teacher_of = updates.classTeacherOf;
-      if ('assignments' in updates) updateData.assignments = updates.assignments;
-      if ('email' in updates && updates.email) {
-        updateData.email = normalizeEmail(updates.email);
-      }
-      
-      const { error } = await supabase
-        .from('teachers')
-        .update(updateData)
-        .eq('email', normalizedEmail);
-      
-      if (error) throw error;
-      console.log(`✅ Updated teacher: ${email}`);
-    } catch (error) {
-      console.error('Error updating teacher:', error);
-      throw new Error('Failed to update teacher');
-    }
-  },
-
-  // Remove teacher
-  async removeTeacher(email: string): Promise<void> {
-    try {
-      const normalizedEmail = normalizeEmail(email);
-      
-      const { error } = await supabase
-        .from('teachers')
-        .delete()
-        .eq('email', normalizedEmail);
-      
-      if (error) throw error;
-      console.log(`✅ Removed teacher: ${email}`);
-    } catch (error) {
-      console.error('Error removing teacher:', error);
-      throw new Error('Failed to remove teacher');
-    }
-  },
-
-  // Seed initial teachers
-  async syncInitialTeachers(teachers: Teacher[]): Promise<void> {
-    try {
-      console.log(`🌱 Seeding ${teachers.length} teachers to Supabase...`);
-      
-      const teachersData = teachers.map(teacher => ({
-        email: normalizeEmail(teacher.email),
-        name: teacher.name,
-        phone: teacher.phone,
-        password: teacher.password || DEFAULT_TEACHER_PASSWORD,
-        is_class_teacher: teacher.isClassTeacher || false,
-        class_teacher_of: teacher.classTeacherOf || null,
-        assignments: teacher.assignments || [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
-      
-      const { error } = await supabase
-        .from('teachers')
-        .upsert(teachersData, {
-          onConflict: 'email'
-        });
-      
-      if (error) throw error;
-      console.log(`✅ Successfully seeded ${teachers.length} teachers`);
-    } catch (error) {
-      console.error('Error syncing teachers:', error);
-      throw new Error('Failed to seed teachers database');
-    }
-  },
-
-  // Submit lesson plan with email notification
-  async submitLessonPlan(plan: Omit<LessonPlan, 'id' | 'submittedAt'>): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('lesson_plans')
-        .insert({
-          teacher_id: plan.teacherId,
-          class_name: plan.className,
-          section: plan.section,
-          subject: plan.subject,
-          week_starting: plan.weekStarting,
-          topics: plan.topics,
-          objectives: plan.objectives,
-          activities: plan.activities,
-          resources: plan.resources,
-          assessment: plan.assessment,
-          status: plan.status || 'submitted',
-          resubmission_status: plan.resubmissionStatus || 'none',
-          submitted_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-      
-      if (error) throw error;
-      console.log(`✅ Submitted lesson plan for ${plan.teacherId}`);
-      
-      // Send email notification
-      const teacher = await this.getTeacherByEmail(plan.teacherId);
-      if (teacher) {
-        const weekRange = this.formatWeekRange(new Date(plan.weekStarting));
-        const emailSent = await EmailService.sendEmail(
-          EmailService.createSubmissionConfirmation(
-            teacher.name,
-            teacher.email,
-            weekRange,
-            [`${plan.className}-${plan.section}: ${plan.subject}`]
-          )
-        );
-        if (emailSent) {
-          console.log(`📧 Email sent to ${teacher.email}`);
-        }
-      }
-    } catch (error) {
-      console.error('Error submitting lesson plan:', error);
-      throw new Error('Failed to submit lesson plan');
-    }
-  },
-
-  // Submit multiple lesson plans with single email
-  async submitMultipleLessonPlans(plans: Omit<LessonPlan, 'id' | 'submittedAt'>[]): Promise<void> {
-    try {
-      const teacherId = plans[0]?.teacherId;
-      if (!teacherId) throw new Error('No teacher ID found');
-      
-      // Insert all plans
-      const plansData = plans.map(plan => ({
-        teacher_id: plan.teacherId,
-        class_name: plan.className,
-        section: plan.section,
-        subject: plan.subject,
-        week_starting: plan.weekStarting,
-        topics: plan.topics,
-        objectives: plan.objectives,
-        activities: plan.activities,
-        resources: plan.resources,
-        assessment: plan.assessment,
-        status: plan.status || 'submitted',
-        resubmission_status: plan.resubmissionStatus || 'none',
-        submitted_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
-      
-      const { error } = await supabase
-        .from('lesson_plans')
-        .insert(plansData);
-      
-      if (error) throw error;
-      console.log(`✅ Submitted ${plans.length} lesson plans for ${teacherId}`);
-      
-      // Send single email notification for all submissions
-      const teacher = await this.getTeacherByEmail(teacherId);
-      if (teacher) {
-        const weekRange = this.formatWeekRange(new Date(plans[0].weekStarting));
-        const submittedClasses = plans.map(p => `${p.className}-${p.section}: ${p.subject}`);
-        
-        const emailSent = await EmailService.sendEmail(
-          EmailService.createSubmissionConfirmation(
-            teacher.name,
-            teacher.email,
-            weekRange,
-            submittedClasses
-          )
-        );
-        
-        if (emailSent) {
-          console.log(`📧 Summary email sent to ${teacher.email}`);
-        }
-      }
-    } catch (error) {
-      console.error('Error submitting multiple lesson plans:', error);
-      throw new Error('Failed to submit lesson plans');
-    }
-  },
-
-  // Request resubmission for multiple classes
-  async requestResubmission(
-    teacherId: string,
-    weekStarting: string,
-    classSections: Array<{className: string, section: string, subject: string}>
-  ): Promise<string> {
-    try {
-      const teacher = await this.getTeacherByEmail(teacherId);
-      if (!teacher) throw new Error('Teacher not found');
-      
-      const requestId = `RS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const weekRange = this.formatWeekRange(new Date(weekStarting));
-      
-      // Update lesson plans to mark as pending resubmission
-      for (const classSection of classSections) {
-        const { error } = await supabase
-          .from('lesson_plans')
-          .update({ 
-            resubmission_status: 'pending',
-            updated_at: new Date().toISOString()
-          })
-          .eq('teacher_id', teacherId)
-          .eq('week_starting', weekStarting)
-          .eq('class_name', classSection.className)
-          .eq('section', classSection.section)
-          .eq('subject', classSection.subject);
-        
-        if (error) throw error;
-      }
-      
-      console.log(`🔄 Resubmission requested for ${classSections.length} classes`);
-      
-      // Send email notifications
-      const emailSent = await EmailService.sendEmail(
-        EmailService.createResubmissionRequest(
-          teacher.name,
-          teacher.email,
-          weekRange,
-          classSections.map(cs => `${cs.className}-${cs.section}: ${cs.subject}`),
-          requestId
-        )
-      );
-      
-      if (emailSent) {
-        console.log(`📧 Resubmission request emails sent`);
-      }
-      
-      // Store request in database
-      await supabase
-        .from('resubmission_requests')
-        .insert({
-          id: requestId,
-          teacher_id: teacherId,
-          teacher_name: teacher.name,
-          teacher_email: teacher.email,
-          week_starting: weekStarting,
-          class_sections: classSections,
-          status: 'pending',
-          created_at: new Date().toISOString()
-        });
-      
-      return requestId;
-    } catch (error) {
-      console.error('Error requesting resubmission:', error);
-      throw new Error('Failed to request resubmission');
-    }
-  },
-
-  // Approve resubmission request
-  async approveResubmission(requestId: string): Promise<void> {
-    try {
-      // Fetch request details
-      const { data: request, error: fetchError } = await supabase
-        .from('resubmission_requests')
-        .select('*')
-        .eq('id', requestId)
-        .single();
-      
-      if (fetchError || !request) throw new Error('Request not found');
-      
-      // Delete existing lesson plans for those class sections
-      for (const classSection of request.class_sections) {
-        const { error: deleteError } = await supabase
-          .from('lesson_plans')
-          .delete()
-          .eq('teacher_id', request.teacher_id)
-          .eq('week_starting', request.week_starting)
-          .eq('class_name', classSection.className)
-          .eq('section', classSection.section)
-          .eq('subject', classSection.subject);
-        
-        if (deleteError) throw deleteError;
-      }
-      
-      // Update request status
-      await supabase
-        .from('resubmission_requests')
-        .update({ 
-          status: 'approved',
-          approved_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', requestId);
-      
-      // Send approval email
-      const weekRange = this.formatWeekRange(new Date(request.week_starting));
-      const approvalLink = `https://your-app-url.com/teacher/submit?week=${request.week_starting}`;
-      
-      await EmailService.sendEmail(
-        EmailService.createResubmissionApproval(
-          request.teacher_name,
-          request.teacher_email,
-          weekRange,
-          approvalLink
-        )
-      );
-      
-      console.log(`✅ Resubmission request approved: ${requestId}`);
-    } catch (error) {
-      console.error('Error approving resubmission:', error);
-      throw new Error('Failed to approve resubmission');
-    }
-  },
-
-  // Decline resubmission request
-  async declineResubmission(requestId: string, reason?: string): Promise<void> {
-    try {
-      // Fetch request details
-      const { data: request, error: fetchError } = await supabase
-        .from('resubmission_requests')
-        .select('*')
-        .eq('id', requestId)
-        .single();
-      
-      if (fetchError || !request) throw new Error('Request not found');
-      
-      // Update lesson plans to mark as declined
-      for (const classSection of request.class_sections) {
-        const { error: updateError } = await supabase
-          .from('lesson_plans')
-          .update({ 
-            resubmission_status: 'declined',
-            updated_at: new Date().toISOString()
-          })
-          .eq('teacher_id', request.teacher_id)
-          .eq('week_starting', request.week_starting)
-          .eq('class_name', classSection.className)
-          .eq('section', classSection.section)
-          .eq('subject', classSection.subject);
-        
-        if (updateError) throw updateError;
-      }
-      
-      // Update request status
-      await supabase
-        .from('resubmission_requests')
-        .update({ 
-          status: 'declined',
-          decline_reason: reason,
-          declined_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', requestId);
-      
-      // Send decline email
-      const weekRange = this.formatWeekRange(new Date(request.week_starting));
-      
-      await EmailService.sendEmail(
-        EmailService.createResubmissionRejection(
-          request.teacher_name,
-          request.teacher_email,
-          weekRange,
-          reason
-        )
-      );
-      
-      console.log(`❌ Resubmission request declined: ${requestId}`);
-    } catch (error) {
-      console.error('Error declining resubmission:', error);
-      throw new Error('Failed to decline resubmission');
-    }
-  },
-
-  // Send defaulter reminders
-  async sendDefaulterReminders(defaulters: Teacher[], weekRange: string): Promise<void> {
-    try {
-      const dayOfWeek = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-      
-      for (const teacher of defaulters) {
-        await EmailService.sendEmail(
-          EmailService.createDefaulterReminder(
-            teacher.name,
-            teacher.email,
-            weekRange,
-            dayOfWeek
-          )
-        );
-        console.log(`📧 Reminder sent to ${teacher.email}`);
-        
-        // Add delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      console.log(`✅ Sent ${defaulters.length} defaulter reminders`);
-    } catch (error) {
-      console.error('Error sending defaulter reminders:', error);
-      throw new Error('Failed to send reminders');
-    }
-  },
-
-  // Schedule automatic reminders (to be called by a cron job)
-  async scheduleAutomaticReminders(): Promise<void> {
-    try {
-      const dayOfWeek = new Date().getDay(); // 0 = Sunday, 4 = Thursday, 5 = Friday, 6 = Saturday
-      
-      // Only run on Thursday (4), Friday (5), or Saturday (6) at 1 PM
-      if ([4, 5, 6].includes(dayOfWeek)) {
-        const upcomingMonday = this.getUpcomingMonday();
-        const weekRange = this.formatWeekRange(upcomingMonday);
-        
-        // Get defaulters
-        const [teachers, lessonPlans] = await Promise.all([
-          this.fetchTeachers(),
-          this.fetchLessonPlans()
-        ]);
-        
-        const submittedTeachers = new Set(
-          lessonPlans
-            .filter(plan => plan.weekStarting === upcomingMonday.toISOString())
-            .map(plan => plan.teacherId)
-        );
-        
-        const defaulters = teachers.filter(teacher => !submittedTeachers.has(teacher.email));
-        
-        if (defaulters.length > 0) {
-          await this.sendDefaulterReminders(defaulters, weekRange);
-          console.log(`⏰ Automated reminders sent for ${dayOfWeek === 6 ? 'Saturday' : dayOfWeek === 5 ? 'Friday' : 'Thursday'}`);
-        }
-      }
-    } catch (error) {
-      console.error('Error in automatic reminders:', error);
-    }
-  },
-
-  // Compile weekly PDFs and send to class teachers
-  async compileWeeklyPDFs(): Promise<void> {
-    try {
-      const upcomingMonday = this.getUpcomingMonday();
-      const weekRange = this.formatWeekRange(upcomingMonday);
-      
-      // Get all lesson plans for the upcoming week
-      const lessonPlans = await this.fetchLessonPlans();
-      const teachers = await this.fetchTeachers();
-      
-      const weeklyPlans = lessonPlans.filter(
-        plan => plan.weekStarting === upcomingMonday.toISOString()
-      );
-      
-      // Group by class and section
-      const groupedPlans: Record<string, LessonPlan[]> = {};
-      weeklyPlans.forEach(plan => {
-        const key = `${plan.className}-${plan.section}`;
-        if (!groupedPlans[key]) groupedPlans[key] = [];
-        groupedPlans[key].push(plan);
-      });
-      
-      // For each class-section, create PDF and send to class teacher
-      for (const [classSection, plans] of Object.entries(groupedPlans)) {
-        const [className, section] = classSection.split('-');
-        
-        // Find class teacher
-        const classTeacher = teachers.find(t => 
-          t.classTeacherOf === `${className}-${section}`
-        );
-        
-        if (classTeacher) {
-          // Here you would generate PDF
-          // For now, we'll simulate PDF generation
-          const pdfUrl = `https://your-app-url.com/pdf/${className}/${section}/${upcomingMonday.toISOString()}`;
-          
-          // Get missing teachers for this class-section
-          const allTeachersForClass = teachers.filter(t => 
-            t.assignments.some(a => a.className === className && a.sections.includes(section))
-          );
-          
-          const submittedTeachers = new Set(plans.map(p => p.teacherId));
-          const missingTeachers = allTeachersForClass
-            .filter(t => !submittedTeachers.has(t.email))
-            .map(t => t.name);
-          
-          // Send PDF email
-          await EmailService.sendEmail(
-            EmailService.createWeeklyPDFNotification(
-              classTeacher.name,
-              classTeacher.email,
-              weekRange,
-              className,
-              section,
-              pdfUrl,
-              missingTeachers
-            )
-          );
-          
-          console.log(`📤 PDF sent to class teacher of ${classSection}`);
-        }
-      }
-      
-      console.log(`✅ Weekly PDF compilation completed for ${weekRange}`);
-    } catch (error) {
-      console.error('Error compiling weekly PDFs:', error);
-      throw new Error('Failed to compile PDFs');
-    }
-  },
-
-  // Get pending resubmission requests
-  async getPendingResubmissions(): Promise<any[]> {
-    try {
-      const { data, error } = await supabase
-        .from('resubmission_requests')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching pending resubmissions:', error);
-      return [];
-    }
-  },
-
-  // Helper: Format week range
-  formatWeekRange(date: Date): string {
-    const start = new Date(date);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 6);
-    
-    return `${start.getDate().toString().padStart(2, '0')}-${(start.getMonth() + 1).toString().padStart(2, '0')}-${start.getFullYear()} to ${end.getDate().toString().padStart(2, '0')}-${(end.getMonth() + 1).toString().padStart(2, '0')}-${end.getFullYear()}`;
-  },
-
-  // Helper: Get upcoming Monday
-  getUpcomingMonday(): Date {
-    const today = new Date();
-    const day = today.getDay();
-    const diff = day === 0 ? 1 : (8 - day) % 7;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + diff);
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-  },
-
-  // Log login activity
-  async logLoginActivity(user: { email: string; name: string }): Promise<void> {
-    try {
-      await supabase
-        .from('login_logs')
-        .insert({
-          email: normalizeEmail(user.email),
-          name: user.name,
-          timestamp: new Date().toISOString(),
-          device_info: {
-            userAgent: navigator.userAgent,
-            platform: navigator.platform
-          }
-        });
-    } catch (error) {
-      console.error('Error logging login activity:', error);
-    }
-  },
-
-  // Get teacher by email
-  async getTeacherByEmail(email: string): Promise<Teacher | null> {
-    try {
-      const normalizedEmail = normalizeEmail(email);
-      
-      const { data, error } = await supabase
-        .from('teachers')
-        .select('*')
-        .eq('email', normalizedEmail)
-        .single();
-      
-      if (error || !data) return null;
-      
-      return {
-        id: data.email,
-        email: data.email,
-        name: data.name,
-        phone: data.phone || '',
-        password: data.password || DEFAULT_TEACHER_PASSWORD,
-        isClassTeacher: data.is_class_teacher || false,
-        classTeacherOf: data.class_teacher_of || null,
-        assignments: data.assignments || []
-      } as Teacher;
-    } catch (error) {
-      console.error('Error getting teacher by email:', error);
-      return null;
-    }
-  },
-
-  // Clear teachers
-  async clearTeachersCollection(): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('teachers')
-        .delete()
-        .neq('email', 'dummy');
-      
-      if (error) throw error;
-      console.log('✅ Cleared all teachers from database');
-    } catch (error) {
-      console.error('Error clearing teachers:', error);
-      throw new Error('Failed to clear teachers');
-    }
-  },
-
-  // Get database status
-  async getDatabaseStatus(): Promise<{ seeded: boolean; teacherCount: number }> {
-    try {
-      const teachers = await this.fetchTeachers();
-      return {
-        seeded: teachers.length > 0,
-        teacherCount: teachers.length
-      };
-    } catch (error) {
-      console.error('Error getting database status:', error);
+      console.error('❌ Error in getDatabaseStatus:', error);
       return { seeded: false, teacherCount: 0 };
     }
   }
-};
+
+  // ===================== RESUBMISSION REQUESTS =====================
+  static async createResubmissionRequest(data: any): Promise<any> {
+    console.log('📝 Creating resubmission request for:', data.teacher_name);
+    
+    const requestData = {
+      teacher_id: data.teacher_id,
+      teacher_name: data.teacher_name,
+      teacher_email: data.teacher_email,
+      week_range: data.week_range,
+      classes: data.classes,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    const { data: request, error } = await supabase
+      .from('resubmission_requests')
+      .insert([requestData])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error creating resubmission request:', error);
+      throw error;
+    }
+    
+    console.log('✅ Resubmission request created:', request.id);
+    return request;
+  }
+
+  static async getResubmissionRequests(teacherEmail: string, weekRange?: string): Promise<any[]> {
+    console.log('🔍 Fetching resubmission requests for:', teacherEmail);
+    
+    let query = supabase
+      .from('resubmission_requests')
+      .select('*')
+      .eq('teacher_email', teacherEmail);
+    
+    if (weekRange) {
+      query = query.eq('week_range', weekRange);
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('❌ Error fetching resubmission requests:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Found ${data?.length || 0} requests`);
+    return data || [];
+  }
+
+  static async getAllResubmissionRequests(): Promise<any[]> {
+    console.log('📋 Fetching all resubmission requests');
+    
+    const { data, error } = await supabase
+      .from('resubmission_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('❌ Error fetching all resubmission requests:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Found ${data?.length || 0} total requests`);
+    return data || [];
+  }
+
+  static async updateResubmissionRequest(id: string, updates: any): Promise<any> {
+    console.log('🔄 Updating resubmission request:', id);
+    
+    const { data, error } = await supabase
+      .from('resubmission_requests')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error updating resubmission request:', error);
+      throw error;
+    }
+    
+    console.log('✅ Resubmission request updated');
+    return data;
+  }
+
+  static async deleteTeacherSubmissions(teacherId: string, weekRange: string, classes: any[]): Promise<boolean> {
+    console.log('🗑️ Deleting teacher submissions for:', teacherId, weekRange);
+    
+    // Extract class names from classes array
+    const classNames = classes.map((c: any) => c.className);
+    
+    console.log('Deleting classes:', classNames);
+    
+    const { error } = await supabase
+      .from('lesson_plans')
+      .delete()
+      .eq('teacher_id', teacherId)
+      .eq('week_range', weekRange)
+      .in('class_name', classNames);
+    
+    if (error) {
+      console.error('❌ Error deleting teacher submissions:', error);
+      throw error;
+    }
+    
+    console.log('✅ Teacher submissions deleted');
+    return true;
+  }
+
+  static async getTeacherSubmissionsForWeek(teacherId: string, weekRange: string): Promise<any[]> {
+    console.log('📄 Fetching teacher submissions for week:', teacherId, weekRange);
+    
+    const { data, error } = await supabase
+      .from('lesson_plans')
+      .select('*')
+      .eq('teacher_id', teacherId)
+      .eq('week_range', weekRange);
+    
+    if (error) {
+      console.error('❌ Error fetching teacher submissions:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Found ${data?.length || 0} submissions`);
+    return (data || []).map(convertLessonPlanToFrontend);
+  }
+
+  // ===================== EMAIL LOGGING =====================
+  static async logEmail(recipient: string, subject: string, type: string, status: string = 'sent'): Promise<void> {
+    console.log('📧 Logging email:', { recipient, subject, type, status });
+    
+    const { error } = await supabase
+      .from('email_logs')
+      .insert([{
+        recipient,
+        subject,
+        type,
+        status,
+        sent_at: new Date().toISOString()
+      }]);
+    
+    if (error) {
+      console.error('❌ Error logging email:', error);
+    } else {
+      console.log('✅ Email logged successfully');
+    }
+  }
+
+  // ===================== DEFALTER REMINDERS =====================
+  static async getDefaultersForWeek(weekRange: string): Promise<any[]> {
+    console.log('🔍 Finding defaulters for week:', weekRange);
+    
+    // Get all teachers
+    const { data: teachers, error: teachersError } = await supabase
+      .from('teachers')
+      .select('*');
+    
+    if (teachersError) throw teachersError;
+    
+    // Get submissions for this week
+    const { data: submissions, error: subsError } = await supabase
+      .from('lesson_plans')
+      .select('teacher_id')
+      .eq('week_range', weekRange);
+    
+    if (subsError) throw subsError;
+    
+    const submittedTeacherIds = submissions?.map(s => s.teacher_id) || [];
+    const defaulters = teachers?.filter(t => !submittedTeacherIds.includes(t.email)) || [];
+    
+    console.log(`✅ Found ${defaulters.length} defaulters for ${weekRange}`);
+    return defaulters.map(convertTeacherToFrontend);
+  }
+
+  // ===================== PDF GENERATION =====================
+  static async getClassTeachers(): Promise<any[]> {
+    console.log('👨‍🏫 Fetching class teachers');
+    
+    const { data, error } = await supabase
+      .from('teachers')
+      .select('*')
+      .eq('is_class_teacher', true);
+    
+    if (error) {
+      console.error('❌ Error fetching class teachers:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Found ${data?.length || 0} class teachers`);
+    return (data || []).map(convertTeacherToFrontend);
+  }
+
+  static async getLessonPlansForClass(className: string, section: string, weekRange: string): Promise<any[]> {
+    console.log('📚 Fetching lesson plans for:', `${className}-${section}`, weekRange);
+    
+    const { data, error } = await supabase
+      .from('lesson_plans')
+      .select('*')
+      .eq('class_name', className)
+      .eq('section', section)
+      .eq('week_range', weekRange);
+    
+    if (error) {
+      console.error('❌ Error fetching lesson plans:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Found ${data?.length || 0} lesson plans`);
+    return (data || []).map(convertLessonPlanToFrontend);
+  }
+
+  // ===================== UTILITY METHODS =====================
+  static async getTeacherAssignments(email: string): Promise<any[]> {
+    console.log('📋 Fetching teacher assignments for:', email);
+    
+    const { data, error } = await supabase
+      .from('teachers')
+      .select('assignments')
+      .eq('email', email)
+      .single();
+    
+    if (error) {
+      console.error('❌ Error fetching teacher assignments:', error);
+      throw error;
+    }
+    
+    return data?.assignments || [];
+  }
+
+  static async getClassTeacherOf(email: string): Promise<any | null> {
+    console.log('🏫 Fetching class teacher info for:', email);
+    
+    const { data, error } = await supabase
+      .from('teachers')
+      .select('class_teacher_of')
+      .eq('email', email)
+      .single();
+    
+    if (error) {
+      console.error('❌ Error fetching class teacher info:', error);
+      return null;
+    }
+    
+    return data?.class_teacher_of;
+  }
+
+  static async getRecentActivity(limit: number = 50): Promise<any[]> {
+    console.log('📈 Fetching recent activity');
+    
+    const { data, error } = await supabase
+      .from('login_logs')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      console.error('❌ Error fetching recent activity:', error);
+      throw error;
+    }
+    
+    return data || [];
+  }
+
+  // ===================== WEEK RANGE UTILITIES =====================
+  static async getCurrentWeekRange(): Promise<string> {
+    const today = new Date();
+    const startDate = formatDate(today.toString());
+    
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() + 6);
+    const endDateFormatted = formatDate(endDate.toString());
+    
+    return `${startDate} to ${endDateFormatted}`;
+  }
+
+  static async getNextWeekRange(): Promise<string> {
+    const today = new Date();
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    
+    const startDate = formatDate(nextWeek.toString());
+    
+    const endDate = new Date(nextWeek);
+    endDate.setDate(endDate.getDate() + 6);
+    const endDateFormatted = formatDate(endDate.toString());
+    
+    return `${startDate} to ${endDateFormatted}`;
+  }
+}
