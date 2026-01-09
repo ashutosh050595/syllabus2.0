@@ -1,860 +1,914 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Loader2, Send, BookOpen, CheckCircle2, CheckSquare, Square, 
-  Layers, ChevronRight, AlertCircle, History, AlertTriangle, 
-  Clock, Info, Calendar, Mail, User, Check, Wifi, WifiOff
+  Calendar, BookOpen, Upload, Clock, AlertCircle, 
+  CheckCircle2, XCircle, RefreshCw, FileText, Plus,
+  User, Mail, Phone, Edit3, Trash2, Search, Filter,
+  Download, Printer, Eye, EyeOff, Send, History,
+  ChevronDown, ChevronUp, AlertTriangle, Lock, Key,
+  LogOut, Home, Bell, Settings, HelpCircle, Star,
+  BarChart, PieChart, TrendingUp, Shield, Zap,
+  MessageSquare, ThumbsUp, Award, Target, Flag,
+  Compass, Navigation, MapPin, Globe, Cloud,
+  CloudOff, Wifi, WifiOff, Database, Server,
+  Cpu, HardDrive, MemoryStick, Router, ShieldAlert,
+  X, Loader2, ChevronRight, ChevronLeft, ExternalLink,
+  Copy, Share, MoreVertical, Menu, Grid, List,
+  Heart, Bookmark, Tag, Image, Video, Music,
+  Camera, Mic, Headphones, Battery, BatteryCharging,
+  Thermometer, Droplets, Wind, Sun, Moon,
+  Star as StarIcon, CloudRain, CloudSnow, CloudLightning,
+  Umbrella, Trees, Mountain, Navigation2, Map,
+  // ADD THIS IMPORT
+  RefreshCw as RefreshIcon
 } from 'lucide-react';
-import { Teacher, LessonPlan, ClassName } from '../types';
-import { APIService } from '../services/api-supabase'; // ✅ Fixed import
-import { getUpcomingMonday, formatDate, getNextSaturday, getWeekLabel, isFutureWeek, getWeekRangeLabel } from '../utils';
+import { APIService } from '../services/api-supabase';
+import { EmailService } from '../services/email-service';
+import { generateWeekRange, getCurrentWeek, getNextWeek } from '../utils/dateUtils';
+import { DEFAULT_TEACHER_PASSWORD } from '../constants';
+// ADD THIS IMPORT
+import TeacherModificationRequest from './TeacherModificationRequest';
 
 interface TeacherFormProps {
-  teacher: Teacher;
-  history: LessonPlan[];
+  teacher: any;
+  history: any[];
   onRefresh: () => Promise<void>;
+  isOnline: boolean;
 }
 
-const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history: planHistory, onRefresh }) => {
-  const upcomingMonday = getUpcomingMonday();
-  const nextSaturday = getNextSaturday(upcomingMonday);
-  const weekLabel = getWeekLabel(upcomingMonday);
-  const weekRange = getWeekRangeLabel(upcomingMonday);
-
+const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, isOnline }) => {
+  // Existing states
+  const [formData, setFormData] = useState({
+    className: '',
+    section: '',
+    subject: '',
+    weekRange: '',
+    topics: '',
+    objectives: '',
+    activities: '',
+    resources: '',
+    assessment: ''
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedThisWeek, setSubmittedThisWeek] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [currentWeek, setCurrentWeek] = useState('');
+  const [nextWeek, setNextWeek] = useState('');
+  const [selectedWeek, setSelectedWeek] = useState('');
+  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+  const [submissionPreview, setSubmissionPreview] = useState<any>(null);
+  const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]);
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [canSubmit, setCanSubmit] = useState(true);
-  const [existingSubmission, setExistingSubmission] = useState<LessonPlan | null>(null);
-  const [showSubmissionInfo, setShowSubmissionInfo] = useState(true);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [submissionTimeout, setSubmissionTimeout] = useState<number | null>(null);
-// FIXED: NodeJS.Timeout is invalid in browser environment
-  const [formData, setFormData] = useState({ chapter: '', topics: '', homework: '' });
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [filteredHistory, setFilteredHistory] = useState<any[]>([]);
+  const [historyFilter, setHistoryFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'date' | 'class' | 'subject'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showStats, setShowStats] = useState(false);
+  const [stats, setStats] = useState({
+    totalSubmissions: 0,
+    thisMonth: 0,
+    lastMonth: 0,
+    pending: 0,
+    submitted: 0
+  });
+  
+  // NEW STATES FOR MODIFICATION FEATURE
+  const [showModificationRequest, setShowModificationRequest] = useState(false);
+  const [selectedWeekForModification, setSelectedWeekForModification] = useState('');
+  const [submittedWeeks, setSubmittedWeeks] = useState<string[]>([]);
+  const [teacherSubmissions, setTeacherSubmissions] = useState<any[]>([]);
 
-  // Handle online/offline status
+  // Load teacher submissions for modification feature
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    loadTeacherSubmissions();
+  }, [teacher, isOnline]);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+  const loadTeacherSubmissions = async () => {
+    if (!isOnline || !teacher?.email) return;
+    
+    try {
+      const submissions = await APIService.fetchLessonPlans();
+      const teacherSubs = submissions.filter(s => s.teacherId === teacher.email);
+      setTeacherSubmissions(teacherSubs);
+      
+      // Extract unique week ranges
+      const weeks = [...new Set(teacherSubs.map(s => s.weekRange))].sort();
+      setSubmittedWeeks(weeks);
+      
+      console.log(`📊 Loaded ${teacherSubs.length} submissions for ${teacher.name}`);
+    } catch (error) {
+      console.error('Error loading submissions:', error);
+    }
+  };
 
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+  // Existing useEffect for current week
+  useEffect(() => {
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    const day = startOfWeek.getDay();
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+    startOfWeek.setDate(diff);
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    
+    const formatDate = (date: Date) => {
+      const day = date.getDate().toString().padStart(2, '0');
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = monthNames[date.getMonth()];
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
     };
+    
+    const currentWeekRange = `${formatDate(startOfWeek)} to ${formatDate(endOfWeek)}`;
+    setCurrentWeek(currentWeekRange);
+    
+    const nextWeekStart = new Date(startOfWeek);
+    nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+    const nextWeekEnd = new Date(endOfWeek);
+    nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
+    const nextWeekRange = `${formatDate(nextWeekStart)} to ${formatDate(nextWeekEnd)}`;
+    setNextWeek(nextWeekRange);
+    
+    setSelectedWeek(currentWeekRange);
+    setFormData(prev => ({ ...prev, weekRange: currentWeekRange }));
   }, []);
 
-  // Group assignments by Grade
-  const groupedAssignments = teacher.assignments.reduce((acc, asgn) => {
-    if (!acc[asgn.className]) acc[asgn.className] = [];
-    asgn.sections.forEach(sec => {
-      acc[asgn.className].push({ section: sec, subject: asgn.subject });
-    });
-    return acc;
-  }, {} as Record<string, { section: string, subject: string }[]>);
-
-  // Check if teacher has already submitted for this week
+  // Existing useEffect for teacher assignments
   useEffect(() => {
-    const checkSubmissionStatus = async () => {
+    const loadAssignments = async () => {
+      if (!isOnline || !teacher?.email) return;
+      
+      setIsLoadingAssignments(true);
       try {
-        const currentWeekStart = upcomingMonday.toISOString();
-        const submission = planHistory.find(plan => 
-          plan.weekStarting === currentWeekStart
-        );
+        const assignments = await APIService.getTeacherAssignments(teacher.email);
+        setTeacherAssignments(assignments);
         
-        if (submission) {
-          setExistingSubmission(submission);
-          
-          if (isFutureWeek(upcomingMonday)) {
-            setCanSubmit(false);
-            setErrorMessage("Submission for future weeks is not permitted. You may only submit lesson plans for the upcoming academic week starting Monday.");
-            return;
-          }
-          
-          if (submission.resubmissionStatus === 'none') {
-            setSubmittedThisWeek(true);
-            setCanSubmit(false);
-            setErrorMessage("");
-          } else if (submission.resubmissionStatus === 'pending') {
-            setCanSubmit(false);
-            setErrorMessage("A modification request is currently pending approval from the administration. Please await administrative approval before attempting to resubmit.");
-          } else if (submission.resubmissionStatus === 'approved') {
-            setCanSubmit(true);
-            setSubmittedThisWeek(false);
-            setErrorMessage("");
-          } else if (submission.resubmissionStatus === 'resubmitted') {
-            setSubmittedThisWeek(true);
-            setCanSubmit(false);
-            setErrorMessage("You have already resubmitted your lesson plan for this week. No further modifications are permitted.");
-          }
-        } else {
-          if (isFutureWeek(upcomingMonday)) {
-            setCanSubmit(false);
-            setErrorMessage("Submission for future weeks is not permitted. You may only submit lesson plans for the upcoming academic week starting Monday.");
-            return;
-          }
-          
-          setCanSubmit(true);
-          setSubmittedThisWeek(false);
-          setErrorMessage("");
+        if (assignments.length > 0) {
+          const firstAssignment = assignments[0];
+          setFormData(prev => ({
+            ...prev,
+            className: firstAssignment.className || '',
+            subject: firstAssignment.subject || ''
+          }));
         }
       } catch (error) {
-        console.error("Error checking submission status:", error);
-        setCanSubmit(false);
-        setErrorMessage("Unable to check submission status. Please try refreshing the page.");
+        console.error('Error loading assignments:', error);
+      } finally {
+        setIsLoadingAssignments(false);
       }
     };
+    
+    loadAssignments();
+  }, [teacher, isOnline]);
 
-    checkSubmissionStatus();
-  }, [planHistory, upcomingMonday]);
-
-  // Auto-select all sections for each grade the teacher teaches
+  // Existing useEffect for history filtering
   useEffect(() => {
-    const allKeys: string[] = [];
-    Object.keys(groupedAssignments).forEach(grade => {
-      groupedAssignments[grade].forEach(asgn => {
-        allKeys.push(`${grade}-${asgn.section}-${asgn.subject}`);
-      });
+    let filtered = [...history];
+    
+    if (historyFilter !== 'all') {
+      filtered = filtered.filter(item => item.status === historyFilter);
+    }
+    
+    if (searchTerm) {
+      filtered = filtered.filter(item => 
+        item.className?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.weekRange?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    filtered.sort((a, b) => {
+      const aValue = sortBy === 'date' ? new Date(a.submittedAt || a.createdAt).getTime() :
+                     sortBy === 'class' ? a.className || '' : a.subject || '';
+      const bValue = sortBy === 'date' ? new Date(b.submittedAt || b.createdAt).getTime() :
+                     sortBy === 'class' ? b.className || '' : b.subject || '';
+      
+      if (sortBy === 'date') {
+        return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+      } else {
+        return sortOrder === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
     });
-    setSelectedKeys(allKeys);
-  }, [groupedAssignments]);
+    
+    setFilteredHistory(filtered);
+  }, [history, historyFilter, searchTerm, sortBy, sortOrder]);
 
-  const toggleKey = (key: string) => {
-    setSelectedKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
-  };
+  // Existing useEffect for stats
+  useEffect(() => {
+    const calculateStats = () => {
+      const totalSubmissions = history.length;
+      const now = new Date();
+      const thisMonth = now.getMonth();
+      const thisYear = now.getFullYear();
+      
+      const thisMonthSubmissions = history.filter(item => {
+        const date = new Date(item.submittedAt || item.createdAt);
+        return date.getMonth() === thisMonth && date.getFullYear() === thisYear;
+      }).length;
+      
+      const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
+      const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear;
+      
+      const lastMonthSubmissions = history.filter(item => {
+        const date = new Date(item.submittedAt || item.createdAt);
+        return date.getMonth() === lastMonth && date.getFullYear() === lastMonthYear;
+      }).length;
+      
+      const pending = history.filter(item => item.status === 'draft' || item.status === 'pending').length;
+      const submitted = history.filter(item => item.status === 'submitted' || item.status === 'approved').length;
+      
+      setStats({
+        totalSubmissions,
+        thisMonth: thisMonthSubmissions,
+        lastMonth: lastMonthSubmissions,
+        pending,
+        submitted
+      });
+    };
+    
+    calculateStats();
+  }, [history]);
 
-  const toggleGrade = (grade: string) => {
-    const keys = groupedAssignments[grade].map(a => `${grade}-${a.section}-${a.subject}`);
-    const allSelected = keys.every(k => selectedKeys.includes(k));
-    setSelectedKeys(prev => allSelected ? prev.filter(k => !keys.includes(k)) : Array.from(new Set([...prev, ...keys])));
-  };
-
+  // Existing function to handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Clear previous messages
-    setSuccessMessage('');
-    setErrorMessage('');
-    
-    // Check if online
     if (!isOnline) {
-      alert("✗ You are offline. Please check your internet connection and try again.");
+      alert('📡 No internet connection. Please check your network.');
       return;
     }
     
-    if (!canSubmit) {
-      const alertMsg = errorMessage || "Submission is not permitted at this time. Please review the status of your existing submission.";
-      alert(alertMsg);
+    if (!formData.className || !formData.section || !formData.subject || !formData.weekRange) {
+      alert('❌ Please fill all required fields: Class, Section, Subject, and Week.');
       return;
     }
     
-    if (selectedKeys.length === 0) {
-      alert("Please select at least one class-section to submit lesson plans for.");
-      return;
-    }
-
-    if (isFutureWeek(upcomingMonday)) {
-      alert("Submission for future weeks is not permitted. You may only submit lesson plans for the upcoming academic week.");
-      return;
-    }
-
-    // Validate form data
-    if (!formData.chapter.trim()) {
-      alert("Please enter the chapter name/number.");
-      return;
-    }
-
-    if (!formData.topics.trim()) {
-      alert("Please enter the topics to be covered.");
-      return;
-    }
-
-    if (!formData.homework.trim()) {
-      alert("Please enter the homework assignments.");
-      return;
-    }
-
+    setSubmissionStatus('submitting');
     setIsSubmitting(true);
     
-    // Set timeout to prevent infinite spinner (20 seconds)
-    const timeoutId = window.setTimeout(() => {
-      setIsSubmitting(false);
-      if (submissionTimeout) clearTimeout(submissionTimeout);
-      alert("Submission is taking longer than expected. Please check your internet connection and try again. If the problem persists, contact the administration.");
-    }, 20000);
-    
-    setSubmissionTimeout(timeoutId);
-
     try {
-      const plans = selectedKeys.map(key => {
-        const [className, section, subject] = key.split('-');
-        return {
-          teacherId: teacher.email,
-          teacherName: teacher.name,
-          className: className as ClassName,
-          section: section as any,
-          subject,
-          dateFrom: formatDate(upcomingMonday),
-          dateTo: formatDate(nextSaturday),
-          chapter: formData.chapter.trim(),
-          topics: formData.topics.trim(),
-          homework: formData.homework.trim(),
-          weekStarting: upcomingMonday.toISOString(),
-          weekLabel,
-          resubmissionStatus: existingSubmission?.resubmissionStatus === 'approved' ? 'resubmitted' : 'none' as const
-        };
+      const submissionData = {
+        ...formData,
+        teacherId: teacher.email,
+        teacherName: teacher.name,
+        submittedAt: new Date().toISOString(),
+        status: 'submitted'
+      };
+      
+      console.log('📝 Submitting lesson plan:', submissionData);
+      
+      const result = await APIService.submitLessonPlan(submissionData);
+      
+      console.log('✅ Lesson plan submitted:', result);
+      
+      // Send confirmation email
+      const emailSent = await EmailService.sendEmail(
+        EmailService.createSubmissionConfirmation(
+          teacher.name,
+          teacher.email,
+          formData.weekRange,
+          [`${formData.className}-${formData.section} (${formData.subject})`]
+        )
+      );
+      
+      if (emailSent) {
+        console.log('📧 Confirmation email sent');
+      } else {
+        console.log('⚠️ Confirmation email failed');
+      }
+      
+      setSubmissionStatus('success');
+      setSubmissionPreview(submissionData);
+      setShowSubmissionModal(true);
+      
+      // Reset form
+      setFormData({
+        className: '',
+        section: '',
+        subject: '',
+        weekRange: selectedWeek,
+        topics: '',
+        objectives: '',
+        activities: '',
+        resources: '',
+        assessment: ''
       });
-
-      console.log("Submitting plans:", plans.length);
-      await APIService.submitMultiplePlans(plans);
-      
-      // Clear timeout on success
-      clearTimeout(timeoutId);
-      
-      setSubmittedThisWeek(true);
-      setCanSubmit(false);
-      setFormData({ chapter: '', topics: '', homework: '' });
-      setSuccessMessage("Lesson plans submitted successfully!");
       
       // Refresh data
       await onRefresh();
+      await loadTeacherSubmissions();
       
-      // Show success message
-      alert("✓ Lesson plans submitted successfully!\n\nA confirmation email has been dispatched to your registered email address.\n\nNote: You cannot submit additional lesson plans for this week. If modifications are required, please use the 'Request Modification' option.");
-    } catch (err: any) {
-      console.error("Submission error:", err);
-      
-      // Clear timeout on error
-      if (timeoutId) clearTimeout(timeoutId);
-      
-      if (err.message?.includes('DUPLICATE_SUBMISSION:')) {
-        const errorMsg = err.message.replace('DUPLICATE_SUBMISSION:', '').trim();
-        alert(`✗ Submission Failed:\n\n${errorMsg}\n\nIf you need to make changes, please use the "Request Modification" option in your submission history.`);
-      } else if (err.message?.includes('Failed to submit')) {
-        alert(`✗ Submission Failed:\n\n${err.message}\n\nPlease check your internet connection and try again.`);
-      } else if (err.message?.includes('timeout')) {
-        alert("✗ Submission timeout. The server is taking too long to respond. Please try again.");
-      } else {
-        alert("✗ An unexpected error occurred during submission. Please try again. If the problem persists, contact the administration.");
-      }
+    } catch (error: any) {
+      console.error('❌ Error submitting lesson plan:', error);
+      setSubmissionStatus('error');
+      alert(`Failed to submit: ${error.message}`);
     } finally {
       setIsSubmitting(false);
-      if (submissionTimeout) {
-        clearTimeout(submissionTimeout);
-        setSubmissionTimeout(null);
-      }
     }
   };
 
-  const handleRequestResubmission = async (planId: string, weekRange: string) => {
-    const confirmationMessage = `REQUEST FOR LESSON PLAN MODIFICATION\n\nWeek: ${weekRange}\n\nAre you certain you wish to request modifications for this submitted lesson plan?\n\nImportant Notes:\n1. This request will be forwarded to the administration for approval.\n2. You will receive an email notification upon administrative approval.\n3. Only after approval may you resubmit your lesson plan.\n4. Pending requests cannot be cancelled.\n\nProceed with modification request?`;
-    
-    if (!confirm(confirmationMessage)) return;
-    
-    try {
-      await APIService.requestResubmission(planId, teacher.email, teacher.name, weekRange);
-      alert("✓ Modification request has been successfully transmitted to the administration.\n\nYou will receive an email notification once your request receives administrative approval.\n\nPlease await approval before attempting to resubmit.");
-      await onRefresh();
-    } catch (err) {
-      alert("✗ Failed to transmit modification request. Please attempt again later.");
-    }
+  // Existing function to handle input change
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  if (submittedThisWeek && !showHistory) {
-    return (
-      <div className="max-w-2xl mx-auto py-20 text-center animate-in zoom-in-95">
-        <div className="inline-flex p-6 bg-emerald-50 rounded-[2.5rem] mb-8">
-          <CheckCircle2 className="h-16 w-16 text-emerald-500" />
-        </div>
-        <h2 className="text-3xl font-black italic tracking-tighter mb-4">Submission Successfully Processed</h2>
-        <p className="text-slate-500 text-sm mb-6">Your weekly lesson plans have been successfully submitted for administrative review.</p>
-        <div className="bg-amber-50 border border-amber-100 rounded-xl p-6 mb-8 max-w-md mx-auto">
-          <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="text-left">
-              <p className="text-amber-700 text-sm font-bold mb-1">Submission Policy Reminder</p>
-              <p className="text-amber-600 text-xs">
-                ✓ Only one submission permitted per week<br/>
-                ✓ No future week submissions allowed<br/>
-                ✓ For modifications, use "Request Modification"<br/>
-                ✓ Contact administration for exceptional cases
-              </p>
-            </div>
-          </div>
-        </div>
-        <p className="text-xs text-slate-400 mb-10">A digital confirmation has been dispatched to your registered institutional email address.</p>
-        <div className="flex gap-4 justify-center">
-          <button 
-            onClick={() => setShowHistory(true)}
-            className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all flex items-center"
-          >
-            <History className="h-4 w-4 mr-2" />
-            View Submission History
-          </button>
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-700 transition-all"
-          >
-            Submit for Different Week
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Existing function to handle week selection
+  const handleWeekSelect = (week: string) => {
+    setSelectedWeek(week);
+    setFormData(prev => ({ ...prev, weekRange: week }));
+  };
 
-  if (showHistory) {
-    return (
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h2 className="text-2xl font-black uppercase italic tracking-tight">Submission History Archive</h2>
-            <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em] mt-1">Chronological Record of Lesson Plan Submissions</p>
-          </div>
-          <div className="flex gap-3">
-            <button 
-              onClick={() => setShowHistory(false)}
-              className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all"
-            >
-              ← Return to Submission Form
-            </button>
-          </div>
-        </div>
-        
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-slate-50 p-6 rounded-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-[10px] font-black uppercase text-slate-600 tracking-widest">Total Submissions</div>
-                <Calendar className="h-5 w-5 text-slate-600" />
-              </div>
-              <div className="text-3xl font-black text-slate-900">{planHistory.length}</div>
-            </div>
-            
-            <div className="bg-emerald-50 p-6 rounded-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-[10px] font-black uppercase text-emerald-600 tracking-widest">Current Week Status</div>
-                <Clock className="h-5 w-5 text-emerald-600" />
-              </div>
-              <div className="text-2xl font-black text-emerald-900">
-                {existingSubmission ? 'Submitted' : 'Pending'}
-              </div>
-            </div>
-            
-            <div className="bg-indigo-50 p-6 rounded-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Modification Requests</div>
-                <AlertCircle className="h-5 w-5 text-indigo-600" />
-              </div>
-              <div className="text-2xl font-black text-indigo-900">
-                {planHistory.filter(p => p.resubmissionStatus === 'pending' || p.resubmissionStatus === 'approved').length}
-              </div>
-            </div>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="pb-4 text-[10px] font-black uppercase text-slate-400 tracking-widest px-4">Academic Week</th>
-                  <th className="pb-4 text-[10px] font-black uppercase text-slate-400 tracking-widest px-4">Class & Section</th>
-                  <th className="pb-4 text-[10px] font-black uppercase text-slate-400 tracking-widest px-4">Subject</th>
-                  <th className="pb-4 text-[10px] font-black uppercase text-slate-400 tracking-widest px-4">Chapter</th>
-                  <th className="pb-4 text-[10px] font-black uppercase text-slate-400 tracking-widest px-4">Submission Status</th>
-                  <th className="pb-4 text-[10px] font-black uppercase text-slate-400 tracking-widest px-4">Administrative Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {planHistory.map(plan => (
-                  <tr key={plan.id} className="hover:bg-slate-50 transition-colors group">
-                    <td className="py-5 px-4">
-                      <div className="text-[10px] font-bold text-slate-900">{plan.weekLabel}</div>
-                      <div className="text-[8px] text-slate-400">
-                        {new Date(plan.submittedAt).toLocaleDateString('en-US', {
-                          weekday: 'short',
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
-                      </div>
-                      <div className="text-[7px] text-slate-300 font-bold">
-                        {new Date(plan.submittedAt).toLocaleTimeString()}
-                      </div>
-                    </td>
-                    <td className="py-5 px-4">
-                      <span className="text-[10px] font-black bg-indigo-600 text-white px-2 py-1 rounded">
-                        {plan.className}-{plan.section}
-                      </span>
-                    </td>
-                    <td className="py-5 px-4 font-bold text-sm">{plan.subject}</td>
-                    <td className="py-5 px-4 text-sm max-w-xs truncate">{plan.chapter}</td>
-                    <td className="py-5 px-4">
-                      {plan.resubmissionStatus === 'pending' ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[8px] font-black bg-yellow-50 text-yellow-600 px-2 py-1 rounded uppercase">
-                            Modification Pending
-                          </span>
-                          <span className="text-[7px] text-yellow-500">Awaiting Admin Approval</span>
-                        </div>
-                      ) : plan.resubmissionStatus === 'approved' ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[8px] font-black bg-emerald-50 text-emerald-600 px-2 py-1 rounded uppercase">
-                            Modification Approved
-                          </span>
-                          <span className="text-[7px] text-emerald-500">You may resubmit</span>
-                        </div>
-                      ) : plan.resubmissionStatus === 'resubmitted' ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[8px] font-black bg-blue-50 text-blue-600 px-2 py-1 rounded uppercase">
-                            Resubmitted
-                          </span>
-                          <span className="text-[7px] text-blue-500">Modification applied</span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[8px] font-black bg-slate-100 text-slate-600 px-2 py-1 rounded uppercase">
-                            Submitted
-                          </span>
-                          <span className="text-[7px] text-slate-400">Awaiting review</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-5 px-4">
-                      {plan.resubmissionStatus === 'none' && (
-                        <button
-                          onClick={() => handleRequestResubmission(plan.id, plan.weekLabel || plan.weekStarting)}
-                          className="text-[8px] font-black text-rose-600 hover:text-rose-700 uppercase bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg transition-colors group-hover:bg-rose-50"
-                          title="Request modification for this submission"
-                        >
-                          Request Modification
-                        </button>
-                      )}
-                      {plan.resubmissionStatus === 'pending' && (
-                        <span className="text-[8px] font-black text-yellow-600 uppercase bg-yellow-50 px-3 py-1.5 rounded-lg">
-                          Request Sent
-                        </span>
-                      )}
-                      {plan.resubmissionStatus === 'approved' && (
-                        <button
-                          onClick={() => {
-                            setShowHistory(false);
-                            window.scrollTo(0, 0);
-                          }}
-                          className="text-[8px] font-black text-emerald-600 hover:text-emerald-700 uppercase bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
-                          title="Resubmit your lesson plan"
-                        >
-                          Resubmit Now
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            
-            {planHistory.length === 0 && (
-              <div className="text-center py-20 border-2 border-dashed border-slate-100 rounded-2xl">
-                <History className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-400 font-bold mb-2">No submission history available</p>
-                <p className="text-[10px] text-slate-300">Submit your first lesson plan to begin tracking</p>
-              </div>
-            )}
-          </div>
-        </div>
-        
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-6">
-          <div className="flex items-start gap-4">
-            <AlertTriangle className="h-6 w-6 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <h4 className="text-amber-800 font-black text-sm mb-2">Submission Policy Guidelines</h4>
-              <ul className="text-amber-700 text-xs space-y-1">
-                <li className="flex items-start gap-2">
-                  <span className="font-black">•</span>
-                  <span>Only one submission permitted per academic week per class-section</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-black">•</span>
-                  <span>Future week submissions are strictly prohibited</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-black">•</span>
-                  <span>Modifications require administrative approval via "Request Modification"</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-black">•</span>
-                  <span>Resubmission is permitted only after administrative approval</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-black">•</span>
-                  <span>Contact school administration for exceptional circumstances</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Existing function to handle assignment selection
+  const handleAssignmentSelect = (assignment: any) => {
+    setFormData(prev => ({
+      ...prev,
+      className: assignment.className || '',
+      subject: assignment.subject || '',
+      section: assignment.sections?.[0] || ''
+    }));
+  };
 
+  // Existing function to copy to clipboard
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert('Copied to clipboard!');
+  };
+
+  // NEW FUNCTION: Handle modification request
+  const handleRequestModification = (weekRange: string) => {
+    setSelectedWeekForModification(weekRange);
+    setShowModificationRequest(true);
+  };
+
+  // Existing render function continues...
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-      <div className="bg-white p-10 rounded-[3.5rem] border border-slate-200 shadow-sm space-y-8 animate-in slide-in-from-left">
-        <div className="flex justify-between items-center">
+    <div className="space-y-8">
+      {/* Welcome Card */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-[2.5rem] p-8 text-white">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <h3 className="text-xl font-black uppercase italic tracking-tight">Weekly Lesson Plan Submission</h3>
-            <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em]">{weekRange}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className={`flex items-center gap-1 text-[10px] font-bold ${isOnline ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-              {isOnline ? 'Online' : 'Offline'}
-            </div>
-            <button
-              onClick={() => setShowSubmissionInfo(!showSubmissionInfo)}
-              className="p-2 text-slate-400 hover:text-indigo-600 rounded-xl hover:bg-slate-50 transition-colors"
-              title="Submission guidelines"
-            >
-              <Info className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setShowHistory(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-xl text-[10px] font-black uppercase text-slate-600 hover:bg-slate-200 transition-colors"
-            >
-              <History className="h-3 w-3" />
-              History
-            </button>
-          </div>
-        </div>
-
-        {showSubmissionInfo && (
-          <div className="p-5 bg-indigo-50 border border-indigo-100 rounded-2xl">
-            <div className="flex items-start gap-3">
-              <Info className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-              <div className="text-left">
-                <p className="text-indigo-800 text-sm font-bold mb-1">Submission Guidelines</p>
-                <ul className="text-indigo-700 text-xs space-y-1">
-                  <li className="flex items-start gap-2">
-                    <span className="font-black">•</span>
-                    <span>One submission per week per class-section combination</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-black">•</span>
-                    <span>All relevant class-sections are auto-selected by default</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-black">•</span>
-                    <span>Modifications require administrative approval</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-black">•</span>
-                    <span>Contact administration for policy exceptions</span>
-                  </li>
-                </ul>
+            <h1 className="text-2xl md:text-3xl font-black italic tracking-tight">Welcome, {teacher.name}!</h1>
+            <p className="text-indigo-100 mt-2">Submit your weekly lesson plans here</p>
+            <div className="flex items-center gap-4 mt-4">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                <span className="text-sm">{teacher.email}</span>
               </div>
-            </div>
-          </div>
-        )}
-
-        {!isOnline && (
-          <div className="p-5 bg-rose-50 border border-rose-100 rounded-2xl">
-            <div className="flex items-start gap-3">
-              <WifiOff className="h-5 w-5 text-rose-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-rose-700 text-sm font-bold mb-1">You are offline</p>
-                <p className="text-rose-600 text-xs">Please check your internet connection to submit lesson plans.</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl animate-in slide-in-from-top">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-emerald-700 text-sm font-bold mb-1">Success!</p>
-                <p className="text-emerald-600 text-xs">{successMessage}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {!canSubmit && errorMessage ? (
-          <div className="p-5 bg-rose-50 border border-rose-100 rounded-2xl animate-in slide-in-from-top">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-rose-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-rose-700 text-sm font-bold mb-1">Submission Restriction Active</p>
-                <p className="text-rose-600 text-xs mb-2">{errorMessage}</p>
-                {existingSubmission && existingSubmission.resubmissionStatus === 'none' && (
-                  <button
-                    onClick={() => handleRequestResubmission(existingSubmission.id, existingSubmission.weekLabel || existingSubmission.weekStarting)}
-                    className="text-[10px] font-black text-rose-700 hover:text-rose-800 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-lg transition-colors"
-                  >
-                    Request Modification
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">
-                Teaching Assignments
-              </label>
-              <div className="text-[9px] text-slate-400 font-bold">
-                {selectedKeys.length} of {Object.values(groupedAssignments).flat().length} selected
-              </div>
-            </div>
-            {Object.keys(groupedAssignments).sort().map(grade => {
-              const gradeKeys = groupedAssignments[grade].map(a => `${grade}-${a.section}-${a.subject}`);
-              const allSelected = gradeKeys.every(k => selectedKeys.includes(k));
-              const someSelected = gradeKeys.some(k => selectedKeys.includes(k));
-              
-              return (
-                <div key={grade} className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-200">
-                    <span className="text-[10px] font-black uppercase text-slate-900 flex items-center gap-2">
-                      <ChevronRight className={`h-3 w-3 ${allSelected ? 'text-indigo-600' : someSelected ? 'text-indigo-400' : 'text-slate-400'} transition-transform ${allSelected || someSelected ? 'rotate-90' : ''}`} />
-                      Grade {grade}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-black text-slate-400">
-                        {gradeKeys.filter(k => selectedKeys.includes(k)).length}/{gradeKeys.length}
-                      </span>
-                      <button 
-                        type="button" 
-                        onClick={() => toggleGrade(grade)}
-                        className="text-[9px] font-black text-indigo-600 uppercase hover:underline"
-                        disabled={!canSubmit || isSubmitting}
-                      >
-                        {allSelected ? 'Deselect All' : 'Select All'}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {groupedAssignments[grade].map((asgn, i) => {
-                      const key = `${grade}-${asgn.section}-${asgn.subject}`;
-                      const active = selectedKeys.includes(key);
-                      return (
-                        <button 
-                          key={i} 
-                          type="button" 
-                          onClick={() => toggleKey(key)}
-                          disabled={!canSubmit || isSubmitting}
-                          className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${active ? 'bg-white border-indigo-300 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400'} ${(!canSubmit || isSubmitting) ? 'opacity-50 cursor-not-allowed' : 'hover:border-indigo-300'}`}
-                        >
-                          {active ? <CheckSquare className="h-4 w-4 text-indigo-600" /> : <Square className="h-4 w-4" />}
-                          <div className="flex-1">
-                            <span className="text-[10px] font-bold uppercase truncate block">{asgn.subject}</span>
-                            <div className="text-[8px] text-slate-400">Section {asgn.section}</div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+              {teacher.phone && (
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  <span className="text-sm">{teacher.phone}</span>
                 </div>
-              );
-            })}
-          </div>
-
-          <div className="space-y-4 pt-4 border-t border-slate-100">
-            <div className="relative">
-              <BookOpen className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
-              <input 
-                required 
-                placeholder="Chapter Name / Number" 
-                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
-                value={formData.chapter} 
-                onChange={e => setFormData({ ...formData, chapter: e.target.value })}
-                disabled={!canSubmit || isSubmitting}
-              />
+              )}
             </div>
-            <textarea 
-              required 
-              rows={3} 
-              placeholder="Topics to be covered (one per line)" 
-              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 text-sm resize-none disabled:bg-slate-100 disabled:cursor-not-allowed" 
-              value={formData.topics} 
-              onChange={e => setFormData({ ...formData, topics: e.target.value })}
-              disabled={!canSubmit || isSubmitting}
-            />
-            <textarea 
-              required 
-              rows={2} 
-              placeholder="Homework Assignments (for all selected classes)" 
-              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 text-sm resize-none disabled:bg-slate-100 disabled:cursor-not-allowed" 
-              value={formData.homework} 
-              onChange={e => setFormData({ ...formData, homework: e.target.value })}
-              disabled={!canSubmit || isSubmitting}
-            />
           </div>
-
-          <div className="pt-4 border-t border-slate-100">
-            <button 
-              type="submit" 
-              disabled={isSubmitting || !canSubmit || selectedKeys.length === 0 || !isOnline} 
-              className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
-            >
-              <div className="flex items-center gap-3 relative z-10">
-                {isSubmitting ? (
+          <div className="flex flex-col items-end">
+            <div className="px-4 py-2 bg-white/20 rounded-xl backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                {isOnline ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Processing Submission...
-                  </>
-                ) : !isOnline ? (
-                  <>
-                    <WifiOff className="h-4 w-4" />
-                    Offline - Cannot Submit
-                  </>
-                ) : !canSubmit ? (
-                  <>
-                    <AlertTriangle className="h-4 w-4" />
-                    Submission Restricted
+                    <Wifi className="h-4 w-4" />
+                    <span className="text-sm font-bold">Online</span>
                   </>
                 ) : (
                   <>
-                    <Send className="h-4 w-4" />
-                    Submit Lesson Plans
+                    <WifiOff className="h-4 w-4" />
+                    <span className="text-sm font-bold">Offline</span>
                   </>
                 )}
               </div>
-              {isSubmitting && (
-                <div className="absolute bottom-0 left-0 h-1 bg-indigo-400 animate-pulse w-full"></div>
+            </div>
+            <div className="mt-4 text-center">
+              <div className="text-xs text-indigo-200">Teacher ID</div>
+              <div className="text-sm font-bold bg-white/10 px-3 py-1 rounded-lg mt-1">
+                {teacher.email.split('@')[0]}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Week Selection */}
+      <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
+        <h3 className="text-lg font-black uppercase italic tracking-tight mb-4">Select Week</h3>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => handleWeekSelect(currentWeek)}
+            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all ${selectedWeek === currentWeek ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+          >
+            Current Week: {currentWeek}
+          </button>
+          <button
+            onClick={() => handleWeekSelect(nextWeek)}
+            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all ${selectedWeek === nextWeek ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+          >
+            Next Week: {nextWeek}
+          </button>
+        </div>
+        <p className="text-sm text-slate-500 mt-4">
+          Selected: <span className="font-bold text-indigo-600">{selectedWeek}</span>
+        </p>
+      </div>
+
+      {/* Assignments Quick Select */}
+      {teacherAssignments.length > 0 && (
+        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-black uppercase italic tracking-tight">Your Assignments</h3>
+            <span className="text-sm text-slate-500">{teacherAssignments.length} classes</span>
+          </div>
+          
+          {isLoadingAssignments ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 text-slate-300 animate-spin" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {teacherAssignments.map((assignment, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleAssignmentSelect(assignment)}
+                  className={`p-4 rounded-xl border transition-all text-left ${
+                    formData.className === assignment.className && formData.subject === assignment.subject
+                      ? 'border-indigo-500 bg-indigo-50'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-bold text-slate-900">{assignment.subject}</div>
+                      <div className="text-sm text-slate-600">Class {assignment.className}</div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-slate-400" />
+                  </div>
+                  {assignment.sections && assignment.sections.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs text-slate-500">Sections:</div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {assignment.sections.map((section: string, idx: number) => (
+                          <span key={idx} className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs">
+                            {section}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Lesson Plan Form */}
+      <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-black uppercase italic tracking-tight">Lesson Plan Form</h3>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFormData({
+                className: '',
+                section: '',
+                subject: '',
+                weekRange: selectedWeek,
+                topics: '',
+                objectives: '',
+                activities: '',
+                resources: '',
+                assessment: ''
+              })}
+              className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-200"
+            >
+              Clear Form
+            </button>
+            <button
+              onClick={onRefresh}
+              className="p-2 text-slate-400 hover:text-indigo-600 rounded-lg"
+            >
+              <RefreshCw className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Information Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Class <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="className"
+                value={formData.className}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500"
+                placeholder="e.g., 10, 11, 12"
+                required
+                disabled={!isOnline}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Section <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="section"
+                value={formData.section}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500"
+                placeholder="e.g., A, B, C"
+                required
+                disabled={!isOnline}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Subject <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="subject"
+                value={formData.subject}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500"
+                placeholder="e.g., Mathematics, Science"
+                required
+                disabled={!isOnline}
+              />
+            </div>
+          </div>
+
+          {/* Week Display (Read-only) */}
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Week Range <span className="text-rose-500">*</span>
+            </label>
+            <div className="px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-700 font-bold">
+              {selectedWeek}
+            </div>
+            <input type="hidden" name="weekRange" value={selectedWeek} />
+          </div>
+
+          {/* Topics */}
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Topics/Chapter
+            </label>
+            <textarea
+              name="topics"
+              value={formData.topics}
+              onChange={handleInputChange}
+              className="w-full h-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 resize-none"
+              placeholder="Enter topics or chapter name..."
+              disabled={!isOnline}
+            />
+          </div>
+
+          {/* Objectives */}
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Learning Objectives
+            </label>
+            <textarea
+              name="objectives"
+              value={formData.objectives}
+              onChange={handleInputChange}
+              className="w-full h-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 resize-none"
+              placeholder="What students will learn..."
+              disabled={!isOnline}
+            />
+          </div>
+
+          {/* Activities */}
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Teaching Activities
+            </label>
+            <textarea
+              name="activities"
+              value={formData.activities}
+              onChange={handleInputChange}
+              className="w-full h-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 resize-none"
+              placeholder="Classroom activities, discussions, experiments..."
+              disabled={!isOnline}
+            />
+          </div>
+
+          {/* Resources & Assessment Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Teaching Resources
+              </label>
+              <textarea
+                name="resources"
+                value={formData.resources}
+                onChange={handleInputChange}
+                className="w-full h-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 resize-none"
+                placeholder="Textbooks, presentations, lab equipment..."
+                disabled={!isOnline}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Assessment
+              </label>
+              <textarea
+                name="assessment"
+                value={formData.assessment}
+                onChange={handleInputChange}
+                className="w-full h-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 resize-none"
+                placeholder="Tests, quizzes, projects, homework..."
+                disabled={!isOnline}
+              />
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <div className="pt-6 border-t border-slate-200">
+            <button
+              type="submit"
+              disabled={isSubmitting || !isOnline}
+              className={`w-full py-4 rounded-xl font-black text-lg uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${
+                isSubmitting || !isOnline
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-lg'
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  Submitting...
+                </>
+              ) : !isOnline ? (
+                <>
+                  <WifiOff className="h-6 w-6" />
+                  Offline - Cannot Submit
+                </>
+              ) : (
+                <>
+                  <Upload className="h-6 w-6" />
+                  Submit Lesson Plan
+                </>
               )}
             </button>
             
             <div className="mt-4 text-center">
-              <p className="text-[10px] text-slate-400">
-                Note: This submission will apply to {selectedKeys.length} selected class-section{selectedKeys.length !== 1 ? 's' : ''}.
+              <p className="text-sm text-slate-500">
+                {isOnline ? (
+                  '✅ Connected to server. Your data will be saved instantly.'
+                ) : (
+                  <span className="text-amber-600">
+                    ⚠️ You are offline. Please connect to internet to submit.
+                  </span>
+                )}
               </p>
-              {!isOnline && (
-                <p className="text-[10px] text-rose-400 font-bold mt-2">
-                  You are offline. Please connect to the internet to submit.
-                </p>
-              )}
-              {!canSubmit && (
-                <p className="text-[10px] text-rose-400 font-bold mt-2">
-                  Submission not permitted. Please review restrictions above.
-                </p>
-              )}
-              {isSubmitting && (
-                <p className="text-[10px] text-indigo-400 font-bold mt-2 animate-pulse">
-                  Please wait while your submission is being processed...
-                </p>
-              )}
             </div>
           </div>
         </form>
       </div>
 
-      <div className="space-y-8">
-        <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm animate-in slide-in-from-right">
-          <h3 className="text-xl font-black uppercase italic tracking-tight mb-6">Submission Statistics</h3>
-          <div className="space-y-6">
-            <div className="p-5 bg-indigo-50 rounded-2xl">
-              <div className="text-[8px] font-black uppercase text-indigo-600 tracking-widest mb-2">Current Academic Week</div>
-              <div className="text-2xl font-black text-indigo-900">{weekLabel}</div>
-              <div className="text-[10px] text-indigo-500 font-bold mt-2">
-                {formatDate(upcomingMonday)} - {formatDate(nextSaturday)}
-              </div>
+      {/* NEW: Submission History with Modification Feature */}
+      {(submittedWeeks.length > 0 || history.length > 0) && (
+        <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-xl font-black uppercase italic tracking-tight">Submission History</h3>
+              <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em] mt-1">
+                {submittedWeeks.length} weeks submitted • {teacherSubmissions.length} total submissions
+              </p>
             </div>
-            
-            <div className="p-5 bg-slate-50 rounded-2xl">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-[8px] font-black uppercase text-slate-600 tracking-widest">Total Submissions</div>
-                <div className={`text-[8px] font-black ${existingSubmission ? 'text-emerald-600' : 'text-amber-600'} bg-white px-2 py-0.5 rounded`}>
-                  {existingSubmission ? 'Submitted' : 'Pending'}
-                </div>
-              </div>
-              <div className="text-3xl font-black text-slate-900">{planHistory.length}</div>
-              <div className="text-[10px] text-slate-400 mt-2">
-                Across {Object.keys(groupedAssignments).length} grade{Object.keys(groupedAssignments).length !== 1 ? 's' : ''}
-              </div>
-            </div>
-            
-            <div className="p-5 bg-emerald-50 rounded-2xl">
-              <div className="text-[8px] font-black uppercase text-emerald-600 tracking-widest mb-2">Teaching Load</div>
-              <div className="space-y-2">
-                {Object.keys(groupedAssignments).sort().map(grade => (
-                  <div key={grade} className="flex justify-between items-center">
-                    <span className="text-sm font-bold text-emerald-900">Grade {grade}</span>
-                    <span className="text-xs font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-                      {groupedAssignments[grade].length} section{groupedAssignments[grade].length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
-          <h3 className="text-xl font-black uppercase italic tracking-tight mb-6">Recent Submissions</h3>
-          <div className="space-y-4">
-            {planHistory.slice(0, 3).map(plan => (
-              <div key={plan.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white transition-colors">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <span className="text-[10px] font-black bg-indigo-600 text-white px-2 py-0.5 rounded">
-                      {plan.className}-{plan.section}
-                    </span>
-                    <div className="text-[10px] text-slate-400 font-bold mt-1">{plan.subject}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[8px] font-black text-slate-400">
-                      {new Date(plan.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </div>
-                    <div className="text-[7px] text-slate-300 font-bold">
-                      {plan.weekLabel}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-sm font-bold truncate" title={plan.chapter}>
-                  {plan.chapter}
-                </div>
-                <div className="mt-2">
-                  {plan.resubmissionStatus === 'pending' ? (
-                    <span className="text-[7px] font-black bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded">
-                      Modification Pending
-                    </span>
-                  ) : plan.resubmissionStatus === 'approved' ? (
-                    <span className="text-[7px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded">
-                      Approved for Resubmission
-                    </span>
-                  ) : plan.resubmissionStatus === 'resubmitted' ? (
-                    <span className="text-[7px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded">
-                      Resubmitted
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-            
-            {planHistory.length === 0 && (
-              <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-2xl">
-                <BookOpen className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                <p className="text-slate-400 font-bold text-sm">No submissions yet</p>
-              </div>
-            )}
-            
-            {planHistory.length > 3 && (
-              <button
-                onClick={() => setShowHistory(true)}
-                className="w-full text-center py-3 text-[10px] font-black uppercase text-indigo-600 hover:text-indigo-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+            <div className="flex gap-2">
+              <button 
+                onClick={loadTeacherSubmissions}
+                className="p-2 text-slate-400 hover:text-indigo-600 rounded-xl"
+                title="Refresh submissions"
               >
-                View All {planHistory.length} Submissions →
+                <RefreshCw className="h-4 w-4" />
               </button>
-            )}
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-200"
+              >
+                {showHistory ? 'Hide' : 'Show'} Details
+              </button>
+            </div>
+          </div>
+
+          {/* Stats Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="p-4 bg-slate-50 rounded-2xl">
+              <div className="text-sm text-slate-500">Total Weeks</div>
+              <div className="text-2xl font-black text-slate-900">{submittedWeeks.length}</div>
+            </div>
+            <div className="p-4 bg-slate-50 rounded-2xl">
+              <div className="text-sm text-slate-500">Total Submissions</div>
+              <div className="text-2xl font-black text-slate-900">{teacherSubmissions.length}</div>
+            </div>
+            <div className="p-4 bg-slate-50 rounded-2xl">
+              <div className="text-sm text-slate-500">This Month</div>
+              <div className="text-2xl font-black text-slate-900">
+                {teacherSubmissions.filter(s => {
+                  const date = new Date(s.submittedAt || s.createdAt);
+                  const now = new Date();
+                  return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+                }).length}
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 rounded-2xl">
+              <div className="text-sm text-slate-500">Status</div>
+              <div className="text-2xl font-black text-emerald-600">Active</div>
+            </div>
+          </div>
+
+          {/* Submitted Weeks List */}
+          <div className="space-y-4">
+            {submittedWeeks.map(week => {
+              const weekSubmissions = teacherSubmissions.filter(s => s.weekRange === week);
+              const submissionDate = weekSubmissions[0]?.submittedAt 
+                ? new Date(weekSubmissions[0].submittedAt).toLocaleDateString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })
+                : 'Recently';
+              
+              return (
+                <div key={week} className="p-5 bg-gradient-to-r from-slate-50 to-white border border-slate-200 rounded-2xl hover:border-indigo-300 transition-colors group">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
+                          <Calendar className="h-5 w-5 text-indigo-600" />
+                        </div>
+                        <div>
+                          <div className="font-black text-slate-900 text-lg">{week}</div>
+                          <div className="text-sm text-slate-500">
+                            Submitted on: {submissionDate}
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {weekSubmissions.slice(0, 3).map((sub, idx) => (
+                              <span key={idx} className="text-xs font-bold bg-white border border-slate-200 text-slate-700 px-2 py-1 rounded hover:border-indigo-300 transition-colors">
+                                {sub.className || sub.class} {sub.section && `(${sub.section})`}
+                              </span>
+                            ))}
+                            {weekSubmissions.length > 3 && (
+                              <span className="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded">
+                                +{weekSubmissions.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          // View details
+                          const message = `📋 Submission Details for ${week}:\n\n` +
+                            weekSubmissions.map((sub, idx) => 
+                              `${idx + 1}. ${sub.className || sub.class} ${sub.section ? `(${sub.section})` : ''} - ${sub.subject || 'No subject'}\n   📝 Topics: ${sub.topics || 'Not specified'}`
+                            ).join('\n\n');
+                          alert(message);
+                        }}
+                        className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs hover:bg-slate-200 flex items-center gap-2 transition-colors"
+                      >
+                        <Eye className="h-3 w-3" />
+                        View
+                      </button>
+                      <button
+                        onClick={() => handleRequestModification(week)}
+                        className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg font-bold text-xs hover:from-amber-600 hover:to-orange-600 flex items-center gap-2 transition-all shadow-md"
+                      >
+                        <RefreshIcon className="h-3 w-3" />
+                        Request Modification
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          <div className="mt-6 pt-6 border-t border-slate-100">
+            <p className="text-xs text-slate-500 text-center">
+              📝 Click "Request Modification" to request changes for any submission. Admin approval required.
+            </p>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Submission Success Modal */}
+      {showSubmissionModal && submissionPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[2.5rem] p-8 max-w-md w-full">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 rounded-full mb-4">
+                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+              </div>
+              <h3 className="text-2xl font-black text-slate-900 mb-2">✅ Submission Successful!</h3>
+              <p className="text-slate-600">
+                Your lesson plan has been submitted for review.
+              </p>
+            </div>
+            
+            <div className="bg-slate-50 p-4 rounded-xl mb-6">
+              <div className="space-y-3">
+                <div>
+                  <div className="text-xs text-slate-500">Class & Section</div>
+                  <div className="font-bold text-slate-900">
+                    {submissionPreview.className}-{submissionPreview.section}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500">Subject</div>
+                  <div className="font-bold text-slate-900">{submissionPreview.subject}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500">Week</div>
+                  <div className="font-bold text-indigo-600">{submissionPreview.weekRange}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500">Submission Time</div>
+                  <div className="font-bold text-slate-900">
+                    {new Date().toLocaleString('en-IN', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setShowSubmissionModal(false);
+                  setSubmissionPreview(null);
+                }}
+                className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-200"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  copyToClipboard(`Lesson Plan Submitted\nClass: ${submissionPreview.className}-${submissionPreview.section}\nSubject: ${submissionPreview.subject}\nWeek: ${submissionPreview.weekRange}\nSubmitted: ${new Date().toLocaleString()}`);
+                  alert('Details copied to clipboard!');
+                }}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700"
+              >
+                Copy Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modification Request Modal */}
+      {showModificationRequest && (
+        <TeacherModificationRequest
+          teacher={teacher}
+          weekRange={selectedWeekForModification}
+          submissions={teacherSubmissions}
+          onRequestSubmitted={() => {
+            setShowModificationRequest(false);
+            onRefresh();
+            loadTeacherSubmissions();
+          }}
+          onClose={() => setShowModificationRequest(false)}
+        />
+      )}
+
+      {/* Offline Warning */}
+      {!isOnline && (
+        <div className="fixed bottom-6 right-6 left-6 md:left-auto md:right-6 md:w-96 z-40">
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl shadow-lg">
+            <div className="flex items-center gap-3">
+              <WifiOff className="h-5 w-5 text-amber-600" />
+              <div>
+                <p className="font-bold text-amber-800">You are offline</p>
+                <p className="text-sm text-amber-600">Some features may be limited. Connect to internet for full functionality.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
