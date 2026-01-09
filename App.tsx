@@ -14,6 +14,7 @@ import AdminRegistry from './components/AdminRegistry';
 import AdminCompiler from './components/AdminCompiler';
 import TeacherForm from './components/TeacherForm';
 import SubmissionHistory from './components/SubmissionHistory';
+import AutoSendDashboard from './components/AutoSendDashboard';
 import DefaultersList from './components/DefaultersList';
 import TeacherLoginHistory from './components/TeacherLoginHistory';
 
@@ -551,6 +552,7 @@ const App: React.FC = () => {
               { id: 'defaulters', label: 'Defaulters', icon: AlertTriangle },
               { id: 'teacher-logins', label: 'Teacher Logins', icon: Clock },
               { id: 'compile', label: 'PDF Compilation', icon: Printer },
+              { id: 'auto-send', label: 'Auto Send', icon: Zap }, // ✅ YEH LINE ADD KARNA HAI
               { id: 'logins', label: 'All Logs', icon: Key }
             ].map(tab => (
               <button 
@@ -616,6 +618,16 @@ const App: React.FC = () => {
                 teachers={state.teachers} 
               />
             )}
+              // ISKE BAAD YEH ADD KARNA HAI:
+            {activeTab === 'auto-send' && (
+              <AutoSendDashboard 
+                teachers={state.teachers}
+                lessonPlans={state.lessonPlans}
+                isOnline={isOnline}
+              />
+            )}
+
+
             
             {activeTab === 'logins' && (
               <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
