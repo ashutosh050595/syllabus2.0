@@ -1,187 +1,29 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { format } from 'date-fns';
-
-// Types for lesson plan data
-interface LessonPlanData {
-  subject: string;
-  teacherName: string;
-  chapterName: string;
-  topics: string;
-  homeAssignments: string;
-}
-
-interface PDFOptions {
-  className: string;
-  section: string;
-  weekRange: string;
-  classTeacherName: string;
-  lessonPlans: LessonPlanData[];
-  missingTeachers?: string[];
-}
+import { NotoSansDevanagariRegular } from './fonts';
 
 export class PDFGenerator {
-  // Generate PDF in Sacred Heart format
-  static generateWeeklySyllabusPDF(options: PDFOptions): string {
-    const {
-      className,
-      section,
-      weekRange,
-      classTeacherName,
-      lessonPlans,
-      missingTeachers = []
-    } = options;
-
-    // Create PDF document - A4 size, portrait
-    const doc = new jsPDF('p', 'mm', 'a4');
-    
-    // Set font
-    doc.setFont('helvetica');
-    
-    // =========== PAGE 1: HEADER & TABLE ===========
-    
-    // Sacred Heart School Header
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('SACRED HEART SCHOOL', 105, 20, { align: 'center' });
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('(Affiliated to CBSE, New Delhi, upto +2 Level)', 105, 26, { align: 'center' });
-    
-    // Weekly Syllabus Title
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('WEEKLY SYLLABUS', 105, 38, { align: 'center' });
-    
-    // Underline
-    doc.setLineWidth(0.5);
-    doc.line(60, 40, 150, 40);
-    
-    // Date, Class & Teacher Info
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Date           : ${weekRange}`, 20, 50);
-    doc.text(`Class & Sec   : ${className} ${section}`, 20, 58);
-    doc.text(`Name of Class Teacher : ${classTeacherName}`, 20, 66);
-    
-    // Table Headers
-    const tableColumn = [
-      "Subject",
-      "Subject Teacher", 
-      "Chapter Name",
-      "Topics/Sub-Topics",
-      "Home Assignments"
-    ];
-    
-    // Prepare table data
-    const tableRows = lessonPlans.map(plan => [
-      plan.subject || '---',
-      plan.teacherName || '---',
-      plan.chapterName || '---',
-      plan.topics || '---',
-      plan.homeAssignments || '---'
-    ]);
-    
-    // Add missing teachers as empty rows
-    missingTeachers.forEach(teacher => {
-      tableRows.push([
-        '---',
-        teacher,
-        'Lesson Plan Not Submitted',
-        '---',
-        '---'
-      ]);
-    });
-    
-    // Generate table
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 75,
-      theme: 'grid',
-      headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        fontStyle: 'bold',
-        fontSize: 10
-      },
-      bodyStyles: {
-        fontSize: 9,
-        cellPadding: 3
-      },
-      columnStyles: {
-        0: { cellWidth: 25 }, // Subject
-        1: { cellWidth: 30 }, // Teacher
-        2: { cellWidth: 30 }, // Chapter
-        3: { cellWidth: 50 }, // Topics
-        4: { cellWidth: 40 }  // Assignments
-      },
-      margin: { left: 15, right: 15 },
-      styles: {
-        overflow: 'linebreak',
-        cellWidth: 'wrap'
-      },
-      didDrawPage: function (data) {
-        // Page footer
-        const pageCount = doc.internal.getNumberOfPages();
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        doc.text(
-          `Page ${data.pageNumber} of ${pageCount} - Sacred Heart School Weekly Syllabus`,
-          105,
-          doc.internal.pageSize.height - 10,
-          { align: 'center' }
-        );
-      }
-    });
-    
-    // =========== PAGE 2: ADDITIONAL INFORMATION ===========
-    
-    // Add second page if needed
-    if (missingTeachers.length > 0) {
-      doc.addPage();
+  private static setupDevanagariFont(doc: jsPDF): jsPDF {
+    try {
+      // Remove any newlines from base64 string
+      const cleanFont = NotoSansDevanagariRegular.replace(/\s/g, '');
       
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Missing Lesson Plans', 105, 30, { align: 'center' });
+      doc.addFileToVFS('NotoSansDevanagari.ttf', cleanFont);
+      doc.addFont('NotoSansDevanagari.ttf', 'NotoSansDevanagari', 'normal');
       
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Class: ${className} ${section}`, 20, 45);
-      doc.text(`Week: ${weekRange}`, 20, 55);
+      console.log('✅ Font registered, checking if available...');
       
-      doc.setFont('helvetica', 'bold');
-      doc.text('Teachers who have not submitted:', 20, 70);
+      // Test if font is available
+      const fonts = doc.getFontList();
+      console.log('Available fonts:', fonts);
       
-      doc.setFont('helvetica', 'normal');
-      missingTeachers.forEach((teacher, index) => {
-        doc.text(`${index + 1}. ${teacher}`, 30, 80 + (index * 7));
-      });
-      
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'italic');
-      doc.text(
-        'Note: These teachers will be marked as defaulters and notified to administration.',
-        20,
-        doc.internal.pageSize.height - 30
-      );
+      return doc;
+    } catch (error) {
+      console.error('Font registration error:', error);
+      return doc;
     }
-    
-    // Generate PDF filename
-    const filename = `${className}_${section}_${weekRange.replace(/ /g, '_')}.pdf`;
-    
-    // Save PDF
-    doc.save(filename);
-    
-    // Return PDF as base64 string for email attachment
-    const pdfOutput = doc.output('datauristring');
-    const base64 = pdfOutput.split(',')[1];
-    
-    return base64;
   }
-  
-  // Generate PDF from existing lesson plans data
+
   static generatePDFFromLessonPlans(
     className: string,
     section: string,
@@ -190,53 +32,235 @@ export class PDFGenerator {
     lessonPlans: any[],
     allTeachers: any[]
   ): string {
-    // Filter lesson plans for this class, section, and week
-    const classLessonPlans = lessonPlans.filter(plan => 
-      plan.className === className && 
-      plan.section === section && 
-      plan.weekRange === weekRange
-    );
+    const doc = new jsPDF('p', 'mm', 'a4');
     
-    // Get all teachers assigned to this class
-    const assignedTeachers = allTeachers.filter(teacher => 
-      teacher.assignments?.some((assignment: any) => 
+    // Setup Devanagari font
+    this.setupDevanagariFont(doc);
+    
+    // =========== SACRED HEART SCHOOL HEADER ===========
+    
+    // School Name (English)
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 51, 102); // Dark blue
+    doc.text('SACRED HEART SCHOOL', 105, 20, { align: 'center' });
+    
+    // School Name (Hindi)
+    doc.setFont('NotoSansDevanagari', 'normal');
+    doc.setFontSize(14);
+    doc.setTextColor(0, 51, 102);
+    doc.text('सैक्रेड हार्ट स्कूल', 105, 30, { align: 'center' });
+    
+    // CBSE Affiliation
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text('(Affiliated to CBSE, New Delhi, upto +2 Level)', 105, 38, { align: 'center' });
+    
+    // Weekly Syllabus Title
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(139, 0, 0); // Dark red
+    doc.text('WEEKLY SYLLABUS', 105, 48, { align: 'center' });
+    
+    // Weekly Syllabus Title (Hindi)
+    doc.setFont('NotoSansDevanagari', 'bold');
+    doc.setFontSize(12);
+    doc.text('साप्ताहिक पाठ्यक्रम', 105, 56, { align: 'center' });
+    
+    // Underline
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(139, 0, 0);
+    doc.line(60, 58, 150, 58);
+    
+    // =========== INFORMATION SECTION ===========
+    
+    // Date
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    doc.text('Date:', 20, 70);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${weekRange}`, 40, 70);
+    
+    // Class & Section
+    doc.setFont('helvetica', 'normal');
+    doc.text('Class & Section:', 20, 78);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${className} - ${section}`, 55, 78);
+    
+    // Class Teacher (English)
+    doc.setFont('helvetica', 'normal');
+    doc.text('Class Teacher:', 20, 86);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${classTeacherName}`, 50, 86);
+    
+    // Class Teacher (Hindi) - if name contains Hindi text
+    if (this.containsDevanagari(classTeacherName)) {
+      doc.setFont('NotoSansDevanagari', 'normal');
+      doc.text('कक्षा अध्यापक:', 20, 94);
+      doc.setFont('NotoSansDevanagari', 'bold');
+      doc.text(`${classTeacherName}`, 50, 94);
+    }
+    
+    // =========== GET ALL TEACHERS FOR THIS CLASS ===========
+    
+    const assignedTeachers = allTeachers.filter(teacher => {
+      return teacher.assignments?.some((assignment: any) => 
         assignment.className === className && 
         assignment.sections?.includes(section)
-      )
+      );
+    });
+    
+    // =========== PREPARE TABLE DATA ===========
+    
+    const tableHeaders = [
+      { header: 'Subject\nविषय', dataKey: 'subject' },
+      { header: 'Subject Teacher\nविषय अध्यापक', dataKey: 'teacher' },
+      { header: 'Chapter/Topic\nअध्याय/विषय', dataKey: 'chapter' },
+      { header: 'Sub-Topics\nउप-विषय', dataKey: 'topics' },
+      { header: 'Home Assignment\nगृह कार्य', dataKey: 'homework' }
+    ];
+    
+    const tableData: any[] = [];
+    
+    // Sort teachers by name
+    const sortedTeachers = [...assignedTeachers].sort((a, b) => 
+      a.name.localeCompare(b.name, 'hi')
     );
     
-    // Find missing teachers
-    const submittedTeacherIds = classLessonPlans.map(plan => plan.teacherId);
-    const missingTeachers = assignedTeachers
-      .filter(teacher => !submittedTeacherIds.includes(teacher.email))
-      .map(teacher => teacher.name);
-    
-    // Format lesson plans data for PDF
-    const pdfLessonPlans: LessonPlanData[] = classLessonPlans.map(plan => ({
-      subject: plan.subject || '---',
-      teacherName: plan.teacherName || '---',
-      chapterName: plan.topics?.split('\n')[0] || '---',
-      topics: plan.topics || '---',
-      homeAssignments: plan.assessment || '---'
-    }));
-    
-    // Generate PDF
-    return this.generateWeeklySyllabusPDF({
-      className,
-      section,
-      weekRange,
-      classTeacherName,
-      lessonPlans: pdfLessonPlans,
-      missingTeachers
+    sortedTeachers.forEach(teacher => {
+      const assignment = teacher.assignments?.find((a: any) => 
+        a.className === className && a.sections?.includes(section)
+      );
+      
+      const subject = assignment?.subject || '---';
+      
+      const lessonPlan = lessonPlans.find(plan => 
+        plan.teacherId === teacher.email && 
+        plan.className === className && 
+        plan.section === section && 
+        plan.weekRange === weekRange
+      );
+      
+      tableData.push({
+        subject: subject,
+        teacher: teacher.name,
+        chapter: lessonPlan?.topics?.split('\n')[0] || '---',
+        topics: lessonPlan?.topics || '---',
+        homework: lessonPlan?.assessment || 'Homework Not Submitted\n(गृह कार्य नहीं दिया गया)'
+      });
     });
+    
+    // =========== GENERATE TABLE ===========
+    
+    autoTable(doc, {
+      head: [['Subject\nविषय', 'Subject Teacher\nविषय अध्यापक', 'Chapter/Topic\nअध्याय/विषय', 'Sub-Topics\nउप-विषय', 'Home Assignment\nगृह कार्य']],
+      body: tableData.map(row => [
+        row.subject,
+        row.teacher,
+        row.chapter,
+        row.topics,
+        row.homework
+      ]),
+      startY: 100,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [0, 51, 102], // Dark blue
+        textColor: 255,
+        fontStyle: 'bold',
+        fontSize: 10,
+        font: 'helvetica',
+        halign: 'center',
+        valign: 'middle'
+      },
+      bodyStyles: {
+        fontSize: 9,
+        cellPadding: 3,
+        font: 'NotoSansDevanagari',
+        textColor: [0, 0, 0],
+        lineWidth: 0.1,
+        overflow: 'linebreak'
+      },
+      alternateRowStyles: {
+        fillColor: [240, 240, 240]
+      },
+      columnStyles: {
+        0: { cellWidth: 25, halign: 'center' },
+        1: { cellWidth: 35, halign: 'center' },
+        2: { cellWidth: 30, halign: 'center' },
+        3: { cellWidth: 50, halign: 'left' },
+        4: { cellWidth: 40, halign: 'left' }
+      },
+      margin: { left: 10, right: 10 },
+      didParseCell: function(data) {
+        // Handle Devanagari text in cells
+        if (data.row.index > 0) { // Skip header row
+          data.cell.styles.font = 'NotoSansDevanagari';
+        }
+      },
+      didDrawPage: function(data) {
+        // Page number
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'italic');
+        doc.text(
+          `Page ${data.pageNumber}`,
+          doc.internal.pageSize.width - 20,
+          doc.internal.pageSize.height - 10
+        );
+      }
+    });
+    
+    // =========== SIGNATURE SECTION ===========
+    
+    const finalY = (doc as any).lastAutoTable?.finalY || 200;
+    
+    if (finalY < 250) {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Class Teacher Signature
+      doc.text('Signature of Class Teacher:', 30, finalY + 20);
+      doc.text('कक्षा अध्यापक के हस्ताक्षर:', 30, finalY + 26);
+      doc.line(30, finalY + 30, 80, finalY + 30);
+      
+      // Principal Signature
+      doc.text('Signature of Principal:', 120, finalY + 20);
+      doc.text('प्राचार्य के हस्ताक्षर:', 120, finalY + 26);
+      doc.line(120, finalY + 30, 170, finalY + 30);
+      
+      // Date
+      doc.text('Date:', 30, finalY + 40);
+      doc.text(new Date().toLocaleDateString('en-IN'), 45, finalY + 40);
+    }
+    
+    // =========== FOOTER ===========
+    
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      'Generated by Sacred Heart School Management System • हिंदी संस्कृत समर्थित',
+      105,
+      doc.internal.pageSize.height - 5,
+      { align: 'center' }
+    );
+    
+    // Save and return
+    const pdfOutput = doc.output('datauristring');
+    return pdfOutput.split(',')[1];
   }
   
-  // Generate PDF for all classes (for auto-send)
-  static async generatePDFsForAllClasses(
+  private static containsDevanagari(text: string): boolean {
+    // Check if text contains Devanagari Unicode characters
+    return /[\u0900-\u097F]/.test(text);
+  }
+  
+  static generatePDFsForAllClasses(
     weekRange: string,
     teachers: any[],
     lessonPlans: any[]
-  ): Promise<Array<{className: string; section: string; pdfBase64: string; teacherEmail: string}>> {
+  ): Array<{className: string; section: string; pdfBase64: string; teacherName: string; teacherEmail: string}> {
     const classTeachers = teachers.filter(t => t.isClassTeacher);
     const results = [];
     
@@ -245,6 +269,7 @@ export class PDFGenerator {
         if (!teacher.classTeacherOf) continue;
         
         const { className, section } = teacher.classTeacherOf;
+        
         const pdfBase64 = this.generatePDFFromLessonPlans(
           className,
           section,
@@ -258,11 +283,13 @@ export class PDFGenerator {
           className,
           section,
           pdfBase64,
-          teacherEmail: teacher.email,
-          teacherName: teacher.name
+          teacherName: teacher.name,
+          teacherEmail: teacher.email
         });
+        
+        console.log(`✅ PDF generated for ${className}-${section}`);
       } catch (error) {
-        console.error(`Error generating PDF for ${teacher.name}:`, error);
+        console.error(`❌ Error for ${teacher.name}:`, error);
       }
     }
     
