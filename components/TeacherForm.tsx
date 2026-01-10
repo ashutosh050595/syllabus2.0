@@ -1,84 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Calendar, BookOpen, Upload, Clock, AlertCircle, 
-  CheckCircle2, XCircle, RefreshCw, FileText, Plus,
-  User, Mail, Phone, Edit3, Trash2, Search, Filter,
-  Download, Printer, Eye, EyeOff, Send, History,
-  ChevronDown, ChevronUp, AlertTriangle, Lock, Key,
-  LogOut, Home, Bell, Settings, HelpCircle, Star,
-  BarChart, PieChart, TrendingUp, Shield, Zap,
-  MessageSquare, ThumbsUp, Award, Target, Flag,
-  Compass, Navigation, MapPin, Globe, Cloud,
-  CloudOff, Wifi, WifiOff, Database, Server,
+  CheckCircle2, XCircle, RefreshCw, FileText,
+  User, Mail, Phone, Eye, Check, X, ArrowRight, ArrowLeft, Book,
+  Users, Wifi, WifiOff, Database, Server,
   Loader2, ChevronRight, ChevronLeft, ExternalLink,
-  Copy, Share, MoreVertical, Menu, Grid, List,
-  Heart, Bookmark, Tag, Image, Video, Music,
-  Camera, Mic, Headphones, Battery, BatteryCharging,
-  Thermometer, Droplets, Wind, Sun, Moon,
-  Star as StarIcon, CloudRain, CloudSnow, CloudLightning,
-  Umbrella, Trees, Mountain, Navigation2, Map,
-  Users, Check, X, ArrowRight, ArrowLeft, Book,
-  File, Folder, FolderOpen, HardDrive, Cpu, Router,
-  ShieldAlert, Battery as BatteryFull, ThermometerSun,
-  Wind as WindIcon, Sunrise, Sunset, Cloud as CloudIcon,
-  Moon as MoonIcon, Sun as SunIcon, Rain as RainIcon,
-  Snow as SnowIcon, CloudLightning as LightningIcon,
-  // Custom icons for our features
-  FileCheck, FileX, FileSearch, FileQuestion,
-  ClipboardCheck, ClipboardList, ClipboardX,
-  BookmarkCheck, BookmarkX, CalendarCheck,
-  CalendarX, CalendarDays, CalendarRange,
-  Notebook, NotebookText, NotebookPen,
-  School, GraduationCap as GradCap, Chalkboard,
-  ChalkboardTeacher, UserCheck, UserX, UserCog,
-  Users as UsersIcon, UserPlus, UserMinus,
-  BarChart3, PieChart as PieChartIcon, TrendingUp as TrendingUpIcon,
-  DownloadCloud, UploadCloud, Save, Share2,
-  Link, Unlink, Lock as LockIcon, Unlock,
-  Key as KeyIcon, Fingerprint, Shield as ShieldIcon,
-  ShieldCheck, ShieldOff, AlertOctagon, Info,
-  HelpCircle as HelpCircleIcon, Settings as SettingsIcon,
-  Bell as BellIcon, BellOff, BellRing,
-  Home as HomeIcon, LogOut as LogOutIcon,
-  User as UserIcon, Mail as MailIcon, Phone as PhoneIcon,
-  MessageCircle, MessageSquare as MessageSquareIcon,
-  Send as SendIcon, Paperclip, Image as ImageIcon,
-  Film, Music as MusicIcon, Headphones as HeadphonesIcon,
-  Video as VideoIcon, Camera as CameraIcon, Mic as MicIcon,
-  Volume2, VolumeX, Play, Pause, StopCircle,
-  SkipBack, SkipForward, Repeat, Shuffle,
-  Heart as HeartIcon, HeartOff, ThumbsUp as ThumbsUpIcon,
-  ThumbsDown, Star as StarIcon2, Flag as FlagIcon,
-  Award as AwardIcon, Trophy, Medal, Crown,
-  Target as TargetIcon, Crosshair, Compass as CompassIcon,
-  Map as MapIcon, Navigation as NavigationIcon,
-  Globe as GlobeIcon, MapPin as MapPinIcon,
-  // New imports for our features
-  Eye as EyeIcon, EyeOff as EyeOffIcon,
-  Filter as FilterIcon, Grid as GridIcon,
-  List as ListIcon, MoreVertical as MoreVerticalIcon,
-  ChevronRight as ChevronRightIcon,
-  ChevronLeft as ChevronLeftIcon,
-  // PDF Generator
-  FilePdf,
-  // New features
-  CheckSquare, Square, Layers, GitMerge,
-  GitPullRequest, GitBranch, GitCommit,
-  GitCompare, GitMerge as GitMergeIcon,
-  GitPullRequest as GitPullRequestIcon,
-  GitBranch as GitBranchIcon,
-  GitCommit as GitCommitIcon,
-  GitCompare as GitCompareIcon,
-  // Additional
-  Coffee, Cigarette, Wine, Beer, Cake,
-  Pizza, Hamburger, IceCream, Apple,
-  Banana, Carrot, Egg, Fish, Milk,
-  Coffee as CoffeeIcon, Wine as WineIcon,
-  Beer as BeerIcon, Cake as CakeIcon,
-  Pizza as PizzaIcon, Hamburger as HamburgerIcon,
-  IceCream as IceCreamIcon, Apple as AppleIcon,
-  Banana as BananaIcon, Carrot as CarrotIcon,
-  Egg as EggIcon, Fish as FishIcon, Milk as MilkIcon
+  Download, Printer, EyeOff, Send, History,
+  AlertTriangle, Lock, Key, LogOut, Home, Bell, Settings,
+  Shield, Zap, MessageSquare, ThumbsUp, Award, Target, Flag,
+  Compass, Navigation, MapPin, Globe, Cloud, CloudOff,
+  Filter, Grid, List, MoreVertical, Menu
 } from 'lucide-react';
 import { APIService } from '../services/api-supabase';
 import { EmailService } from '../services/email-service';
@@ -95,7 +26,7 @@ interface TeacherFormProps {
 
 const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, isOnline }) => {
   // =========== STATES ===========
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [currentWeek, setCurrentWeek] = useState('');
   const [nextWeek, setNextWeek] = useState('');
   const [selectedWeek, setSelectedWeek] = useState('');
@@ -104,7 +35,6 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
   const [selectedClasses, setSelectedClasses] = useState<any[]>([]);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   
   // Teacher assignments and submissions
   const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]);
@@ -115,7 +45,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
   const [isClassTeacher, setIsClassTeacher] = useState(false);
   const [classTeacherInfo, setClassTeacherInfo] = useState<any>(null);
   const [classTeachersStatus, setClassTeachersStatus] = useState<any[]>([]);
-  const [showClassStatus, setShowClassStatus] = useState(true); // Default: show class status
+  const [showClassStatus, setShowClassStatus] = useState(true);
   const [isLoadingClassStatus, setIsLoadingClassStatus] = useState(false);
   
   // Modification request
@@ -126,6 +56,10 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
   // Success modal
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [submissionPreview, setSubmissionPreview] = useState<any>(null);
+
+  // =========== REFS ===========
+  const initRef = useRef(false);
+  const teacherEmailRef = useRef<string>('');
 
   // =========== HELPER FUNCTIONS ===========
   const getWeekRange = (date: Date) => {
@@ -150,35 +84,47 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
 
   // =========== INITIALIZATION ===========
   useEffect(() => {
-    const initializeTeacherData = async () => {
-      if (!teacher?.email) return;
+    // Calculate weeks - runs only once
+    if (!currentWeek) {
+      const today = new Date();
+      const currentWeekRange = getWeekRange(today);
+      const nextWeekRange = getWeekRange(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000));
       
+      setCurrentWeek(currentWeekRange);
+      setNextWeek(nextWeekRange);
+      setSelectedWeek(currentWeekRange);
+    }
+  }, []);
+
+  // Load teacher data when teacher or online status changes
+  useEffect(() => {
+    const loadData = async () => {
+      // Skip if already loading or teacher not changed
+      if (isLoading || !teacher?.email || teacherEmailRef.current === teacher.email) {
+        return;
+      }
+
+      teacherEmailRef.current = teacher.email;
       setIsLoading(true);
+      
       try {
-        // Calculate weeks
-        const today = new Date();
-        setCurrentWeek(getWeekRange(today));
-        setNextWeek(getWeekRange(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)));
-        setSelectedWeek(getWeekRange(today));
-        
         // Check if teacher is class teacher
         const classTeacher = teacher.isClassTeacher;
         setIsClassTeacher(classTeacher);
         
         if (classTeacher && teacher.classTeacherOf) {
           setClassTeacherInfo(teacher.classTeacherOf);
-          if (isOnline) {
-            await loadClassTeachersStatus();
-          }
         }
         
-        // Load teacher data
+        // Load teacher data in parallel
+        const loadPromises = [];
+        
         if (isOnline) {
-          await Promise.all([
+          loadPromises.push(
             loadTeacherAssignments(),
             loadTeacherSubmissions(),
             loadPendingModificationRequests()
-          ]);
+          );
         } else {
           // Load from localStorage if offline
           const cachedData = localStorage.getItem(`teacher_${teacher.email}_data`);
@@ -190,6 +136,13 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
           }
         }
         
+        await Promise.all(loadPromises);
+        
+        // Load class status only if class teacher and online
+        if (classTeacher && teacher.classTeacherOf && isOnline) {
+          await loadClassTeachersStatus();
+        }
+        
       } catch (error) {
         console.error('Initialization error:', error);
       } finally {
@@ -197,23 +150,16 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       }
     };
 
-    initializeTeacherData();
-  }, [teacher?.email, teacher?.isClassTeacher, teacher?.classTeacherOf, isOnline]);
+    loadData();
+  }, [teacher?.email, isOnline]);
 
   // =========== DATA LOADING FUNCTIONS ===========
-  const loadTeacherAssignments = async () => {
+  const loadTeacherAssignments = useCallback(async () => {
     if (!isOnline || !teacher?.email) return;
     
     try {
       const assignments = await APIService.getTeacherAssignments(teacher.email);
       setTeacherAssignments(assignments);
-      
-      // Cache data for offline use
-      const cachedData = {
-        assignments,
-        lastUpdated: new Date().toISOString()
-      };
-      localStorage.setItem(`teacher_${teacher.email}_assignments`, JSON.stringify(cachedData));
       
       // Initialize form data for each assignment
       const initialFormData: Record<string, any> = {};
@@ -234,16 +180,10 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       
     } catch (error) {
       console.error('Error loading assignments:', error);
-      // Try to load from cache on error
-      const cached = localStorage.getItem(`teacher_${teacher.email}_assignments`);
-      if (cached) {
-        const data = JSON.parse(cached);
-        setTeacherAssignments(data.assignments || []);
-      }
     }
-  };
+  }, [isOnline, teacher?.email, selectedWeek, currentWeek]);
 
-  const loadTeacherSubmissions = async () => {
+  const loadTeacherSubmissions = useCallback(async () => {
     if (!isOnline || !teacher?.email) return;
     
     try {
@@ -255,33 +195,17 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       const weeks = [...new Set(teacherSubs.map(s => s.weekRange))].sort();
       setSubmittedWeeks(weeks);
       
-      // Cache data
-      const cacheData = {
-        submissions: teacherSubs,
-        submittedWeeks: weeks,
-        lastUpdated: new Date().toISOString()
-      };
-      localStorage.setItem(`teacher_${teacher.email}_submissions`, JSON.stringify(cacheData));
-      
     } catch (error) {
       console.error('Error loading submissions:', error);
-      // Load from cache
-      const cached = localStorage.getItem(`teacher_${teacher.email}_submissions`);
-      if (cached) {
-        const data = JSON.parse(cached);
-        setTeacherSubmissions(data.submissions || []);
-        setSubmittedWeeks(data.submittedWeeks || []);
-      }
     }
-  };
+  }, [isOnline, teacher?.email]);
 
-  const loadClassTeachersStatus = async () => {
+  const loadClassTeachersStatus = useCallback(async () => {
     if (!isOnline || !isClassTeacher || !classTeacherInfo) return;
     
     setIsLoadingClassStatus(true);
     try {
       const { className, section } = classTeacherInfo;
-      const currentWeekRange = getWeekRange(new Date());
       
       const [allTeachers, allLessonPlans] = await Promise.all([
         APIService.fetchTeachers(),
@@ -301,45 +225,28 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
           plan.teacherId === t.email && 
           plan.className === className && 
           plan.section === section && 
-          plan.weekRange === currentWeekRange
-        );
-        
-        // Get the subject for this class
-        const assignment = t.assignments?.find((a: any) => 
-          a.className === className && a.sections?.includes(section)
+          plan.weekRange === currentWeek
         );
         
         return {
           teacher: t,
           submitted: hasSubmitted,
-          subject: assignment?.subject || 'N/A',
-          assignment: assignment
+          subject: t.assignments?.find((a: any) => 
+            a.className === className && a.sections?.includes(section)
+          )?.subject || 'N/A'
         };
       });
       
       setClassTeachersStatus(status);
       
-      // Cache the status
-      localStorage.setItem(`class_${className}_${section}_status`, JSON.stringify({
-        status,
-        week: currentWeekRange,
-        lastUpdated: new Date().toISOString()
-      }));
-      
     } catch (error) {
       console.error('Error loading class teachers status:', error);
-      // Try to load from cache
-      const cached = localStorage.getItem(`class_${classTeacherInfo.className}_${classTeacherInfo.section}_status`);
-      if (cached) {
-        const data = JSON.parse(cached);
-        setClassTeachersStatus(data.status || []);
-      }
     } finally {
       setIsLoadingClassStatus(false);
     }
-  };
+  }, [isOnline, isClassTeacher, classTeacherInfo, currentWeek]);
 
-  const loadPendingModificationRequests = async () => {
+  const loadPendingModificationRequests = useCallback(async () => {
     if (!isOnline || !teacher?.email) return;
     
     try {
@@ -350,27 +257,29 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
     } catch (error) {
       console.error('Error loading modification requests:', error);
     }
-  };
+  }, [isOnline, teacher?.email]);
 
   // =========== FORM HANDLING ===========
-  const handleClassToggle = (assignment: any) => {
+  const handleClassToggle = useCallback((assignment: any) => {
     const key = `${assignment.className}_${assignment.sections?.[0] || 'A'}_${assignment.subject}`;
     
-    if (selectedClasses.some(c => c.key === key)) {
-      // Remove from selection
-      setSelectedClasses(prev => prev.filter(c => c.key !== key));
-    } else {
-      // Add to selection
-      setSelectedClasses(prev => [...prev, {
-        key,
-        className: assignment.className,
-        section: assignment.sections?.[0] || 'A',
-        subject: assignment.subject
-      }]);
-      
-      // Initialize form data if not exists
-      if (!formData[key]) {
-        setFormData(prev => ({
+    setSelectedClasses(prev => {
+      if (prev.some(c => c.key === key)) {
+        return prev.filter(c => c.key !== key);
+      } else {
+        return [...prev, {
+          key,
+          className: assignment.className,
+          section: assignment.sections?.[0] || 'A',
+          subject: assignment.subject
+        }];
+      }
+    });
+    
+    // Initialize form data if not exists
+    setFormData(prev => {
+      if (!prev[key]) {
+        return {
           ...prev,
           [key]: {
             className: assignment.className,
@@ -381,45 +290,49 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
             topics: '',
             homework: ''
           }
-        }));
+        };
       }
-    }
-  };
+      return prev;
+    });
+  }, [selectedWeek, currentWeek]);
 
-  const handleSelectAllClasses = () => {
-    if (selectedClasses.length === teacherAssignments.length) {
-      // Deselect all
-      setSelectedClasses([]);
-    } else {
-      // Select all
-      const allClasses = teacherAssignments.map(assignment => ({
-        key: `${assignment.className}_${assignment.sections?.[0] || 'A'}_${assignment.subject}`,
-        className: assignment.className,
-        section: assignment.sections?.[0] || 'A',
-        subject: assignment.subject
-      }));
-      setSelectedClasses(allClasses);
-      
-      // Initialize form data for all
-      const newFormData: Record<string, any> = { ...formData };
-      allClasses.forEach(cls => {
-        if (!newFormData[cls.key]) {
-          newFormData[cls.key] = {
-            className: cls.className,
-            section: cls.section,
-            subject: cls.subject,
-            weekRange: selectedWeek || currentWeek,
-            chapter: '',
-            topics: '',
-            homework: ''
-          };
-        }
-      });
-      setFormData(newFormData);
-    }
-  };
+  const handleSelectAllClasses = useCallback(() => {
+    setSelectedClasses(prev => {
+      if (prev.length === teacherAssignments.length) {
+        return [];
+      } else {
+        const allClasses = teacherAssignments.map(assignment => ({
+          key: `${assignment.className}_${assignment.sections?.[0] || 'A'}_${assignment.subject}`,
+          className: assignment.className,
+          section: assignment.sections?.[0] || 'A',
+          subject: assignment.subject
+        }));
+        
+        // Initialize form data for all
+        setFormData(prevFormData => {
+          const newFormData = { ...prevFormData };
+          allClasses.forEach(cls => {
+            if (!newFormData[cls.key]) {
+              newFormData[cls.key] = {
+                className: cls.className,
+                section: cls.section,
+                subject: cls.subject,
+                weekRange: selectedWeek || currentWeek,
+                chapter: '',
+                topics: '',
+                homework: ''
+              };
+            }
+          });
+          return newFormData;
+        });
+        
+        return allClasses;
+      }
+    });
+  }, [teacherAssignments, selectedWeek, currentWeek]);
 
-  const handleInputChange = (key: string, field: string, value: string) => {
+  const handleInputChange = useCallback((key: string, field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [key]: {
@@ -427,7 +340,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
         [field]: value
       }
     }));
-  };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -456,7 +369,6 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       return;
     }
     
-    setSubmissionStatus('submitting');
     setIsSubmitting(true);
     
     try {
@@ -478,7 +390,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
           status: 'submitted'
         };
         
-        const result = await APIService.submitLessonPlan(submissionData);
+        await APIService.submitLessonPlan(submissionData);
         submissionResults.push({
           class: `${data.className}-${data.section}`,
           subject: data.subject,
@@ -500,23 +412,19 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       );
       
       let emailSent = false;
-      if (isOnline) {
-        try {
-          emailSent = await EmailService.sendEmail(
-            EmailService.createSubmissionConfirmation(
-              teacher.name,
-              teacher.email,
-              selectedWeek,
-              submittedClasses
-            )
-          );
-        } catch (emailError) {
-          console.error('Email sending failed:', emailError);
-          emailSent = false;
-        }
+      try {
+        emailSent = await EmailService.sendEmail(
+          EmailService.createSubmissionConfirmation(
+            teacher.name,
+            teacher.email,
+            selectedWeek,
+            submittedClasses
+          )
+        );
+      } catch (emailError) {
+        console.error('Email sending failed:', emailError);
       }
       
-      setSubmissionStatus('success');
       setSubmissionPreview({
         week: selectedWeek,
         classes: submissionResults,
@@ -526,30 +434,31 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       setShowSubmissionModal(true);
       
       // Clear form for submitted classes
-      const newFormData = { ...formData };
-      selectedClasses.forEach(cls => {
-        if (newFormData[cls.key]) {
-          newFormData[cls.key] = {
-            ...newFormData[cls.key],
-            chapter: '',
-            topics: '',
-            homework: ''
-          };
-        }
+      setFormData(prev => {
+        const newFormData = { ...prev };
+        selectedClasses.forEach(cls => {
+          if (newFormData[cls.key]) {
+            newFormData[cls.key] = {
+              ...newFormData[cls.key],
+              chapter: '',
+              topics: '',
+              homework: ''
+            };
+          }
+        });
+        return newFormData;
       });
-      setFormData(newFormData);
+      
       setSelectedClasses([]);
       
       // Refresh data
       await loadTeacherSubmissions();
-      if (isClassTeacher) await loadClassTeachersStatus();
-      
-      // Clear cache after submission
-      localStorage.removeItem(`teacher_${teacher.email}_submissions`);
+      if (isClassTeacher) {
+        await loadClassTeachersStatus();
+      }
       
     } catch (error: any) {
       console.error('❌ Error submitting lesson plans:', error);
-      setSubmissionStatus('error');
       alert(`Failed to submit: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -617,14 +526,20 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
         allTeachers
       );
       
-      // Open PDF in new tab
-      const pdfBlob = base64ToBlob(pdfBase64, 'application/pdf');
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      window.open(pdfUrl, '_blank');
+      // Open PDF in new tab using blob URL
+      const byteCharacters = atob(pdfBase64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
       
-      setTimeout(() => {
-        URL.revokeObjectURL(pdfUrl);
-      }, 100);
+      window.open(url, '_blank');
+      
+      // Clean up URL after some time
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       
     } catch (error: any) {
       console.error('Error previewing PDF:', error);
@@ -632,29 +547,8 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
     }
   };
 
-  const base64ToBlob = (base64: string, contentType: string = '', sliceSize: number = 512) => {
-    const byteCharacters = atob(base64);
-    const byteArrays = [];
-
-    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-      const slice = byteCharacters.slice(offset, offset + sliceSize);
-
-      const byteNumbers = new Array(slice.length);
-      for (let i = 0; i < slice.length; i++) {
-        byteNumbers[i] = slice.charCodeAt(i);
-      }
-
-      const byteArray = new Uint8Array(byteNumbers);
-      byteArrays.push(byteArray);
-    }
-
-    const blob = new Blob(byteArrays, { type: contentType });
-    return blob;
-  };
-
   // =========== MODIFICATION REQUEST ===========
   const handleRequestModification = (weekRange: string) => {
-    // Check if already has pending request for this week
     const existingRequest = pendingModificationRequests.find(
       req => req.week_range === weekRange
     );
@@ -755,7 +649,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                 {classTeacherInfo.className}-{classTeacherInfo.section} • Week: {currentWeek}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setShowClassStatus(!showClassStatus)}
                 className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-200 flex items-center gap-2"
@@ -803,122 +697,65 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {classTeachersStatus.length === 0 ? (
-                  <div className="col-span-full text-center py-8">
-                    <p className="text-slate-400">No teachers assigned to this class</p>
-                  </div>
-                ) : (
-                  classTeachersStatus.map((status, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-4 rounded-xl border ${status.submitted ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'} hover:shadow-sm transition-all`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="font-bold text-slate-900">{status.teacher.name}</div>
-                          <div className="text-sm text-slate-600">{status.subject}</div>
-                          <div className="text-xs text-slate-500 mt-1">
-                            Email: {status.teacher.email}
-                          </div>
-                          {status.teacher.phone && (
-                            <div className="text-xs text-slate-500">
-                              Phone: {status.teacher.phone}
+              {classTeachersStatus.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-slate-400">No teachers assigned to this class</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {classTeachersStatus.map((status, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-4 rounded-xl border ${status.submitted ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-bold text-slate-900">{status.teacher.name}</div>
+                            <div className="text-sm text-slate-600">{status.subject}</div>
+                            <div className="text-xs text-slate-500 mt-1">
+                              Email: {status.teacher.email}
                             </div>
-                          )}
-                        </div>
-                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${status.submitted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {status.submitted ? (
-                            <span className="flex items-center gap-1">
-                              <Check className="h-3 w-3" /> Submitted
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1">
-                              <AlertTriangle className="h-3 w-3" /> Pending
-                            </span>
-                          )}
+                          </div>
+                          <div className={`px-3 py-1 rounded-full text-xs font-bold ${status.submitted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {status.submitted ? '✅ Submitted' : '⏳ Pending'}
+                          </div>
                         </div>
                       </div>
-                      
-                      {/* Action buttons for class teacher */}
-                      {!status.submitted && isOnline && (
-                        <div className="mt-3 pt-3 border-t border-slate-200">
-                          <button
-                            onClick={() => {
-                              const message = `Reminder: Please submit your lesson plan for ${classTeacherInfo.className}-${classTeacherInfo.section} (${status.subject}) for week ${currentWeek}`;
-                              alert(`Would send reminder to: ${status.teacher.name}\n\n${message}`);
-                            }}
-                            className="w-full text-xs bg-amber-100 text-amber-700 py-1.5 px-3 rounded-lg hover:bg-amber-200 transition-colors font-bold"
-                          >
-                            Send Reminder
-                          </button>
-                        </div>
-                      )}
+                    ))}
+                  </div>
+                  
+                  <div className="mt-6 pt-4 border-t border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-slate-600">
+                        Total Teachers: {classTeachersStatus.length}
+                      </div>
+                      <div className="text-sm font-bold">
+                        <span className="text-emerald-600">
+                          ✅ Submitted: {classTeachersStatus.filter(s => s.submitted).length}
+                        </span>
+                        {' • '}
+                        <span className="text-amber-600">
+                          ⏳ Pending: {classTeachersStatus.filter(s => !s.submitted).length}
+                        </span>
+                      </div>
                     </div>
-                  ))
-                )}
-              </div>
-              
-              <div className="mt-6 pt-4 border-t border-slate-200">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-slate-600">
-                    Total Teachers: <span className="font-bold">{classTeachersStatus.length}</span>
                   </div>
-                  <div className="text-sm font-bold">
-                    <span className="text-emerald-600">
-                      ✅ Submitted: {classTeachersStatus.filter(s => s.submitted).length}
-                    </span>
-                    {' • '}
-                    <span className="text-amber-600">
-                      ⏳ Pending: {classTeachersStatus.filter(s => !s.submitted).length}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Progress bar */}
-                <div className="mt-3">
-                  <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-                    <span>Submission Progress</span>
-                    <span>
-                      {classTeachersStatus.length > 0 
-                        ? Math.round((classTeachersStatus.filter(s => s.submitted).length / classTeachersStatus.length) * 100)
-                        : 0}%
-                    </span>
-                  </div>
-                  <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                      style={{ 
-                        width: classTeachersStatus.length > 0 
-                          ? `${(classTeachersStatus.filter(s => s.submitted).length / classTeachersStatus.length) * 100}%`
-                          : '0%'
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           )}
 
           <div className="text-sm text-slate-600">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="mb-2">
-                  <strong>Class:</strong> {classTeacherInfo.className}-{classTeacherInfo.section}
-                </p>
-                <p className="mb-2">
-                  <strong>Current Week:</strong> {currentWeek}
-                </p>
-              </div>
-              <div>
-                <p className="mb-2">
-                  <strong>Status:</strong> {classTeachersStatus.filter(s => s.submitted).length} of {classTeachersStatus.length} teachers submitted
-                </p>
-                <p>
-                  <strong>Note:</strong> As class teacher, you can track submissions, send reminders, and download weekly PDFs.
-                </p>
-              </div>
-            </div>
+            <p className="mb-2">
+              <strong>Class:</strong> {classTeacherInfo.className}-{classTeacherInfo.section}
+            </p>
+            <p className="mb-2">
+              <strong>Current Week:</strong> {currentWeek}
+            </p>
+            <p>
+              <strong>Note:</strong> As class teacher, you can track submissions and download weekly PDFs.
+            </p>
           </div>
         </div>
       )}
@@ -1028,7 +865,6 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                     </div>
                     
                     <div className="space-y-4">
-                      {/* Chapter Name */}
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2">
                           Name of the Chapter to be taught in current week *
@@ -1043,7 +879,6 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                         />
                       </div>
                       
-                      {/* Topics/Subtopics */}
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2">
                           Topics/Subtopics of the Chapter to be taught *
@@ -1057,7 +892,6 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                         />
                       </div>
                       
-                      {/* Proposed Homework */}
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2">
                           Proposed Home Work *
