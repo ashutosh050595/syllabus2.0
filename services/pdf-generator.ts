@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// Font URLs - Directly use from public folder
+// Font URLs
 const FONT_URLS = {
   regular: '/fonts/NotoSansDevanagari-Regular.ttf',
   bold: '/fonts/NotoSansDevanagari-Bold.ttf'
@@ -11,7 +11,7 @@ export class PDFGenerator {
   private static fontsRegistered = false;
   private static fontPromises: Map<string, Promise<string>> = new Map();
 
-  // Load font as binary and convert to base64 dynamically
+  // Load font from public folder
   private static async loadFont(url: string): Promise<string> {
     if (this.fontPromises.has(url)) {
       return this.fontPromises.get(url)!;
@@ -21,20 +21,17 @@ export class PDFGenerator {
       try {
         console.log(`📥 Loading font: ${url}`);
         
-        // Fetch font file
         const response = await fetch(url);
         if (!response.ok) {
-          throw new Error(`Failed to fetch font: ${response.status} ${response.statusText}`);
+          throw new Error(`Failed to fetch font: ${response.status}`);
         }
         
         const blob = await response.blob();
         
-        // Convert blob to base64
         return new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onloadend = () => {
             const base64 = reader.result as string;
-            // Remove data URL prefix (e.g., "data:application/octet-stream;base64,")
             const base64Data = base64.split(',')[1];
             resolve(base64Data);
           };
@@ -42,7 +39,7 @@ export class PDFGenerator {
           reader.readAsDataURL(blob);
         });
       } catch (error) {
-        console.error(`❌ Error loading font from ${url}:`, error);
+        console.error(`Error loading font: ${error}`);
         throw error;
       }
     })();
@@ -51,61 +48,53 @@ export class PDFGenerator {
     return fontPromise;
   }
 
-  // Register fonts with jsPDF
+  // Register fonts
   private static async registerFonts(doc: jsPDF): Promise<boolean> {
     if (this.fontsRegistered) return true;
 
     try {
-      console.log('🔄 Registering fonts...');
+      console.log('Registering fonts...');
       
       // Load regular font
       try {
-        const regularFontBase64 = await this.loadFont(FONT_URLS.regular);
-        doc.addFileToVFS('NotoSansDevanagari-Regular.ttf', regularFontBase64);
+        const regularFont = await this.loadFont(FONT_URLS.regular);
+        doc.addFileToVFS('NotoSansDevanagari-Regular.ttf', regularFont);
         doc.addFont('NotoSansDevanagari-Regular.ttf', 'NotoSansDevanagari', 'normal');
         console.log('✅ Regular font registered');
       } catch (error) {
-        console.warn('⚠️ Could not load regular font, using fallback');
+        console.warn('Could not load regular font');
       }
 
-      // Try to load bold font
+      // Load bold font
       try {
-        const boldFontBase64 = await this.loadFont(FONT_URLS.bold);
-        doc.addFileToVFS('NotoSansDevanagari-Bold.ttf', boldFontBase64);
+        const boldFont = await this.loadFont(FONT_URLS.bold);
+        doc.addFileToVFS('NotoSansDevanagari-Bold.ttf', boldFont);
         doc.addFont('NotoSansDevanagari-Bold.ttf', 'NotoSansDevanagari', 'bold');
         console.log('✅ Bold font registered');
       } catch (error) {
-        console.log('ℹ️ Bold font not available, will use regular for bold text');
+        console.log('Bold font not available');
       }
 
       this.fontsRegistered = true;
       return true;
       
     } catch (error) {
-      console.error('❌ Font registration failed:', error);
+      console.error('Font registration failed:', error);
       return false;
     }
   }
 
-  // Check if text contains Devanagari
+  // Check for Devanagari text
   private static isDevanagari(text: string): boolean {
+    if (!text || typeof text !== 'string') return false;
     return /[\u0900-\u097F]/.test(text);
   }
 
-  // Set appropriate font
+  // Set font
   private static setFont(doc: jsPDF, text: string, style: 'normal' | 'bold' = 'normal'): void {
     if (this.isDevanagari(text) && this.fontsRegistered) {
       try {
-        if (style === 'bold') {
-          // Try bold, fallback to regular
-          try {
-            doc.setFont('NotoSansDevanagari', 'bold');
-          } catch {
-            doc.setFont('NotoSansDevanagari', 'normal');
-          }
-        } else {
-          doc.setFont('NotoSansDevanagari', 'normal');
-        }
+        doc.setFont('NotoSansDevanagari', style);
       } catch {
         doc.setFont('helvetica', style);
       }
@@ -114,22 +103,16 @@ export class PDFGenerator {
     }
   }
 
-  // Main PDF generation function (Async)
-  static async generatePDF(data: {
-    className: string;
-    section: string;
-    weekRange: string;
-    classTeacher: string;
-    subjects: Array<{
-      subject: string;
-      teacher: string;
-      chapter: string;
-      topics: string;
-      homework: string;
-      submitted: boolean;
-    }>;
-  }): Promise<string> {
-    console.log('📊 Generating PDF...');
+  // ✅ **FIXED FUNCTION NAME: generatePDFFromLessonPlans**
+  static async generatePDFFromLessonPlans(
+    className: string,
+    section: string,
+    weekRange: string,
+    classTeacherName: string,
+    allLessonPlans: any[],
+    allTeachers: any[]
+  ): Promise<string> {
+    console.log(`📊 Generating PDF for ${className}-${section}`);
     
     try {
       // Create PDF
@@ -187,22 +170,47 @@ export class PDFGenerator {
       doc.setTextColor(0, 0, 0);
       doc.text('Date:', 20, infoY);
       doc.setFont('helvetica', 'bold');
-      doc.text(data.weekRange, 40, infoY);
+      doc.text(weekRange, 40, infoY);
 
       // Class & Section
       doc.setFont('helvetica', 'normal');
       doc.text('Class & Section:', 20, infoY + 8);
       doc.setFont('helvetica', 'bold');
-      doc.text(`${data.className} - ${data.section}`, 55, infoY + 8);
+      doc.text(`${className} - ${section}`, 55, infoY + 8);
 
       // Class Teacher
       doc.setFont('helvetica', 'normal');
       doc.text('Class Teacher:', 20, infoY + 16);
       doc.setFont('helvetica', 'bold');
-      this.setFont(doc, data.classTeacher, 'bold');
-      doc.text(data.classTeacher, 50, infoY + 16);
+      this.setFont(doc, classTeacherName, 'bold');
+      doc.text(classTeacherName, 50, infoY + 16);
 
-      // =========== TABLE ===========
+      // =========== GET TEACHERS DATA ===========
+      
+      const assignedTeachers = allTeachers.filter(teacher => {
+        if (!teacher.assignments) return false;
+        return teacher.assignments.some((assignment: any) => 
+          assignment.className === className && 
+          assignment.sections?.includes(section)
+        );
+      });
+
+      const submittedTeachers = assignedTeachers.filter(teacher => 
+        allLessonPlans.some(plan => 
+          plan.teacherId === teacher.email && 
+          plan.className === className && 
+          plan.section === section && 
+          plan.weekRange === weekRange
+        )
+      );
+
+      const missingTeachers = assignedTeachers.filter(teacher => 
+        !submittedTeachers.includes(teacher)
+      );
+
+      console.log(`Total: ${assignedTeachers.length}, Submitted: ${submittedTeachers.length}, Missing: ${missingTeachers.length}`);
+
+      // =========== TABLE DATA ===========
       
       const tableColumns = [
         { header: 'Subject\nविषय', width: 30 },
@@ -212,17 +220,54 @@ export class PDFGenerator {
         { header: 'Home Assignment\nगृह कार्य', width: 40 }
       ];
 
-      const tableRows = data.subjects.map(subject => [
-        subject.subject,
-        subject.teacher,
-        subject.chapter || '---',
-        subject.topics || '---',
-        subject.submitted 
-          ? (subject.homework || '---')
-          : 'Homework Not Submitted\n(गृह कार्य नहीं दिया गया)'
-      ]);
+      const tableRows: any[][] = [];
+      
+      // Sort teachers alphabetically
+      const sortedTeachers = [...assignedTeachers].sort((a, b) => 
+        a.name.localeCompare(b.name, 'hi')
+      );
 
-      // Generate table
+      sortedTeachers.forEach(teacher => {
+        // Find teacher's subject
+        const assignment = teacher.assignments?.find((a: any) => 
+          a.className === className && a.sections?.includes(section)
+        );
+        
+        const subject = assignment?.subject || '---';
+
+        // Check if submitted
+        const isSubmitted = submittedTeachers.some(st => st.email === teacher.email);
+
+        if (isSubmitted) {
+          // Get lesson plan
+          const lessonPlan = allLessonPlans.find(plan => 
+            plan.teacherId === teacher.email && 
+            plan.className === className && 
+            plan.section === section && 
+            plan.weekRange === weekRange
+          );
+
+          tableRows.push([
+            subject,
+            teacher.name,
+            lessonPlan?.topics?.split('\n')[0]?.substring(0, 30) || '---',
+            lessonPlan?.topics?.substring(0, 50) || '---',
+            lessonPlan?.assessment?.substring(0, 50) || '---'
+          ]);
+        } else {
+          // Missing submission
+          tableRows.push([
+            subject,
+            teacher.name,
+            '---',
+            '---',
+            'Homework Not Submitted\n(गृह कार्य नहीं दिया गया)'
+          ]);
+        }
+      });
+
+      // =========== GENERATE TABLE ===========
+      
       try {
         autoTable(doc, {
           startY: infoY + 30,
@@ -250,21 +295,21 @@ export class PDFGenerator {
             3: { cellWidth: 50, halign: 'left' },
             4: { cellWidth: 40, halign: 'left' }
           },
-          didParseCell: (tableData: any) => {
+          didParseCell: (data: any) => {
             // Apply Hindi font
-            const cellText = tableData.cell.text?.join(' ') || '';
+            const cellText = data.cell.text?.join(' ') || '';
             if (this.isDevanagari(cellText) && this.fontsRegistered) {
               try {
-                tableData.cell.styles.font = 'NotoSansDevanagari';
+                data.cell.styles.font = 'NotoSansDevanagari';
               } catch {
                 // Fallback
               }
             }
             
             // Highlight missing homework
-            if (tableData.column.index === 4 && cellText.includes('Not Submitted')) {
-              tableData.cell.styles.textColor = [220, 0, 0];
-              tableData.cell.styles.fontStyle = 'italic';
+            if (data.column.index === 4 && cellText.includes('Not Submitted')) {
+              data.cell.styles.textColor = [220, 0, 0];
+              data.cell.styles.fontStyle = 'italic';
             }
           }
         });
@@ -275,43 +320,48 @@ export class PDFGenerator {
       // =========== SUMMARY ===========
       
       const finalY = (doc as any).lastAutoTable?.finalY || 200;
-      const total = data.subjects.length;
-      const submitted = data.subjects.filter(s => s.submitted).length;
-      const missing = total - submitted;
-
+      
       // Summary
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
       doc.text('Summary:', 20, finalY + 15);
       
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
-      doc.text(`• Total Teachers: ${total}`, 25, finalY + 25);
-      doc.text(`• Submitted: ${submitted}`, 25, finalY + 33);
+      doc.text(`• Total Teachers: ${assignedTeachers.length}`, 25, finalY + 25);
+      doc.text(`• Submitted: ${submittedTeachers.length}`, 25, finalY + 33);
       
-      if (missing > 0) {
+      if (missingTeachers.length > 0) {
         doc.setTextColor(220, 0, 0);
-        doc.text(`• Missing: ${missing}`, 25, finalY + 41);
+        doc.text(`• Missing: ${missingTeachers.length}`, 25, finalY + 41);
       }
 
       // Signatures
       const signatureY = finalY + 60;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
       doc.setTextColor(0, 0, 0);
       
       // Class Teacher
       doc.text('Signature of Class Teacher:', 30, signatureY);
       this.setFont(doc, 'कक्षा अध्यापक के हस्ताक्षर');
       doc.text('कक्षा अध्यापक के हस्ताक्षर:', 30, signatureY + 6);
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.3);
       doc.line(30, signatureY + 8, 80, signatureY + 8);
       
       // Principal
-      doc.setFont('helvetica', 'normal');
       doc.text('Signature of Principal:', 120, signatureY);
       this.setFont(doc, 'प्राचार्य के हस्ताक्षर');
       doc.text('प्राचार्य के हस्ताक्षर:', 120, signatureY + 6);
       doc.line(120, signatureY + 8, 170, signatureY + 8);
+      
+      // Date
+      doc.text(`Date: ${new Date().toLocaleDateString('en-IN')}`, 30, signatureY + 20);
 
-      // Footer
+      // =========== FOOTER ===========
+      
       doc.setFontSize(8);
       doc.setFont('helvetica', 'italic');
       doc.setTextColor(100, 100, 100);
@@ -323,33 +373,80 @@ export class PDFGenerator {
       );
 
       // Return PDF
-      return doc.output('datauristring').split(',')[1];
+      const pdfOutput = doc.output('datauristring');
+      const base64String = pdfOutput.split(',')[1];
+      console.log('✅ PDF generated successfully');
+      return base64String;
       
     } catch (error) {
-      console.error('PDF generation failed:', error);
+      console.error('❌ PDF generation failed:', error);
       throw error;
     }
   }
 
-  // Download helper
-  static downloadPDF(base64String: string, fileName: string): void {
-    const link = document.createElement('a');
-    link.href = `data:application/pdf;base64,${base64String}`;
-    link.download = fileName;
-    link.click();
+  // ✅ **Alternative function with simpler parameters**
+  static async generatePDF(data: {
+    className: string;
+    section: string;
+    weekRange: string;
+    classTeacher: string;
+    subjects: Array<{
+      subject: string;
+      teacher: string;
+      chapter: string;
+      topics: string;
+      homework: string;
+      submitted: boolean;
+    }>;
+  }): Promise<string> {
+    console.log('Generating PDF with simplified data...');
+    
+    // Convert to the format expected by generatePDFFromLessonPlans
+    const allTeachers = data.subjects.map(subject => ({
+      name: subject.teacher,
+      email: `${subject.teacher.replace(/\s+/g, '.').toLowerCase()}@school.com`,
+      assignments: [{
+        className: data.className,
+        sections: [data.section],
+        subject: subject.subject
+      }]
+    }));
+
+    const allLessonPlans = data.subjects
+      .filter(subject => subject.submitted)
+      .map(subject => ({
+        teacherId: `${subject.teacher.replace(/\s+/g, '.').toLowerCase()}@school.com`,
+        className: data.className,
+        section: data.section,
+        weekRange: data.weekRange,
+        topics: subject.topics,
+        assessment: subject.homework
+      }));
+
+    return this.generatePDFFromLessonPlans(
+      data.className,
+      data.section,
+      data.weekRange,
+      data.classTeacher,
+      allLessonPlans,
+      allTeachers
+    );
   }
 
-  // One function to generate and download
-  static async generateAndDownload(
-    data: any,
-    fileName: string = 'Weekly_Syllabus.pdf'
-  ): Promise<void> {
+  // Download helper
+  static downloadPDF(base64String: string, fileName: string): void {
     try {
-      const pdfBase64 = await this.generatePDF(data);
-      this.downloadPDF(pdfBase64, fileName);
+      const link = document.createElement('a');
+      link.href = `data:application/pdf;base64,${base64String}`;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (error) {
-      console.error('Error:', error);
-      alert('PDF generation failed. Please check console for details.');
+      console.error('Download error:', error);
     }
   }
 }
+
+// ✅ **Alias for backward compatibility**
+export const Rd = PDFGenerator;
