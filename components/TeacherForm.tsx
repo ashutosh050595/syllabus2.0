@@ -128,54 +128,77 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [submissionPreview, setSubmissionPreview] = useState<any>(null);
 
+  // =========== WEEK CALCULATION (Runs once) ===========
+  useEffect(() => {
+    const calculateWeeks = () => {
+      const today = new Date();
+      const startOfWeek = new Date(today);
+      const day = startOfWeek.getDay();
+      const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+      startOfWeek.setDate(diff);
+      
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(endOfWeek.getDate() + 6);
+      
+      const formatDate = (date: Date) => {
+        const day = date.getDate().toString().padStart(2, '0');
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = monthNames[date.getMonth()];
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`;
+      };
+      
+      const currentWeekRange = `${formatDate(startOfWeek)} to ${formatDate(endOfWeek)}`;
+      setCurrentWeek(currentWeekRange);
+      
+      const nextWeekStart = new Date(startOfWeek);
+      nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+      const nextWeekEnd = new Date(endOfWeek);
+      nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
+      const nextWeekRange = `${formatDate(nextWeekStart)} to ${formatDate(nextWeekEnd)}`;
+      setNextWeek(nextWeekRange);
+      
+      setSelectedWeek(currentWeekRange);
+    };
+
+    calculateWeeks();
+  }, []);
+
   // =========== INITIALIZATION ===========
   useEffect(() => {
-    const initialize = async () => {
+    const initializeTeacherData = async () => {
+      if (!teacher?.email) return;
+      
       setIsLoading(true);
       try {
-        // Set current and next week
-        const today = new Date();
-        const startOfWeek = new Date(today);
-        const day = startOfWeek.getDay();
-        const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
-        startOfWeek.setDate(diff);
-        
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(endOfWeek.getDate() + 6);
-        
-        const formatDate = (date: Date) => {
-          const day = date.getDate().toString().padStart(2, '0');
-          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          const month = monthNames[date.getMonth()];
-          const year = date.getFullYear();
-          return `${day}-${month}-${year}`;
-        };
-        
-        const currentWeekRange = `${formatDate(startOfWeek)} to ${formatDate(endOfWeek)}`;
-        setCurrentWeek(currentWeekRange);
-        
-        const nextWeekStart = new Date(startOfWeek);
-        nextWeekStart.setDate(nextWeekStart.getDate() + 7);
-        const nextWeekEnd = new Date(endOfWeek);
-        nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
-        const nextWeekRange = `${formatDate(nextWeekStart)} to ${formatDate(nextWeekEnd)}`;
-        setNextWeek(nextWeekRange);
-        
-        setSelectedWeek(currentWeekRange);
-        
         // Check if teacher is class teacher
         const classTeacher = teacher.isClassTeacher;
         setIsClassTeacher(classTeacher);
         
         if (classTeacher && teacher.classTeacherOf) {
           setClassTeacherInfo(teacher.classTeacherOf);
-          await loadClassTeachersStatus();
+          if (isOnline) {
+            await loadClassTeachersStatus();
+          }
         }
         
         // Load teacher data
-        await loadTeacherAssignments();
-        await loadTeacherSubmissions();
-        await loadPendingModificationRequests();
+        if (isOnline) {
+          await Promise.all([
+            loadTeacherAssignments(),
+            loadTeacherSubmissions(),
+            loadPendingModificationRequests()
+          ]);
+        } else {
+          // Load from localStorage if offline
+          const cachedData = localStorage.getItem(`teacher_${teacher.email}_data`);
+          if (cachedData) {
+            const data = JSON.parse(cachedData);
+            setTeacherAssignments(data.assignments || []);
+            setTeacherSubmissions(data.submissions || []);
+            setSubmittedWeeks(data.submittedWeeks || []);
+          }
+        }
         
       } catch (error) {
         console.error('Initialization error:', error);
@@ -184,8 +207,8 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       }
     };
 
-    initialize();
-  }, [teacher, isOnline]);
+    initializeTeacherData();
+  }, [teacher?.email, teacher?.isClassTeacher, isOnline]);
 
   // =========== DATA LOADING FUNCTIONS ===========
   const loadTeacherAssignments = async () => {
@@ -194,6 +217,13 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
     try {
       const assignments = await APIService.getTeacherAssignments(teacher.email);
       setTeacherAssignments(assignments);
+      
+      // Cache data for offline use
+      const cachedData = {
+        assignments,
+        lastUpdated: new Date().toISOString()
+      };
+      localStorage.setItem(`teacher_${teacher.email}_assignments`, JSON.stringify(cachedData));
       
       // Initialize form data for each assignment
       const initialFormData: Record<string, any> = {};
@@ -214,6 +244,12 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       
     } catch (error) {
       console.error('Error loading assignments:', error);
+      // Try to load from cache on error
+      const cached = localStorage.getItem(`teacher_${teacher.email}_assignments`);
+      if (cached) {
+        const data = JSON.parse(cached);
+        setTeacherAssignments(data.assignments || []);
+      }
     }
   };
 
@@ -229,8 +265,23 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       const weeks = [...new Set(teacherSubs.map(s => s.weekRange))].sort();
       setSubmittedWeeks(weeks);
       
+      // Cache data
+      const cacheData = {
+        submissions: teacherSubs,
+        submittedWeeks: weeks,
+        lastUpdated: new Date().toISOString()
+      };
+      localStorage.setItem(`teacher_${teacher.email}_submissions`, JSON.stringify(cacheData));
+      
     } catch (error) {
       console.error('Error loading submissions:', error);
+      // Load from cache
+      const cached = localStorage.getItem(`teacher_${teacher.email}_submissions`);
+      if (cached) {
+        const data = JSON.parse(cached);
+        setTeacherSubmissions(data.submissions || []);
+        setSubmittedWeeks(data.submittedWeeks || []);
+      }
     }
   };
 
@@ -239,8 +290,10 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
     
     try {
       const { className, section } = classTeacherInfo;
-      const allTeachers = await APIService.fetchTeachers();
-      const allLessonPlans = await APIService.fetchLessonPlans();
+      const [allTeachers, allLessonPlans] = await Promise.all([
+        APIService.fetchTeachers(),
+        APIService.fetchLessonPlans()
+      ]);
       
       // Get teachers assigned to this class
       const assignedTeachers = allTeachers.filter(t => 
@@ -424,19 +477,32 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
         setTeacherSubmissions(prev => [...prev, submissionData]);
       }
       
+      // Update submitted weeks
+      if (!submittedWeeks.includes(selectedWeek)) {
+        setSubmittedWeeks(prev => [...prev, selectedWeek].sort());
+      }
+      
       // Send confirmation email
       const submittedClasses = selectedClasses.map(cls => 
         `${cls.className}-${cls.section} (${cls.subject})`
       );
       
-      const emailSent = await EmailService.sendEmail(
-        EmailService.createSubmissionConfirmation(
-          teacher.name,
-          teacher.email,
-          selectedWeek,
-          submittedClasses
-        )
-      );
+      let emailSent = false;
+      if (isOnline) {
+        try {
+          emailSent = await EmailService.sendEmail(
+            EmailService.createSubmissionConfirmation(
+              teacher.name,
+              teacher.email,
+              selectedWeek,
+              submittedClasses
+            )
+          );
+        } catch (emailError) {
+          console.error('Email sending failed:', emailError);
+          emailSent = false;
+        }
+      }
       
       setSubmissionStatus('success');
       setSubmissionPreview({
@@ -463,9 +529,11 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       setSelectedClasses([]);
       
       // Refresh data
-      await onRefresh();
       await loadTeacherSubmissions();
       if (isClassTeacher) await loadClassTeachersStatus();
+      
+      // Clear cache after submission
+      localStorage.removeItem(`teacher_${teacher.email}_submissions`);
       
     } catch (error: any) {
       console.error('❌ Error submitting lesson plans:', error);
@@ -485,8 +553,10 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
     
     try {
       const { className, section } = classTeacherInfo;
-      const allTeachers = await APIService.fetchTeachers();
-      const allLessonPlans = await APIService.fetchLessonPlans();
+      const [allTeachers, allLessonPlans] = await Promise.all([
+        APIService.fetchTeachers(),
+        APIService.fetchLessonPlans()
+      ]);
       
       const pdfBase64 = PDFGenerator.generatePDFFromLessonPlans(
         className,
@@ -521,8 +591,10 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
     
     try {
       const { className, section } = classTeacherInfo;
-      const allTeachers = await APIService.fetchTeachers();
-      const allLessonPlans = await APIService.fetchLessonPlans();
+      const [allTeachers, allLessonPlans] = await Promise.all([
+        APIService.fetchTeachers(),
+        APIService.fetchLessonPlans()
+      ]);
       
       const pdfBase64 = PDFGenerator.generatePDFFromLessonPlans(
         className,
@@ -778,7 +850,12 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
               {selectedClasses.length === teacherAssignments.length ? 'Deselect All' : 'Select All'}
             </button>
             <button
-              onClick={onRefresh}
+              onClick={async () => {
+                await onRefresh();
+                await loadTeacherAssignments();
+                await loadTeacherSubmissions();
+                if (isClassTeacher) await loadClassTeachersStatus();
+              }}
               className="p-2 text-slate-400 hover:text-indigo-600 rounded-lg"
             >
               <RefreshCw className="h-5 w-5" />
