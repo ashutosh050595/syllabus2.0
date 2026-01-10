@@ -10,23 +10,81 @@ import {
   MessageSquare, ThumbsUp, Award, Target, Flag,
   Compass, Navigation, MapPin, Globe, Cloud,
   CloudOff, Wifi, WifiOff, Database, Server,
-  Cpu, HardDrive, MemoryStick, Router, ShieldAlert,
-  X, Loader2, ChevronRight, ChevronLeft, ExternalLink,
+  Loader2, ChevronRight, ChevronLeft, ExternalLink,
   Copy, Share, MoreVertical, Menu, Grid, List,
   Heart, Bookmark, Tag, Image, Video, Music,
   Camera, Mic, Headphones, Battery, BatteryCharging,
   Thermometer, Droplets, Wind, Sun, Moon,
   Star as StarIcon, CloudRain, CloudSnow, CloudLightning,
   Umbrella, Trees, Mountain, Navigation2, Map,
-  // ADD THIS IMPORT
-  RefreshCw as RefreshIcon
+  Users, Check, X, ArrowRight, ArrowLeft, Book,
+  File, Folder, FolderOpen, HardDrive, Cpu, Router,
+  ShieldAlert, Battery as BatteryFull, ThermometerSun,
+  Wind as WindIcon, Sunrise, Sunset, Cloud as CloudIcon,
+  Moon as MoonIcon, Sun as SunIcon, Rain as RainIcon,
+  Snow as SnowIcon, CloudLightning as LightningIcon,
+  // Custom icons for our features
+  FileCheck, FileX, FileSearch, FileQuestion,
+  ClipboardCheck, ClipboardList, ClipboardX,
+  BookmarkCheck, BookmarkX, CalendarCheck,
+  CalendarX, CalendarDays, CalendarRange,
+  Notebook, NotebookText, NotebookPen,
+  School, GraduationCap as GradCap, Chalkboard,
+  ChalkboardTeacher, UserCheck, UserX, UserCog,
+  Users as UsersIcon, UserPlus, UserMinus,
+  BarChart3, PieChart as PieChartIcon, TrendingUp as TrendingUpIcon,
+  DownloadCloud, UploadCloud, Save, Share2,
+  Link, Unlink, Lock as LockIcon, Unlock,
+  Key as KeyIcon, Fingerprint, Shield as ShieldIcon,
+  ShieldCheck, ShieldOff, AlertOctagon, Info,
+  HelpCircle as HelpCircleIcon, Settings as SettingsIcon,
+  Bell as BellIcon, BellOff, BellRing,
+  Home as HomeIcon, LogOut as LogOutIcon,
+  User as UserIcon, Mail as MailIcon, Phone as PhoneIcon,
+  MessageCircle, MessageSquare as MessageSquareIcon,
+  Send as SendIcon, Paperclip, Image as ImageIcon,
+  Film, Music as MusicIcon, Headphones as HeadphonesIcon,
+  Video as VideoIcon, Camera as CameraIcon, Mic as MicIcon,
+  Volume2, VolumeX, Play, Pause, StopCircle,
+  SkipBack, SkipForward, Repeat, Shuffle,
+  Heart as HeartIcon, HeartOff, ThumbsUp as ThumbsUpIcon,
+  ThumbsDown, Star as StarIcon2, Flag as FlagIcon,
+  Award as AwardIcon, Trophy, Medal, Crown,
+  Target as TargetIcon, Crosshair, Compass as CompassIcon,
+  Map as MapIcon, Navigation as NavigationIcon,
+  Globe as GlobeIcon, MapPin as MapPinIcon,
+  // New imports for our features
+  Eye as EyeIcon, EyeOff as EyeOffIcon,
+  Filter as FilterIcon, Grid as GridIcon,
+  List as ListIcon, MoreVertical as MoreVerticalIcon,
+  ChevronRight as ChevronRightIcon,
+  ChevronLeft as ChevronLeftIcon,
+  // PDF Generator
+  FilePdf,
+  // New features
+  CheckSquare, Square, Layers, GitMerge,
+  GitPullRequest, GitBranch, GitCommit,
+  GitCompare, GitMerge as GitMergeIcon,
+  GitPullRequest as GitPullRequestIcon,
+  GitBranch as GitBranchIcon,
+  GitCommit as GitCommitIcon,
+  GitCompare as GitCompareIcon,
+  // Additional
+  Coffee, Cigarette, Wine, Beer, Cake,
+  Pizza, Hamburger, IceCream, Apple,
+  Banana, Carrot, Egg, Fish, Milk,
+  Coffee as CoffeeIcon, Wine as WineIcon,
+  Beer as BeerIcon, Cake as CakeIcon,
+  Pizza as PizzaIcon, Hamburger as HamburgerIcon,
+  IceCream as IceCreamIcon, Apple as AppleIcon,
+  Banana as BananaIcon, Carrot as CarrotIcon,
+  Egg as EggIcon, Fish as FishIcon, Milk as MilkIcon
 } from 'lucide-react';
 import { APIService } from '../services/api-supabase';
 import { EmailService } from '../services/email-service';
-import { generateWeekRange, getCurrentWeek, getNextWeek } from '../utils/dateUtils';
-import { DEFAULT_TEACHER_PASSWORD } from '../constants';
-// ADD THIS IMPORT
+import { PDFGenerator } from '../services/pdf-generator';
 import TeacherModificationRequest from './TeacherModificationRequest';
+import { DEFAULT_TEACHER_PASSWORD } from '../constants';
 
 interface TeacherFormProps {
   teacher: any;
@@ -36,53 +94,128 @@ interface TeacherFormProps {
 }
 
 const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, isOnline }) => {
-  // Existing states
-  const [formData, setFormData] = useState({
-    className: '',
-    section: '',
-    subject: '',
-    weekRange: '',
-    topics: '',
-    objectives: '',
-    activities: '',
-    resources: '',
-    assessment: ''
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // =========== STATES ===========
+  const [isLoading, setIsLoading] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [currentWeek, setCurrentWeek] = useState('');
   const [nextWeek, setNextWeek] = useState('');
   const [selectedWeek, setSelectedWeek] = useState('');
-  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
-  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
-  const [submissionPreview, setSubmissionPreview] = useState<any>(null);
-  const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]);
-  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true);
-  const [showHistory, setShowHistory] = useState(false);
-  const [filteredHistory, setFilteredHistory] = useState<any[]>([]);
-  const [historyFilter, setHistoryFilter] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'date' | 'class' | 'subject'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [showStats, setShowStats] = useState(false);
-  const [stats, setStats] = useState({
-    totalSubmissions: 0,
-    thisMonth: 0,
-    lastMonth: 0,
-    pending: 0,
-    submitted: 0
-  });
   
-  // NEW STATES FOR MODIFICATION FEATURE
+  // Multi-class form states
+  const [selectedClasses, setSelectedClasses] = useState<any[]>([]);
+  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  
+  // Teacher assignments and submissions
+  const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]);
+  const [teacherSubmissions, setTeacherSubmissions] = useState<any[]>([]);
+  const [submittedWeeks, setSubmittedWeeks] = useState<string[]>([]);
+  
+  // Class teacher features
+  const [isClassTeacher, setIsClassTeacher] = useState(false);
+  const [classTeacherInfo, setClassTeacherInfo] = useState<any>(null);
+  const [classTeachersStatus, setClassTeachersStatus] = useState<any[]>([]);
+  const [classPdfPreview, setClassPdfPreview] = useState<string | null>(null);
+  const [showClassStatus, setShowClassStatus] = useState(false);
+  
+  // Modification request
   const [showModificationRequest, setShowModificationRequest] = useState(false);
   const [selectedWeekForModification, setSelectedWeekForModification] = useState('');
-  const [submittedWeeks, setSubmittedWeeks] = useState<string[]>([]);
-  const [teacherSubmissions, setTeacherSubmissions] = useState<any[]>([]);
+  const [pendingModificationRequests, setPendingModificationRequests] = useState<any[]>([]);
+  
+  // Success modal
+  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+  const [submissionPreview, setSubmissionPreview] = useState<any>(null);
 
-  // Load teacher submissions for modification feature
+  // =========== INITIALIZATION ===========
   useEffect(() => {
-    loadTeacherSubmissions();
+    const initialize = async () => {
+      setIsLoading(true);
+      try {
+        // Set current and next week
+        const today = new Date();
+        const startOfWeek = new Date(today);
+        const day = startOfWeek.getDay();
+        const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+        startOfWeek.setDate(diff);
+        
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(endOfWeek.getDate() + 6);
+        
+        const formatDate = (date: Date) => {
+          const day = date.getDate().toString().padStart(2, '0');
+          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const month = monthNames[date.getMonth()];
+          const year = date.getFullYear();
+          return `${day}-${month}-${year}`;
+        };
+        
+        const currentWeekRange = `${formatDate(startOfWeek)} to ${formatDate(endOfWeek)}`;
+        setCurrentWeek(currentWeekRange);
+        
+        const nextWeekStart = new Date(startOfWeek);
+        nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+        const nextWeekEnd = new Date(endOfWeek);
+        nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
+        const nextWeekRange = `${formatDate(nextWeekStart)} to ${formatDate(nextWeekEnd)}`;
+        setNextWeek(nextWeekRange);
+        
+        setSelectedWeek(currentWeekRange);
+        
+        // Check if teacher is class teacher
+        const classTeacher = teacher.isClassTeacher;
+        setIsClassTeacher(classTeacher);
+        
+        if (classTeacher && teacher.classTeacherOf) {
+          setClassTeacherInfo(teacher.classTeacherOf);
+          await loadClassTeachersStatus();
+        }
+        
+        // Load teacher data
+        await loadTeacherAssignments();
+        await loadTeacherSubmissions();
+        await loadPendingModificationRequests();
+        
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initialize();
   }, [teacher, isOnline]);
+
+  // =========== DATA LOADING FUNCTIONS ===========
+  const loadTeacherAssignments = async () => {
+    if (!isOnline || !teacher?.email) return;
+    
+    try {
+      const assignments = await APIService.getTeacherAssignments(teacher.email);
+      setTeacherAssignments(assignments);
+      
+      // Initialize form data for each assignment
+      const initialFormData: Record<string, any> = {};
+      assignments.forEach((assignment: any) => {
+        const key = `${assignment.className}_${assignment.sections?.[0] || 'A'}_${assignment.subject}`;
+        initialFormData[key] = {
+          className: assignment.className,
+          section: assignment.sections?.[0] || 'A',
+          subject: assignment.subject,
+          weekRange: selectedWeek || currentWeek,
+          chapter: '',
+          topics: '',
+          homework: ''
+        };
+      });
+      
+      setFormData(initialFormData);
+      
+    } catch (error) {
+      console.error('Error loading assignments:', error);
+    }
+  };
 
   const loadTeacherSubmissions = async () => {
     if (!isOnline || !teacher?.email) return;
@@ -96,144 +229,141 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       const weeks = [...new Set(teacherSubs.map(s => s.weekRange))].sort();
       setSubmittedWeeks(weeks);
       
-      console.log(`📊 Loaded ${teacherSubs.length} submissions for ${teacher.name}`);
     } catch (error) {
       console.error('Error loading submissions:', error);
     }
   };
 
-  // Existing useEffect for current week
-  useEffect(() => {
-    const today = new Date();
-    const startOfWeek = new Date(today);
-    const day = startOfWeek.getDay();
-    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
-    startOfWeek.setDate(diff);
+  const loadClassTeachersStatus = async () => {
+    if (!isOnline || !isClassTeacher || !classTeacherInfo) return;
     
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(endOfWeek.getDate() + 6);
-    
-    const formatDate = (date: Date) => {
-      const day = date.getDate().toString().padStart(2, '0');
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const month = monthNames[date.getMonth()];
-      const year = date.getFullYear();
-      return `${day}-${month}-${year}`;
-    };
-    
-    const currentWeekRange = `${formatDate(startOfWeek)} to ${formatDate(endOfWeek)}`;
-    setCurrentWeek(currentWeekRange);
-    
-    const nextWeekStart = new Date(startOfWeek);
-    nextWeekStart.setDate(nextWeekStart.getDate() + 7);
-    const nextWeekEnd = new Date(endOfWeek);
-    nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
-    const nextWeekRange = `${formatDate(nextWeekStart)} to ${formatDate(nextWeekEnd)}`;
-    setNextWeek(nextWeekRange);
-    
-    setSelectedWeek(currentWeekRange);
-    setFormData(prev => ({ ...prev, weekRange: currentWeekRange }));
-  }, []);
-
-  // Existing useEffect for teacher assignments
-  useEffect(() => {
-    const loadAssignments = async () => {
-      if (!isOnline || !teacher?.email) return;
+    try {
+      const { className, section } = classTeacherInfo;
+      const allTeachers = await APIService.fetchTeachers();
+      const allLessonPlans = await APIService.fetchLessonPlans();
       
-      setIsLoadingAssignments(true);
-      try {
-        const assignments = await APIService.getTeacherAssignments(teacher.email);
-        setTeacherAssignments(assignments);
-        
-        if (assignments.length > 0) {
-          const firstAssignment = assignments[0];
-          setFormData(prev => ({
-            ...prev,
-            className: firstAssignment.className || '',
-            subject: firstAssignment.subject || ''
-          }));
-        }
-      } catch (error) {
-        console.error('Error loading assignments:', error);
-      } finally {
-        setIsLoadingAssignments(false);
-      }
-    };
-    
-    loadAssignments();
-  }, [teacher, isOnline]);
-
-  // Existing useEffect for history filtering
-  useEffect(() => {
-    let filtered = [...history];
-    
-    if (historyFilter !== 'all') {
-      filtered = filtered.filter(item => item.status === historyFilter);
-    }
-    
-    if (searchTerm) {
-      filtered = filtered.filter(item => 
-        item.className?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.weekRange?.toLowerCase().includes(searchTerm.toLowerCase())
+      // Get teachers assigned to this class
+      const assignedTeachers = allTeachers.filter(t => 
+        t.assignments?.some((a: any) => 
+          a.className === className && a.sections?.includes(section)
+        )
       );
-    }
-    
-    filtered.sort((a, b) => {
-      const aValue = sortBy === 'date' ? new Date(a.submittedAt || a.createdAt).getTime() :
-                     sortBy === 'class' ? a.className || '' : a.subject || '';
-      const bValue = sortBy === 'date' ? new Date(b.submittedAt || b.createdAt).getTime() :
-                     sortBy === 'class' ? b.className || '' : b.subject || '';
       
-      if (sortBy === 'date') {
-        return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
-      } else {
-        return sortOrder === 'asc' 
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      }
-    });
-    
-    setFilteredHistory(filtered);
-  }, [history, historyFilter, searchTerm, sortBy, sortOrder]);
-
-  // Existing useEffect for stats
-  useEffect(() => {
-    const calculateStats = () => {
-      const totalSubmissions = history.length;
-      const now = new Date();
-      const thisMonth = now.getMonth();
-      const thisYear = now.getFullYear();
-      
-      const thisMonthSubmissions = history.filter(item => {
-        const date = new Date(item.submittedAt || item.createdAt);
-        return date.getMonth() === thisMonth && date.getFullYear() === thisYear;
-      }).length;
-      
-      const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
-      const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear;
-      
-      const lastMonthSubmissions = history.filter(item => {
-        const date = new Date(item.submittedAt || item.createdAt);
-        return date.getMonth() === lastMonth && date.getFullYear() === lastMonthYear;
-      }).length;
-      
-      const pending = history.filter(item => item.status === 'draft' || item.status === 'pending').length;
-      const submitted = history.filter(item => item.status === 'submitted' || item.status === 'approved').length;
-      
-      setStats({
-        totalSubmissions,
-        thisMonth: thisMonthSubmissions,
-        lastMonth: lastMonthSubmissions,
-        pending,
-        submitted
+      // Check submission status for current week
+      const status = assignedTeachers.map(t => {
+        const hasSubmitted = allLessonPlans.some(plan => 
+          plan.teacherId === t.email && 
+          plan.className === className && 
+          plan.section === section && 
+          plan.weekRange === currentWeek
+        );
+        
+        return {
+          teacher: t,
+          submitted: hasSubmitted,
+          subject: t.assignments?.find((a: any) => 
+            a.className === className && a.sections?.includes(section)
+          )?.subject || 'N/A'
+        };
       });
-    };
-    
-    calculateStats();
-  }, [history]);
+      
+      setClassTeachersStatus(status);
+      
+    } catch (error) {
+      console.error('Error loading class teachers status:', error);
+    }
+  };
 
-  // Existing function to handle form submission
+  const loadPendingModificationRequests = async () => {
+    if (!isOnline || !teacher?.email) return;
+    
+    try {
+      const requests = await APIService.getResubmissionRequests(teacher.email, '');
+      const pending = requests.filter((req: any) => req.status === 'pending');
+      setPendingModificationRequests(pending);
+      
+    } catch (error) {
+      console.error('Error loading modification requests:', error);
+    }
+  };
+
+  // =========== FORM HANDLING ===========
+  const handleClassToggle = (assignment: any) => {
+    const key = `${assignment.className}_${assignment.sections?.[0] || 'A'}_${assignment.subject}`;
+    
+    if (selectedClasses.some(c => c.key === key)) {
+      // Remove from selection
+      setSelectedClasses(prev => prev.filter(c => c.key !== key));
+    } else {
+      // Add to selection
+      setSelectedClasses(prev => [...prev, {
+        key,
+        className: assignment.className,
+        section: assignment.sections?.[0] || 'A',
+        subject: assignment.subject
+      }]);
+      
+      // Initialize form data if not exists
+      if (!formData[key]) {
+        setFormData(prev => ({
+          ...prev,
+          [key]: {
+            className: assignment.className,
+            section: assignment.sections?.[0] || 'A',
+            subject: assignment.subject,
+            weekRange: selectedWeek || currentWeek,
+            chapter: '',
+            topics: '',
+            homework: ''
+          }
+        }));
+      }
+    }
+  };
+
+  const handleSelectAllClasses = () => {
+    if (selectedClasses.length === teacherAssignments.length) {
+      // Deselect all
+      setSelectedClasses([]);
+    } else {
+      // Select all
+      const allClasses = teacherAssignments.map(assignment => ({
+        key: `${assignment.className}_${assignment.sections?.[0] || 'A'}_${assignment.subject}`,
+        className: assignment.className,
+        section: assignment.sections?.[0] || 'A',
+        subject: assignment.subject
+      }));
+      setSelectedClasses(allClasses);
+      
+      // Initialize form data for all
+      const newFormData: Record<string, any> = { ...formData };
+      allClasses.forEach(cls => {
+        if (!newFormData[cls.key]) {
+          newFormData[cls.key] = {
+            className: cls.className,
+            section: cls.section,
+            subject: cls.subject,
+            weekRange: selectedWeek || currentWeek,
+            chapter: '',
+            topics: '',
+            homework: ''
+          };
+        }
+      });
+      setFormData(newFormData);
+    }
+  };
+
+  const handleInputChange = (key: string, field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [field]: value
+      }
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -242,8 +372,22 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       return;
     }
     
-    if (!formData.className || !formData.section || !formData.subject || !formData.weekRange) {
-      alert('❌ Please fill all required fields: Class, Section, Subject, and Week.');
+    if (selectedClasses.length === 0) {
+      alert('❌ Please select at least one class to submit.');
+      return;
+    }
+    
+    // Validate all selected classes
+    const errors = [];
+    selectedClasses.forEach(cls => {
+      const data = formData[cls.key];
+      if (!data.chapter?.trim()) errors.push(`Chapter for ${cls.className}-${cls.section} (${cls.subject})`);
+      if (!data.topics?.trim()) errors.push(`Topics for ${cls.className}-${cls.section} (${cls.subject})`);
+      if (!data.homework?.trim()) errors.push(`Homework for ${cls.className}-${cls.section} (${cls.subject})`);
+    });
+    
+    if (errors.length > 0) {
+      alert(`❌ Please fill all required fields:\n\n${errors.join('\n')}`);
       return;
     }
     
@@ -251,59 +395,80 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
     setIsSubmitting(true);
     
     try {
-      const submissionData = {
-        ...formData,
-        teacherId: teacher.email,
-        teacherName: teacher.name,
-        submittedAt: new Date().toISOString(),
-        status: 'submitted'
-      };
+      const submissionResults = [];
       
-      console.log('📝 Submitting lesson plan:', submissionData);
-      
-      const result = await APIService.submitLessonPlan(submissionData);
-      
-      console.log('✅ Lesson plan submitted:', result);
+      for (const cls of selectedClasses) {
+        const data = formData[cls.key];
+        
+        const submissionData = {
+          className: data.className,
+          section: data.section,
+          subject: data.subject,
+          weekRange: selectedWeek,
+          topics: `${data.chapter}\n\nTopics:\n${data.topics}`,
+          assessment: data.homework,
+          teacherId: teacher.email,
+          teacherName: teacher.name,
+          submittedAt: new Date().toISOString(),
+          status: 'submitted'
+        };
+        
+        const result = await APIService.submitLessonPlan(submissionData);
+        submissionResults.push({
+          class: `${data.className}-${data.section}`,
+          subject: data.subject,
+          success: true
+        });
+        
+        // Update local state
+        setTeacherSubmissions(prev => [...prev, submissionData]);
+      }
       
       // Send confirmation email
+      const submittedClasses = selectedClasses.map(cls => 
+        `${cls.className}-${cls.section} (${cls.subject})`
+      );
+      
       const emailSent = await EmailService.sendEmail(
         EmailService.createSubmissionConfirmation(
           teacher.name,
           teacher.email,
-          formData.weekRange,
-          [`${formData.className}-${formData.section} (${formData.subject})`]
+          selectedWeek,
+          submittedClasses
         )
       );
       
-      if (emailSent) {
-        console.log('📧 Confirmation email sent');
-      } else {
-        console.log('⚠️ Confirmation email failed');
-      }
-      
       setSubmissionStatus('success');
-      setSubmissionPreview(submissionData);
+      setSubmissionPreview({
+        week: selectedWeek,
+        classes: submissionResults,
+        timestamp: new Date(),
+        emailSent
+      });
       setShowSubmissionModal(true);
       
-      // Reset form
-      setFormData({
-        className: '',
-        section: '',
-        subject: '',
-        weekRange: selectedWeek,
-        topics: '',
-        objectives: '',
-        activities: '',
-        resources: '',
-        assessment: ''
+      // Clear form for submitted classes
+      const newFormData = { ...formData };
+      selectedClasses.forEach(cls => {
+        if (newFormData[cls.key]) {
+          newFormData[cls.key] = {
+            ...newFormData[cls.key],
+            chapter: '',
+            topics: '',
+            homework: ''
+          };
+        }
       });
+      setFormData(newFormData);
+      setSelectedClasses([]);
       
       // Refresh data
       await onRefresh();
       await loadTeacherSubmissions();
+      if (isClassTeacher) await loadClassTeachersStatus();
       
     } catch (error: any) {
-      console.error('❌ Error submitting lesson plan:', error);
+      console.error('❌ Error submitting lesson plans:', error);
       setSubmissionStatus('error');
       alert(`Failed to submit: ${error.message}`);
     } finally {
@@ -311,48 +476,136 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
     }
   };
 
-  // Existing function to handle input change
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  // =========== CLASS TEACHER FEATURES ===========
+  const generateClassPdf = async () => {
+    if (!isClassTeacher || !classTeacherInfo || !isOnline) {
+      alert('❌ You are not a class teacher or offline.');
+      return;
+    }
+    
+    try {
+      const { className, section } = classTeacherInfo;
+      const allTeachers = await APIService.fetchTeachers();
+      const allLessonPlans = await APIService.fetchLessonPlans();
+      
+      const pdfBase64 = PDFGenerator.generatePDFFromLessonPlans(
+        className,
+        section,
+        currentWeek,
+        teacher.name,
+        allLessonPlans,
+        allTeachers
+      );
+      
+      setClassPdfPreview(pdfBase64);
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = `data:application/pdf;base64,${pdfBase64}`;
+      link.download = `Class_${className}_${section}_${currentWeek.replace(/ /g, '_')}.pdf`;
+      link.click();
+      
+      alert(`✅ PDF generated for ${className}-${section}`);
+      
+    } catch (error: any) {
+      console.error('Error generating PDF:', error);
+      alert('❌ Failed to generate PDF: ' + error.message);
+    }
   };
 
-  // Existing function to handle week selection
-  const handleWeekSelect = (week: string) => {
-    setSelectedWeek(week);
-    setFormData(prev => ({ ...prev, weekRange: week }));
+  const previewClassPdf = async () => {
+    if (!isClassTeacher || !classTeacherInfo || !isOnline) {
+      alert('❌ You are not a class teacher or offline.');
+      return;
+    }
+    
+    try {
+      const { className, section } = classTeacherInfo;
+      const allTeachers = await APIService.fetchTeachers();
+      const allLessonPlans = await APIService.fetchLessonPlans();
+      
+      const pdfBase64 = PDFGenerator.generatePDFFromLessonPlans(
+        className,
+        section,
+        currentWeek,
+        teacher.name,
+        allLessonPlans,
+        allTeachers
+      );
+      
+      // Open PDF in new tab
+      const pdfWindow = window.open();
+      if (pdfWindow) {
+        pdfWindow.document.write(`
+          <html>
+            <head>
+              <title>PDF Preview - ${className}-${section}</title>
+              <style>
+                body { margin: 0; padding: 0; }
+                iframe { width: 100%; height: 100vh; border: none; }
+              </style>
+            </head>
+            <body>
+              <iframe src="data:application/pdf;base64,${pdfBase64}"></iframe>
+            </body>
+          </html>
+        `);
+      }
+      
+    } catch (error: any) {
+      console.error('Error previewing PDF:', error);
+      alert('❌ Failed to preview PDF: ' + error.message);
+    }
   };
 
-  // Existing function to handle assignment selection
-  const handleAssignmentSelect = (assignment: any) => {
-    setFormData(prev => ({
-      ...prev,
-      className: assignment.className || '',
-      subject: assignment.subject || '',
-      section: assignment.sections?.[0] || ''
-    }));
-  };
-
-  // Existing function to copy to clipboard
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    alert('Copied to clipboard!');
-  };
-
-  // NEW FUNCTION: Handle modification request
+  // =========== MODIFICATION REQUEST ===========
   const handleRequestModification = (weekRange: string) => {
+    // Check if already has pending request for this week
+    const existingRequest = pendingModificationRequests.find(
+      req => req.week_range === weekRange
+    );
+    
+    if (existingRequest) {
+      alert(`⚠️ You already have a pending modification request for ${weekRange}.\n\nRequest ID: ${existingRequest.id}\nStatus: ${existingRequest.status}`);
+      return;
+    }
+    
     setSelectedWeekForModification(weekRange);
     setShowModificationRequest(true);
   };
 
-  // Existing render function continues...
+  // =========== RENDER FUNCTIONS ===========
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative">
+            <div className="h-16 w-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+            <User className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-indigo-600" />
+          </div>
+          <div className="text-center space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Loading Dashboard</p>
+            <p className="text-xs text-slate-500">Welcome, {teacher.name}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
-      {/* Welcome Card */}
+      {/* =========== WELCOME CARD =========== */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-[2.5rem] p-8 text-white">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <h1 className="text-2xl md:text-3xl font-black italic tracking-tight">Welcome, {teacher.name}!</h1>
+            <h1 className="text-2xl md:text-3xl font-black italic tracking-tight">
+              Welcome, {teacher.name}!
+              {isClassTeacher && (
+                <span className="ml-3 text-sm bg-white/20 px-3 py-1 rounded-full">
+                  👨‍🏫 Class Teacher
+                </span>
+              )}
+            </h1>
             <p className="text-indigo-100 mt-2">Submit your weekly lesson plans here</p>
             <div className="flex items-center gap-4 mt-4">
               <div className="flex items-center gap-2">
@@ -383,28 +636,121 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                 )}
               </div>
             </div>
-            <div className="mt-4 text-center">
-              <div className="text-xs text-indigo-200">Teacher ID</div>
-              <div className="text-sm font-bold bg-white/10 px-3 py-1 rounded-lg mt-1">
-                {teacher.email.split('@')[0]}
+            {isClassTeacher && classTeacherInfo && (
+              <div className="mt-4 text-center">
+                <div className="text-xs text-indigo-200">Class Teacher of</div>
+                <div className="text-lg font-bold bg-white/10 px-4 py-2 rounded-lg mt-1">
+                  {classTeacherInfo.className}-{classTeacherInfo.section}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Week Selection */}
+      {/* =========== CLASS TEACHER DASHBOARD =========== */}
+      {isClassTeacher && classTeacherInfo && (
+        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-black uppercase italic tracking-tight flex items-center gap-2">
+                <Users className="h-5 w-5 text-indigo-600" />
+                Class Teacher Dashboard
+              </h3>
+              <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em] mt-1">
+                {classTeacherInfo.className}-{classTeacherInfo.section}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowClassStatus(!showClassStatus)}
+                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-200"
+              >
+                {showClassStatus ? 'Hide Status' : 'Show Status'}
+              </button>
+              <button
+                onClick={previewClassPdf}
+                className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg font-bold text-sm hover:bg-blue-200"
+              >
+                <Eye className="h-4 w-4 inline mr-2" />
+                Preview PDF
+              </button>
+              <button
+                onClick={generateClassPdf}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700"
+              >
+                <Download className="h-4 w-4 inline mr-2" />
+                Download PDF
+              </button>
+            </div>
+          </div>
+
+          {showClassStatus && (
+            <div className="mb-6 p-4 bg-slate-50 rounded-2xl">
+              <h4 className="font-bold text-slate-900 mb-4">Submission Status for {currentWeek}</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {classTeachersStatus.map((status, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-4 rounded-xl border ${status.submitted ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-bold text-slate-900">{status.teacher.name}</div>
+                        <div className="text-sm text-slate-600">{status.subject}</div>
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-xs font-bold ${status.submitted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {status.submitted ? '✅ Submitted' : '⏳ Pending'}
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-slate-500">
+                      Email: {status.teacher.email}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-slate-600">
+                    Total Teachers: {classTeachersStatus.length}
+                  </div>
+                  <div className="text-sm font-bold">
+                    <span className="text-emerald-600">Submitted: {classTeachersStatus.filter(s => s.submitted).length}</span>
+                    {' • '}
+                    <span className="text-amber-600">Pending: {classTeachersStatus.filter(s => !s.submitted).length}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="text-sm text-slate-600">
+            <p className="mb-2">
+              <strong>Class:</strong> {classTeacherInfo.className}-{classTeacherInfo.section}
+            </p>
+            <p className="mb-2">
+              <strong>Current Week:</strong> {currentWeek}
+            </p>
+            <p>
+              <strong>Note:</strong> As class teacher, you can track submissions and download weekly PDFs.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* =========== WEEK SELECTION =========== */}
       <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
         <h3 className="text-lg font-black uppercase italic tracking-tight mb-4">Select Week</h3>
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => handleWeekSelect(currentWeek)}
+            onClick={() => setSelectedWeek(currentWeek)}
             className={`px-6 py-3 rounded-xl font-bold text-sm transition-all ${selectedWeek === currentWeek ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
           >
             Current Week: {currentWeek}
           </button>
           <button
-            onClick={() => handleWeekSelect(nextWeek)}
+            onClick={() => setSelectedWeek(nextWeek)}
             className={`px-6 py-3 rounded-xl font-bold text-sm transition-all ${selectedWeek === nextWeek ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
           >
             Next Week: {nextWeek}
@@ -415,76 +761,21 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
         </p>
       </div>
 
-      {/* Assignments Quick Select */}
-      {teacherAssignments.length > 0 && (
-        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-black uppercase italic tracking-tight">Your Assignments</h3>
-            <span className="text-sm text-slate-500">{teacherAssignments.length} classes</span>
-          </div>
-          
-          {isLoadingAssignments ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 text-slate-300 animate-spin" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {teacherAssignments.map((assignment, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleAssignmentSelect(assignment)}
-                  className={`p-4 rounded-xl border transition-all text-left ${
-                    formData.className === assignment.className && formData.subject === assignment.subject
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-bold text-slate-900">{assignment.subject}</div>
-                      <div className="text-sm text-slate-600">Class {assignment.className}</div>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-slate-400" />
-                  </div>
-                  {assignment.sections && assignment.sections.length > 0 && (
-                    <div className="mt-2">
-                      <div className="text-xs text-slate-500">Sections:</div>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {assignment.sections.map((section: string, idx: number) => (
-                          <span key={idx} className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs">
-                            {section}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Lesson Plan Form */}
+      {/* =========== MULTI-CLASS SUBMISSION FORM =========== */}
       <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-black uppercase italic tracking-tight">Lesson Plan Form</h3>
+          <div>
+            <h3 className="text-xl font-black uppercase italic tracking-tight">Lesson Plan Submission</h3>
+            <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em] mt-1">
+              Submit for multiple classes at once
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setFormData({
-                className: '',
-                section: '',
-                subject: '',
-                weekRange: selectedWeek,
-                topics: '',
-                objectives: '',
-                activities: '',
-                resources: '',
-                assessment: ''
-              })}
+              onClick={handleSelectAllClasses}
               className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-200"
             >
-              Clear Form
+              {selectedClasses.length === teacherAssignments.length ? 'Deselect All' : 'Select All'}
             </button>
             <button
               onClick={onRefresh}
@@ -495,191 +786,162 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Information Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                Class <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="className"
-                value={formData.className}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500"
-                placeholder="e.g., 10, 11, 12"
-                required
-                disabled={!isOnline}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                Section <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="section"
-                value={formData.section}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500"
-                placeholder="e.g., A, B, C"
-                required
-                disabled={!isOnline}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                Subject <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="subject"
-                value={formData.subject}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500"
-                placeholder="e.g., Mathematics, Science"
-                required
-                disabled={!isOnline}
-              />
+        {/* Class Selection */}
+        {teacherAssignments.length > 0 && (
+          <div className="mb-6">
+            <h4 className="font-bold text-slate-700 mb-4">Select Classes to Submit:</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {teacherAssignments.map((assignment, idx) => {
+                const key = `${assignment.className}_${assignment.sections?.[0] || 'A'}_${assignment.subject}`;
+                const isSelected = selectedClasses.some(c => c.key === key);
+                
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleClassToggle(assignment)}
+                    className={`p-4 rounded-xl border text-left transition-all ${isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-bold text-slate-900">{assignment.subject}</div>
+                        <div className="text-sm text-slate-600">Class {assignment.className}</div>
+                        <div className="text-xs text-slate-500">
+                          Section: {assignment.sections?.join(', ') || 'A'}
+                        </div>
+                      </div>
+                      <div className={`h-5 w-5 rounded border ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'}`}>
+                        {isSelected && <Check className="h-4 w-4 text-white" />}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
+        )}
 
-          {/* Week Display (Read-only) */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">
-              Week Range <span className="text-rose-500">*</span>
-            </label>
-            <div className="px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-700 font-bold">
-              {selectedWeek}
+        {/* Form for Selected Classes */}
+        {selectedClasses.length > 0 && (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-8">
+              {selectedClasses.map((cls, idx) => {
+                const data = formData[cls.key] || {};
+                
+                return (
+                  <div key={idx} className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-bold text-lg text-slate-900">
+                        {cls.className}-{cls.section} ({cls.subject})
+                      </h4>
+                      <div className="text-sm text-slate-500">
+                        Week: {selectedWeek}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      {/* Chapter Name */}
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                          Name of the Chapter to be taught in current week *
+                        </label>
+                        <input
+                          type="text"
+                          value={data.chapter || ''}
+                          onChange={(e) => handleInputChange(cls.key, 'chapter', e.target.value)}
+                          className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl outline-none focus:border-indigo-500"
+                          placeholder="Enter chapter name..."
+                          required
+                        />
+                      </div>
+                      
+                      {/* Topics/Subtopics */}
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                          Topics/Subtopics of the Chapter to be taught *
+                        </label>
+                        <textarea
+                          value={data.topics || ''}
+                          onChange={(e) => handleInputChange(cls.key, 'topics', e.target.value)}
+                          className="w-full h-32 px-4 py-3 bg-white border border-slate-300 rounded-xl outline-none focus:border-indigo-500 resize-none"
+                          placeholder="Enter topics/subtopics..."
+                          required
+                        />
+                      </div>
+                      
+                      {/* Proposed Homework */}
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                          Proposed Home Work *
+                        </label>
+                        <textarea
+                          value={data.homework || ''}
+                          onChange={(e) => handleInputChange(cls.key, 'homework', e.target.value)}
+                          className="w-full h-32 px-4 py-3 bg-white border border-slate-300 rounded-xl outline-none focus:border-indigo-500 resize-none"
+                          placeholder="Enter homework assignment..."
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <input type="hidden" name="weekRange" value={selectedWeek} />
-          </div>
 
-          {/* Topics */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">
-              Topics/Chapter
-            </label>
-            <textarea
-              name="topics"
-              value={formData.topics}
-              onChange={handleInputChange}
-              className="w-full h-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 resize-none"
-              placeholder="Enter topics or chapter name..."
-              disabled={!isOnline}
-            />
-          </div>
-
-          {/* Objectives */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">
-              Learning Objectives
-            </label>
-            <textarea
-              name="objectives"
-              value={formData.objectives}
-              onChange={handleInputChange}
-              className="w-full h-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 resize-none"
-              placeholder="What students will learn..."
-              disabled={!isOnline}
-            />
-          </div>
-
-          {/* Activities */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">
-              Teaching Activities
-            </label>
-            <textarea
-              name="activities"
-              value={formData.activities}
-              onChange={handleInputChange}
-              className="w-full h-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 resize-none"
-              placeholder="Classroom activities, discussions, experiments..."
-              disabled={!isOnline}
-            />
-          </div>
-
-          {/* Resources & Assessment Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                Teaching Resources
-              </label>
-              <textarea
-                name="resources"
-                value={formData.resources}
-                onChange={handleInputChange}
-                className="w-full h-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 resize-none"
-                placeholder="Textbooks, presentations, lab equipment..."
-                disabled={!isOnline}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                Assessment
-              </label>
-              <textarea
-                name="assessment"
-                value={formData.assessment}
-                onChange={handleInputChange}
-                className="w-full h-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 resize-none"
-                placeholder="Tests, quizzes, projects, homework..."
-                disabled={!isOnline}
-              />
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <div className="pt-6 border-t border-slate-200">
-            <button
-              type="submit"
-              disabled={isSubmitting || !isOnline}
-              className={`w-full py-4 rounded-xl font-black text-lg uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${
-                isSubmitting || !isOnline
-                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-lg'
-              }`}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                  Submitting...
-                </>
-              ) : !isOnline ? (
-                <>
-                  <WifiOff className="h-6 w-6" />
-                  Offline - Cannot Submit
-                </>
-              ) : (
-                <>
-                  <Upload className="h-6 w-6" />
-                  Submit Lesson Plan
-                </>
-              )}
-            </button>
-            
-            <div className="mt-4 text-center">
-              <p className="text-sm text-slate-500">
-                {isOnline ? (
-                  '✅ Connected to server. Your data will be saved instantly.'
+            {/* Submit Button */}
+            <div className="pt-6 border-t border-slate-200">
+              <button
+                type="submit"
+                disabled={isSubmitting || !isOnline}
+                className={`w-full py-4 rounded-xl font-black text-lg uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${
+                  isSubmitting || !isOnline
+                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-lg'
+                }`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    Submitting {selectedClasses.length} lesson plans...
+                  </>
+                ) : !isOnline ? (
+                  <>
+                    <WifiOff className="h-6 w-6" />
+                    Offline - Cannot Submit
+                  </>
                 ) : (
-                  <span className="text-amber-600">
-                    ⚠️ You are offline. Please connect to internet to submit.
-                  </span>
+                  <>
+                    <Upload className="h-6 w-6" />
+                    Submit {selectedClasses.length} Lesson Plan{selectedClasses.length > 1 ? 's' : ''}
+                  </>
                 )}
-              </p>
+              </button>
+              
+              <div className="mt-4 text-center">
+                <p className="text-sm text-slate-500">
+                  {isOnline ? (
+                    '✅ Connected to server. Your data will be saved instantly.'
+                  ) : (
+                    <span className="text-amber-600">
+                      ⚠️ You are offline. Please connect to internet to submit.
+                    </span>
+                  )}
+                </p>
+              </div>
             </div>
+          </form>
+        )}
+
+        {selectedClasses.length === 0 && (
+          <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl">
+            <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-400 font-bold">No classes selected</p>
+            <p className="text-slate-300 text-sm mt-2">Select classes above to start submitting lesson plans</p>
           </div>
-        </form>
+        )}
       </div>
 
-      {/* NEW: Submission History with Modification Feature */}
-      {(submittedWeeks.length > 0 || history.length > 0) && (
+      {/* =========== SUBMISSION HISTORY =========== */}
+      {(submittedWeeks.length > 0 || teacherSubmissions.length > 0) && (
         <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -695,12 +957,6 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                 title="Refresh submissions"
               >
                 <RefreshCw className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setShowHistory(!showHistory)}
-                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-200"
-              >
-                {showHistory ? 'Hide' : 'Show'} Details
               </button>
             </div>
           </div>
@@ -726,8 +982,10 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
               </div>
             </div>
             <div className="p-4 bg-slate-50 rounded-2xl">
-              <div className="text-sm text-slate-500">Status</div>
-              <div className="text-2xl font-black text-emerald-600">Active</div>
+              <div className="text-sm text-slate-500">Pending Requests</div>
+              <div className={`text-2xl font-black ${pendingModificationRequests.length > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                {pendingModificationRequests.length}
+              </div>
             </div>
           </div>
 
@@ -745,6 +1003,10 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                   })
                 : 'Recently';
               
+              const hasPendingRequest = pendingModificationRequests.some(
+                req => req.week_range === week
+              );
+              
               return (
                 <div key={week} className="p-5 bg-gradient-to-r from-slate-50 to-white border border-slate-200 rounded-2xl hover:border-indigo-300 transition-colors group">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -761,7 +1023,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                           <div className="flex flex-wrap gap-2 mt-2">
                             {weekSubmissions.slice(0, 3).map((sub, idx) => (
                               <span key={idx} className="text-xs font-bold bg-white border border-slate-200 text-slate-700 px-2 py-1 rounded hover:border-indigo-300 transition-colors">
-                                {sub.className || sub.class} {sub.section && `(${sub.section})`}
+                                {sub.className} {sub.section && `(${sub.section})`}
                               </span>
                             ))}
                             {weekSubmissions.length > 3 && (
@@ -770,6 +1032,13 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                               </span>
                             )}
                           </div>
+                          {hasPendingRequest && (
+                            <div className="mt-2">
+                              <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                                ⚠️ Modification Request Pending
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -777,10 +1046,9 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
-                          // View details
                           const message = `📋 Submission Details for ${week}:\n\n` +
                             weekSubmissions.map((sub, idx) => 
-                              `${idx + 1}. ${sub.className || sub.class} ${sub.section ? `(${sub.section})` : ''} - ${sub.subject || 'No subject'}\n   📝 Topics: ${sub.topics || 'Not specified'}`
+                              `${idx + 1}. ${sub.className} ${sub.section ? `(${sub.section})` : ''} - ${sub.subject || 'No subject'}\n   📝 Chapter: ${sub.topics?.split('\n')[0] || 'Not specified'}\n   📚 Topics: ${sub.topics?.split('\n').slice(1).join(', ') || 'Not specified'}\n   🏠 Homework: ${sub.assessment || 'Not specified'}`
                             ).join('\n\n');
                           alert(message);
                         }}
@@ -791,10 +1059,11 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                       </button>
                       <button
                         onClick={() => handleRequestModification(week)}
-                        className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg font-bold text-xs hover:from-amber-600 hover:to-orange-600 flex items-center gap-2 transition-all shadow-md"
+                        disabled={hasPendingRequest}
+                        className={`px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 transition-all shadow-md ${hasPendingRequest ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600'}`}
                       >
-                        <RefreshIcon className="h-3 w-3" />
-                        Request Modification
+                        <RefreshCw className="h-3 w-3" />
+                        {hasPendingRequest ? 'Request Pending' : 'Request Modification'}
                       </button>
                     </div>
                   </div>
@@ -805,13 +1074,13 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
           
           <div className="mt-6 pt-6 border-t border-slate-100">
             <p className="text-xs text-slate-500 text-center">
-              📝 Click "Request Modification" to request changes for any submission. Admin approval required.
+              📝 Note: You can request modification only once per week per class.
             </p>
           </div>
         </div>
       )}
 
-      {/* Submission Success Modal */}
+      {/* =========== SUBMISSION SUCCESS MODAL =========== */}
       {showSubmissionModal && submissionPreview && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[2.5rem] p-8 max-w-md w-full">
@@ -821,25 +1090,21 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
               </div>
               <h3 className="text-2xl font-black text-slate-900 mb-2">✅ Submission Successful!</h3>
               <p className="text-slate-600">
-                Your lesson plan has been submitted for review.
+                Your lesson plans have been submitted for review.
               </p>
             </div>
             
             <div className="bg-slate-50 p-4 rounded-xl mb-6">
               <div className="space-y-3">
                 <div>
-                  <div className="text-xs text-slate-500">Class & Section</div>
-                  <div className="font-bold text-slate-900">
-                    {submissionPreview.className}-{submissionPreview.section}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-slate-500">Subject</div>
-                  <div className="font-bold text-slate-900">{submissionPreview.subject}</div>
-                </div>
-                <div>
                   <div className="text-xs text-slate-500">Week</div>
-                  <div className="font-bold text-indigo-600">{submissionPreview.weekRange}</div>
+                  <div className="font-bold text-indigo-600">{submissionPreview.week}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500">Submitted Classes</div>
+                  <div className="font-bold text-slate-900">
+                    {submissionPreview.classes.map((c: any) => c.class).join(', ')}
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs text-slate-500">Submission Time</div>
@@ -851,6 +1116,12 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                       hour: '2-digit',
                       minute: '2-digit'
                     })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500">Email Confirmation</div>
+                  <div className="font-bold text-emerald-600">
+                    {submissionPreview.emailSent ? '✅ Sent' : '⚠️ Not Sent'}
                   </div>
                 </div>
               </div>
@@ -866,21 +1137,12 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
               >
                 Close
               </button>
-              <button
-                onClick={() => {
-                  copyToClipboard(`Lesson Plan Submitted\nClass: ${submissionPreview.className}-${submissionPreview.section}\nSubject: ${submissionPreview.subject}\nWeek: ${submissionPreview.weekRange}\nSubmitted: ${new Date().toLocaleString()}`);
-                  alert('Details copied to clipboard!');
-                }}
-                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700"
-              >
-                Copy Details
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modification Request Modal */}
+      {/* =========== MODIFICATION REQUEST MODAL =========== */}
       {showModificationRequest && (
         <TeacherModificationRequest
           teacher={teacher}
@@ -890,12 +1152,13 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
             setShowModificationRequest(false);
             onRefresh();
             loadTeacherSubmissions();
+            loadPendingModificationRequests();
           }}
           onClose={() => setShowModificationRequest(false)}
         />
       )}
 
-      {/* Offline Warning */}
+      {/* =========== OFFLINE WARNING =========== */}
       {!isOnline && (
         <div className="fixed bottom-6 right-6 left-6 md:left-auto md:right-6 md:w-96 z-40">
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl shadow-lg">
