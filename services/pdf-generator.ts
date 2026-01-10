@@ -1,7 +1,5 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-// 🔤 Hindi Unicode Font
 import NotoDeva from '../assets/fonts/NotoSansDevanagari-Regular.ttf';
 
 export class PDFGenerator {
@@ -17,7 +15,7 @@ export class PDFGenerator {
 
     const doc = new jsPDF('p', 'mm', 'a4');
 
-    /* ================= FONT SETUP (MOST IMPORTANT) ================= */
+    /* ================= FONT (HINDI SAFE) ================= */
     doc.addFileToVFS('NotoDeva.ttf', NotoDeva);
     doc.addFont('NotoDeva.ttf', 'NotoDeva', 'normal');
     doc.setFont('NotoDeva');
@@ -55,9 +53,9 @@ export class PDFGenerator {
     y += 6;
     doc.text(`Class Teacher: ${generatedBy}`, 14, y);
 
-    /* ================= TABLE DATA ================= */
-    const tableBody = teachers.map(t => {
-      const plan = lessonPlans.find(
+    /* ================= TABLE BODY (SAFE) ================= */
+    const rawBody = (teachers || []).map(t => {
+      const plan = (lessonPlans || []).find(
         p =>
           p.teacherId === t.email &&
           p.className === className &&
@@ -68,11 +66,22 @@ export class PDFGenerator {
       return [
         t.subject || '—',
         t.name || '—',
-        plan ? plan.topics?.split('\n')[0] || '—' : '---',
+        plan ? plan.topics?.split('\n')[0] || '—' : '—',
         plan ? 'Submitted' : 'Homework Not Submitted',
-        plan ? '' : 'गृहकार्य जमा नहीं हुआ'
+        plan ? 'जमा हुआ' : 'गृहकार्य जमा नहीं हुआ'
       ];
     });
+
+    const tableBody =
+      rawBody.length > 0
+        ? rawBody
+        : [[
+            '—',
+            '—',
+            'कोई डेटा उपलब्ध नहीं',
+            '—',
+            '—'
+          ]];
 
     /* ================= TABLE ================= */
     autoTable(doc, {
@@ -88,13 +97,15 @@ export class PDFGenerator {
       styles: {
         font: 'NotoDeva',
         fontSize: 9,
-        cellPadding: 2
+        cellPadding: 2,
+        overflow: 'linebreak'
       },
       headStyles: {
         font: 'NotoDeva',
-        fillColor: [230, 230, 230],
+        fillColor: [235, 235, 235],
         textColor: 0
-      }
+      },
+      tableWidth: 'auto'
     });
 
     /* ================= SUMMARY ================= */
