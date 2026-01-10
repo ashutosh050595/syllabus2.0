@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import 'jspdf-autotable';
 import NotoDeva from '../assets/fonts/NotoSansDevanagari-Regular.ttf';
 
 export class PDFGenerator {
@@ -15,7 +15,7 @@ export class PDFGenerator {
 
     const doc = new jsPDF('p', 'mm', 'a4');
 
-    /* ================= FONT (HINDI SAFE) ================= */
+    /* ================= FONT SETUP ================= */
     doc.addFileToVFS('NotoDeva.ttf', NotoDeva);
     doc.addFont('NotoDeva.ttf', 'NotoDeva', 'normal');
     doc.setFont('NotoDeva');
@@ -46,45 +46,40 @@ export class PDFGenerator {
     y += 10;
     doc.setFontSize(9);
     doc.text(`Date: ${weekRange}`, 14, y);
-
     y += 6;
     doc.text(`Class & Section: ${className} - ${section}`, 14, y);
-
     y += 6;
     doc.text(`Class Teacher: ${generatedBy}`, 14, y);
 
-    /* ================= TABLE BODY (SAFE) ================= */
-    const rawBody = (teachers || []).map(t => {
-      const plan = (lessonPlans || []).find(
-        p =>
-          p.teacherId === t.email &&
-          p.className === className &&
-          p.section === section &&
-          p.weekRange === weekRange
-      );
+    /* ================= SAFE TABLE BODY ================= */
+    const body = (teachers && teachers.length > 0)
+      ? teachers.map(t => {
+          const plan = (lessonPlans || []).find(
+            p =>
+              p.teacherId === t.email &&
+              p.className === className &&
+              p.section === section &&
+              p.weekRange === weekRange
+          );
 
-      return [
-        t.subject || '—',
-        t.name || '—',
-        plan ? plan.topics?.split('\n')[0] || '—' : '—',
-        plan ? 'Submitted' : 'Homework Not Submitted',
-        plan ? 'जमा हुआ' : 'गृहकार्य जमा नहीं हुआ'
-      ];
-    });
+          return [
+            t.subject || '—',
+            t.name || '—',
+            plan ? plan.topics?.split('\n')[0] || '—' : '—',
+            plan ? 'Submitted' : 'Homework Not Submitted',
+            plan ? 'जमा हुआ' : 'गृहकार्य जमा नहीं हुआ'
+          ];
+        })
+      : [[
+          '—',
+          '—',
+          'कोई डेटा उपलब्ध नहीं',
+          '—',
+          '—'
+        ]];
 
-    const tableBody =
-      rawBody.length > 0
-        ? rawBody
-        : [[
-            '—',
-            '—',
-            'कोई डेटा उपलब्ध नहीं',
-            '—',
-            '—'
-          ]];
-
-    /* ================= TABLE ================= */
-    autoTable(doc, {
+    /* ================= TABLE (v3 SAFE CALL) ================= */
+    (doc as any).autoTable({
       startY: y + 6,
       head: [[
         'Subject',
@@ -93,7 +88,7 @@ export class PDFGenerator {
         'Status',
         'स्थिति'
       ]],
-      body: tableBody,
+      body,
       styles: {
         font: 'NotoDeva',
         fontSize: 9,
@@ -109,36 +104,29 @@ export class PDFGenerator {
     });
 
     /* ================= SUMMARY ================= */
-    const submittedCount = tableBody.filter(r => r[3] === 'Submitted').length;
-    const missingCount = tableBody.length - submittedCount;
+    const submittedCount = body.filter(r => r[3] === 'Submitted').length;
+    const missingCount = body.length - submittedCount;
 
     let summaryY = (doc as any).lastAutoTable.finalY + 10;
 
     doc.setFontSize(10);
     doc.text('Summary:', 14, summaryY);
-
     summaryY += 5;
-    doc.text(`• Total Teachers: ${tableBody.length}`, 14, summaryY);
-
+    doc.text(`• Total Teachers: ${body.length}`, 14, summaryY);
     summaryY += 5;
     doc.text(`• Submitted: ${submittedCount}`, 14, summaryY);
-
     summaryY += 5;
     doc.text(`• Missing: ${missingCount}`, 14, summaryY);
-
     summaryY += 8;
     doc.text('(Homework Not Submitted)', 14, summaryY);
 
     /* ================= SIGNATURES ================= */
     summaryY += 12;
     doc.text('Signature of Class Teacher:', 14, summaryY);
-
     summaryY += 5;
     doc.text('कक्षा अध्यापक के हस्ताक्षर:', 14, summaryY);
-
     summaryY += 10;
     doc.text('Signature of Principal:', 14, summaryY);
-
     summaryY += 5;
     doc.text('प्राचार्य के हस्ताक्षर:', 14, summaryY);
 
