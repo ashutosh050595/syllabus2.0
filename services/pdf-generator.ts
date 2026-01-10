@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { FontLoader } from './utils/FontLoader';
+import ... from "../utils/FontLoader";
 
 export class PDFGenerator {
   private static fontsRegistered = false;
