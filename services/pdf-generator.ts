@@ -1,5 +1,4 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import NotoDeva from '../assets/fonts/NotoSansDevanagari-Regular.ttf';
 
 export class PDFGenerator {
@@ -15,7 +14,7 @@ export class PDFGenerator {
 
     const doc = new jsPDF('p', 'mm', 'a4');
 
-    /* ================= FONT SETUP ================= */
+    /* ================= FONT ================= */
     doc.addFileToVFS('NotoDeva.ttf', NotoDeva);
     doc.addFont('NotoDeva.ttf', 'NotoDeva', 'normal');
     doc.setFont('NotoDeva');
@@ -51,84 +50,82 @@ export class PDFGenerator {
     y += 6;
     doc.text(`Class Teacher: ${generatedBy}`, 14, y);
 
-    /* ================= SAFE TABLE BODY ================= */
-    const body = (teachers && teachers.length > 0)
-      ? teachers.map(t => {
-          const plan = (lessonPlans || []).find(
-            p =>
-              p.teacherId === t.email &&
-              p.className === className &&
-              p.section === section &&
-              p.weekRange === weekRange
-          );
+    /* ================= TABLE HEADER ================= */
+    y += 10;
+    doc.setFontSize(9);
 
-          return [
-            t.subject || '—',
-            t.name || '—',
-            plan ? plan.topics?.split('\n')[0] || '—' : '—',
-            plan ? 'Submitted' : 'Homework Not Submitted',
-            plan ? 'जमा हुआ' : 'गृहकार्य जमा नहीं हुआ'
-          ];
-        })
-      : [[
-          '—',
-          '—',
-          'कोई डेटा उपलब्ध नहीं',
-          '—',
-          '—'
-        ]];
+    const colX = [14, 45, 90, 135, 165];
+    const rowHeight = 7;
 
-    /* ================= TABLE (v3 SAFE CALL) ================= */
-    (doc as any).autoTable({
-      startY: y + 6,
-      head: [[
-        'Subject',
-        'Teacher',
-        'Chapter',
-        'Status',
-        'स्थिति'
-      ]],
-      body,
-      styles: {
-        font: 'NotoDeva',
-        fontSize: 9,
-        cellPadding: 2,
-        overflow: 'linebreak'
-      },
-      headStyles: {
-        font: 'NotoDeva',
-        fillColor: [235, 235, 235],
-        textColor: 0
-      },
-      tableWidth: 'auto'
-    });
+    const drawRow = (values: string[]) => {
+      values.forEach((v, i) => {
+        doc.text(v, colX[i], y);
+      });
+      y += rowHeight;
+    };
+
+    drawRow(['Subject', 'Teacher', 'Chapter', 'Status', 'स्थिति']);
+    y += 1;
+
+    doc.line(14, y - 6, 196, y - 6);
+
+    /* ================= TABLE BODY ================= */
+    if (!teachers || teachers.length === 0) {
+      drawRow(['—', '—', 'कोई डेटा उपलब्ध नहीं', '—', '—']);
+    } else {
+      teachers.forEach(t => {
+        const plan = (lessonPlans || []).find(
+          p =>
+            p.teacherId === t.email &&
+            p.className === className &&
+            p.section === section &&
+            p.weekRange === weekRange
+        );
+
+        drawRow([
+          t.subject || '—',
+          t.name || '—',
+          plan ? plan.topics?.split('\n')[0] || '—' : '—',
+          plan ? 'Submitted' : 'Homework Not Submitted',
+          plan ? 'जमा हुआ' : 'गृहकार्य जमा नहीं हुआ'
+        ]);
+
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+      });
+    }
 
     /* ================= SUMMARY ================= */
-    const submittedCount = body.filter(r => r[3] === 'Submitted').length;
-    const missingCount = body.length - submittedCount;
-
-    let summaryY = (doc as any).lastAutoTable.finalY + 10;
-
+    y += 8;
     doc.setFontSize(10);
-    doc.text('Summary:', 14, summaryY);
-    summaryY += 5;
-    doc.text(`• Total Teachers: ${body.length}`, 14, summaryY);
-    summaryY += 5;
-    doc.text(`• Submitted: ${submittedCount}`, 14, summaryY);
-    summaryY += 5;
-    doc.text(`• Missing: ${missingCount}`, 14, summaryY);
-    summaryY += 8;
-    doc.text('(Homework Not Submitted)', 14, summaryY);
+    doc.text('Summary:', 14, y);
 
-    /* ================= SIGNATURES ================= */
-    summaryY += 12;
-    doc.text('Signature of Class Teacher:', 14, summaryY);
-    summaryY += 5;
-    doc.text('कक्षा अध्यापक के हस्ताक्षर:', 14, summaryY);
-    summaryY += 10;
-    doc.text('Signature of Principal:', 14, summaryY);
-    summaryY += 5;
-    doc.text('प्राचार्य के हस्ताक्षर:', 14, summaryY);
+    const submitted = (lessonPlans || []).filter(
+      p => p.className === className && p.section === section && p.weekRange === weekRange
+    ).length;
+
+    y += 5;
+    doc.text(`• Total Teachers: ${teachers?.length || 0}`, 14, y);
+    y += 5;
+    doc.text(`• Submitted: ${submitted}`, 14, y);
+    y += 5;
+    doc.text(`• Missing: ${(teachers?.length || 0) - submitted}`, 14, y);
+
+    y += 8;
+    doc.text('(Homework Not Submitted)', 14, y);
+
+    /* ================= SIGNATURE ================= */
+    y += 12;
+    doc.text('Signature of Class Teacher:', 14, y);
+    y += 5;
+    doc.text('कक्षा अध्यापक के हस्ताक्षर:', 14, y);
+
+    y += 10;
+    doc.text('Signature of Principal:', 14, y);
+    y += 5;
+    doc.text('प्राचार्य के हस्ताक्षर:', 14, y);
 
     /* ================= FOOTER ================= */
     doc.setFontSize(8);
@@ -139,7 +136,7 @@ export class PDFGenerator {
       { align: 'center' }
     );
 
-    /* ================= RETURN BASE64 ================= */
+    /* ================= RETURN ================= */
     return doc.output('datauristring').split(',')[1];
   }
 }
