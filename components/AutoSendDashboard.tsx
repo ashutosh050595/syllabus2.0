@@ -74,81 +74,78 @@ const AutoSendDashboard: React.FC<AutoSendDashboardProps> = ({
     return btoa(unescape(encodeURIComponent(mockPDFContent)));
   };
 
-  const handleManualSend = async () => {
-    if (!isOnline) {
-      alert('❌ No internet connection. Please check your network.');
+const handleManualSend = async () => {
+  if (!isOnline) {
+    alert('❌ No internet connection. Please check your network.');
+    return;
+  }
+
+  if (!confirm('📤 Send weekly PDFs to all class teachers now?\n\nThis will generate and email PDFs to all class teachers.')) {
+    return;
+  }
+
+  setIsSending(true);
+  setStatus('sending');
+  setLogs([]);
+
+  try {
+    // Generate PDFs for all classes
+    const pdfResults = await PDFGenerator.generatePDFsForAllClasses(
+      nextWeek.start + ' to ' + nextWeek.end,
+      teachers,
+      lessonPlans
+    );
+    
+    if (pdfResults.length === 0) {
+      alert('⚠️ No PDFs generated. Check if there are class teachers with assigned classes.');
+      setStatus('error');
       return;
     }
 
-    if (!confirm('📤 Send weekly PDFs to all class teachers now?\n\nThis will send emails with PDF attachments to all class teachers.')) {
-      return;
-    }
+    let successCount = 0;
+    let errorCount = 0;
 
-    setIsSending(true);
-    setStatus('sending');
-    setLogs([]);
-
-    try {
-      // Get all class teachers
-      const classTeachers = teachers.filter(t => t.isClassTeacher);
-      
-      if (classTeachers.length === 0) {
-        alert('⚠️ No class teachers found in the system.');
-        setStatus('error');
-        return;
-      }
-
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (const teacher of classTeachers) {
-        try {
-          const weekRange = '29-Dec-2025 to 10-Jan-2026';
-          const className = teacher.classTeacherOf?.className || 'Class';
-          const section = teacher.classTeacherOf?.section || 'Section';
-          
-          const pdfBase64 = generateMockPDFBase64();
-          
-          // Send email with PDF attachment
-          const emailSent = await EmailService.sendEmail(
-            EmailService.createWeeklyPDFAutoSend(
-              teacher.name,
-              teacher.email,
-              weekRange,
-              className,
-              section,
-              pdfBase64
-            )
-          );
-          
-          if (emailSent) {
-            console.log(`✅ Sent PDF to ${teacher.name} (${teacher.email})`);
-            addLog(`Sent to ${teacher.name}`, 'success');
-            successCount++;
-          } else {
-            console.error(`❌ Failed to send to ${teacher.name}`);
-            addLog(`Failed to send to ${teacher.name}`, 'error');
-            errorCount++;
-          }
-        } catch (error: any) {
-          console.error(`Error sending to ${teacher.name}:`, error);
-          addLog(`Error: ${teacher.name} - ${error.message}`, 'error');
+    for (const result of pdfResults) {
+      try {
+        // Send email with PDF attachment
+        const emailSent = await EmailService.sendEmail(
+          EmailService.createWeeklyPDFAutoSend(
+            result.teacherName,
+            result.teacherEmail,
+            nextWeek.start + ' to ' + nextWeek.end,
+            result.className,
+            result.section,
+            result.pdfBase64
+          )
+        );
+        
+        if (emailSent) {
+          console.log(`✅ Sent PDF to ${result.teacherName} (${result.teacherEmail})`);
+          addLog(`Sent to ${result.teacherName} (${result.className}-${result.section})`, 'success');
+          successCount++;
+        } else {
+          console.error(`❌ Failed to send to ${result.teacherName}`);
+          addLog(`Failed to send to ${result.teacherName}`, 'error');
           errorCount++;
         }
+      } catch (error: any) {
+        console.error(`Error sending to ${result.teacherName}:`, error);
+        addLog(`Error: ${result.teacherName} - ${error.message}`, 'error');
+        errorCount++;
       }
-      
-      setStatus('sent');
-      alert(`✅ Weekly PDFs sent!\n\nSuccess: ${successCount}\nFailed: ${errorCount}`);
-    } catch (error: any) {
-      setStatus('error');
-      console.error('Manual send failed:', error);
-      alert('❌ Failed to send PDFs: ' + error.message);
-    } finally {
-      setIsSending(false);
-      setTimeout(() => setStatus('idle'), 5000);
     }
-  };
-
+    
+    setStatus('sent');
+    alert(`✅ Weekly PDFs sent!\n\nSuccess: ${successCount}\nFailed: ${errorCount}`);
+  } catch (error: any) {
+    setStatus('error');
+    console.error('Manual send failed:', error);
+    alert('❌ Failed to send PDFs: ' + error.message);
+  } finally {
+    setIsSending(false);
+    setTimeout(() => setStatus('idle'), 5000);
+  }
+};
   const addLog = (message: string, type: 'success' | 'error' | 'info') => {
     const newLog = {
       id: Date.now(),
