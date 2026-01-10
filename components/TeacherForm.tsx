@@ -96,7 +96,6 @@ interface TeacherFormProps {
 const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, isOnline }) => {
   // =========== STATES ===========
   const [isLoading, setIsLoading] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
   const [currentWeek, setCurrentWeek] = useState('');
   const [nextWeek, setNextWeek] = useState('');
   const [selectedWeek, setSelectedWeek] = useState('');
@@ -116,8 +115,8 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
   const [isClassTeacher, setIsClassTeacher] = useState(false);
   const [classTeacherInfo, setClassTeacherInfo] = useState<any>(null);
   const [classTeachersStatus, setClassTeachersStatus] = useState<any[]>([]);
-  const [classPdfPreview, setClassPdfPreview] = useState<string | null>(null);
-  const [showClassStatus, setShowClassStatus] = useState(false);
+  const [showClassStatus, setShowClassStatus] = useState(true); // Default: show class status
+  const [isLoadingClassStatus, setIsLoadingClassStatus] = useState(false);
   
   // Modification request
   const [showModificationRequest, setShowModificationRequest] = useState(false);
@@ -128,41 +127,26 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [submissionPreview, setSubmissionPreview] = useState<any>(null);
 
-  // =========== WEEK CALCULATION (Runs once) ===========
-  useEffect(() => {
-    const calculateWeeks = () => {
-      const today = new Date();
-      const startOfWeek = new Date(today);
-      const day = startOfWeek.getDay();
-      const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
-      startOfWeek.setDate(diff);
-      
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(endOfWeek.getDate() + 6);
-      
-      const formatDate = (date: Date) => {
-        const day = date.getDate().toString().padStart(2, '0');
-        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const month = monthNames[date.getMonth()];
-        const year = date.getFullYear();
-        return `${day}-${month}-${year}`;
-      };
-      
-      const currentWeekRange = `${formatDate(startOfWeek)} to ${formatDate(endOfWeek)}`;
-      setCurrentWeek(currentWeekRange);
-      
-      const nextWeekStart = new Date(startOfWeek);
-      nextWeekStart.setDate(nextWeekStart.getDate() + 7);
-      const nextWeekEnd = new Date(endOfWeek);
-      nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
-      const nextWeekRange = `${formatDate(nextWeekStart)} to ${formatDate(nextWeekEnd)}`;
-      setNextWeek(nextWeekRange);
-      
-      setSelectedWeek(currentWeekRange);
+  // =========== HELPER FUNCTIONS ===========
+  const getWeekRange = (date: Date) => {
+    const startOfWeek = new Date(date);
+    const day = startOfWeek.getDay();
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+    startOfWeek.setDate(diff);
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    
+    const formatDate = (date: Date) => {
+      const day = date.getDate().toString().padStart(2, '0');
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = monthNames[date.getMonth()];
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
     };
-
-    calculateWeeks();
-  }, []);
+    
+    return `${formatDate(startOfWeek)} to ${formatDate(endOfWeek)}`;
+  };
 
   // =========== INITIALIZATION ===========
   useEffect(() => {
@@ -171,6 +155,12 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       
       setIsLoading(true);
       try {
+        // Calculate weeks
+        const today = new Date();
+        setCurrentWeek(getWeekRange(today));
+        setNextWeek(getWeekRange(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)));
+        setSelectedWeek(getWeekRange(today));
+        
         // Check if teacher is class teacher
         const classTeacher = teacher.isClassTeacher;
         setIsClassTeacher(classTeacher);
@@ -208,7 +198,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
     };
 
     initializeTeacherData();
-  }, [teacher?.email, teacher?.isClassTeacher, isOnline]);
+  }, [teacher?.email, teacher?.isClassTeacher, teacher?.classTeacherOf, isOnline]);
 
   // =========== DATA LOADING FUNCTIONS ===========
   const loadTeacherAssignments = async () => {
@@ -288,8 +278,11 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
   const loadClassTeachersStatus = async () => {
     if (!isOnline || !isClassTeacher || !classTeacherInfo) return;
     
+    setIsLoadingClassStatus(true);
     try {
       const { className, section } = classTeacherInfo;
+      const currentWeekRange = getWeekRange(new Date());
+      
       const [allTeachers, allLessonPlans] = await Promise.all([
         APIService.fetchTeachers(),
         APIService.fetchLessonPlans()
@@ -308,22 +301,41 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
           plan.teacherId === t.email && 
           plan.className === className && 
           plan.section === section && 
-          plan.weekRange === currentWeek
+          plan.weekRange === currentWeekRange
+        );
+        
+        // Get the subject for this class
+        const assignment = t.assignments?.find((a: any) => 
+          a.className === className && a.sections?.includes(section)
         );
         
         return {
           teacher: t,
           submitted: hasSubmitted,
-          subject: t.assignments?.find((a: any) => 
-            a.className === className && a.sections?.includes(section)
-          )?.subject || 'N/A'
+          subject: assignment?.subject || 'N/A',
+          assignment: assignment
         };
       });
       
       setClassTeachersStatus(status);
       
+      // Cache the status
+      localStorage.setItem(`class_${className}_${section}_status`, JSON.stringify({
+        status,
+        week: currentWeekRange,
+        lastUpdated: new Date().toISOString()
+      }));
+      
     } catch (error) {
       console.error('Error loading class teachers status:', error);
+      // Try to load from cache
+      const cached = localStorage.getItem(`class_${classTeacherInfo.className}_${classTeacherInfo.section}_status`);
+      if (cached) {
+        const data = JSON.parse(cached);
+        setClassTeachersStatus(data.status || []);
+      }
+    } finally {
+      setIsLoadingClassStatus(false);
     }
   };
 
@@ -558,7 +570,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
         APIService.fetchLessonPlans()
       ]);
       
-      const pdfBase64 = PDFGenerator.generatePDFFromLessonPlans(
+      const pdfBase64 = await PDFGenerator.generatePDFFromLessonPlans(
         className,
         section,
         currentWeek,
@@ -567,13 +579,13 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
         allTeachers
       );
       
-      setClassPdfPreview(pdfBase64);
-      
       // Create download link
       const link = document.createElement('a');
       link.href = `data:application/pdf;base64,${pdfBase64}`;
       link.download = `Class_${className}_${section}_${currentWeek.replace(/ /g, '_')}.pdf`;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       
       alert(`✅ PDF generated for ${className}-${section}`);
       
@@ -596,7 +608,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
         APIService.fetchLessonPlans()
       ]);
       
-      const pdfBase64 = PDFGenerator.generatePDFFromLessonPlans(
+      const pdfBase64 = await PDFGenerator.generatePDFFromLessonPlans(
         className,
         section,
         currentWeek,
@@ -606,28 +618,38 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
       );
       
       // Open PDF in new tab
-      const pdfWindow = window.open();
-      if (pdfWindow) {
-        pdfWindow.document.write(`
-          <html>
-            <head>
-              <title>PDF Preview - ${className}-${section}</title>
-              <style>
-                body { margin: 0; padding: 0; }
-                iframe { width: 100%; height: 100vh; border: none; }
-              </style>
-            </head>
-            <body>
-              <iframe src="data:application/pdf;base64,${pdfBase64}"></iframe>
-            </body>
-          </html>
-        `);
-      }
+      const pdfBlob = base64ToBlob(pdfBase64, 'application/pdf');
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      window.open(pdfUrl, '_blank');
+      
+      setTimeout(() => {
+        URL.revokeObjectURL(pdfUrl);
+      }, 100);
       
     } catch (error: any) {
       console.error('Error previewing PDF:', error);
       alert('❌ Failed to preview PDF: ' + error.message);
     }
+  };
+
+  const base64ToBlob = (base64: string, contentType: string = '', sliceSize: number = 512) => {
+    const byteCharacters = atob(base64);
+    const byteArrays = [];
+
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+      const slice = byteCharacters.slice(offset, offset + sliceSize);
+
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+
+    const blob = new Blob(byteArrays, { type: contentType });
+    return blob;
   };
 
   // =========== MODIFICATION REQUEST ===========
@@ -730,28 +752,43 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
                 Class Teacher Dashboard
               </h3>
               <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em] mt-1">
-                {classTeacherInfo.className}-{classTeacherInfo.section}
+                {classTeacherInfo.className}-{classTeacherInfo.section} • Week: {currentWeek}
               </p>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setShowClassStatus(!showClassStatus)}
-                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-200"
+                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-200 flex items-center gap-2"
               >
+                {showClassStatus ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 {showClassStatus ? 'Hide Status' : 'Show Status'}
               </button>
               <button
-                onClick={previewClassPdf}
-                className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg font-bold text-sm hover:bg-blue-200"
+                onClick={loadClassTeachersStatus}
+                disabled={isLoadingClassStatus || !isOnline}
+                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-200 disabled:opacity-50 flex items-center gap-2"
               >
-                <Eye className="h-4 w-4 inline mr-2" />
+                {isLoadingClassStatus ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Refresh
+              </button>
+              <button
+                onClick={previewClassPdf}
+                disabled={!isOnline}
+                className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg font-bold text-sm hover:bg-blue-200 disabled:opacity-50 flex items-center gap-2"
+              >
+                <Eye className="h-4 w-4" />
                 Preview PDF
               </button>
               <button
                 onClick={generateClassPdf}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700"
+                disabled={!isOnline}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
               >
-                <Download className="h-4 w-4 inline mr-2" />
+                <Download className="h-4 w-4" />
                 Download PDF
               </button>
             </div>
@@ -759,38 +796,104 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
 
           {showClassStatus && (
             <div className="mb-6 p-4 bg-slate-50 rounded-2xl">
-              <h4 className="font-bold text-slate-900 mb-4">Submission Status for {currentWeek}</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {classTeachersStatus.map((status, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-4 rounded-xl border ${status.submitted ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-bold text-slate-900">{status.teacher.name}</div>
-                        <div className="text-sm text-slate-600">{status.subject}</div>
-                      </div>
-                      <div className={`px-3 py-1 rounded-full text-xs font-bold ${status.submitted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {status.submitted ? '✅ Submitted' : '⏳ Pending'}
-                      </div>
-                    </div>
-                    <div className="mt-2 text-xs text-slate-500">
-                      Email: {status.teacher.email}
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-bold text-slate-900 text-lg">📊 Class Submission Status</h4>
+                <div className="text-sm text-slate-600">
+                  Current Week: <span className="font-bold text-indigo-600">{currentWeek}</span>
+                </div>
               </div>
               
-              <div className="mt-4 pt-4 border-t border-slate-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {classTeachersStatus.length === 0 ? (
+                  <div className="col-span-full text-center py-8">
+                    <p className="text-slate-400">No teachers assigned to this class</p>
+                  </div>
+                ) : (
+                  classTeachersStatus.map((status, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-4 rounded-xl border ${status.submitted ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'} hover:shadow-sm transition-all`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="font-bold text-slate-900">{status.teacher.name}</div>
+                          <div className="text-sm text-slate-600">{status.subject}</div>
+                          <div className="text-xs text-slate-500 mt-1">
+                            Email: {status.teacher.email}
+                          </div>
+                          {status.teacher.phone && (
+                            <div className="text-xs text-slate-500">
+                              Phone: {status.teacher.phone}
+                            </div>
+                          )}
+                        </div>
+                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${status.submitted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {status.submitted ? (
+                            <span className="flex items-center gap-1">
+                              <Check className="h-3 w-3" /> Submitted
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" /> Pending
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Action buttons for class teacher */}
+                      {!status.submitted && isOnline && (
+                        <div className="mt-3 pt-3 border-t border-slate-200">
+                          <button
+                            onClick={() => {
+                              const message = `Reminder: Please submit your lesson plan for ${classTeacherInfo.className}-${classTeacherInfo.section} (${status.subject}) for week ${currentWeek}`;
+                              alert(`Would send reminder to: ${status.teacher.name}\n\n${message}`);
+                            }}
+                            className="w-full text-xs bg-amber-100 text-amber-700 py-1.5 px-3 rounded-lg hover:bg-amber-200 transition-colors font-bold"
+                          >
+                            Send Reminder
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+              
+              <div className="mt-6 pt-4 border-t border-slate-200">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-slate-600">
-                    Total Teachers: {classTeachersStatus.length}
+                    Total Teachers: <span className="font-bold">{classTeachersStatus.length}</span>
                   </div>
                   <div className="text-sm font-bold">
-                    <span className="text-emerald-600">Submitted: {classTeachersStatus.filter(s => s.submitted).length}</span>
+                    <span className="text-emerald-600">
+                      ✅ Submitted: {classTeachersStatus.filter(s => s.submitted).length}
+                    </span>
                     {' • '}
-                    <span className="text-amber-600">Pending: {classTeachersStatus.filter(s => !s.submitted).length}</span>
+                    <span className="text-amber-600">
+                      ⏳ Pending: {classTeachersStatus.filter(s => !s.submitted).length}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Progress bar */}
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                    <span>Submission Progress</span>
+                    <span>
+                      {classTeachersStatus.length > 0 
+                        ? Math.round((classTeachersStatus.filter(s => s.submitted).length / classTeachersStatus.length) * 100)
+                        : 0}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                      style={{ 
+                        width: classTeachersStatus.length > 0 
+                          ? `${(classTeachersStatus.filter(s => s.submitted).length / classTeachersStatus.length) * 100}%`
+                          : '0%'
+                      }}
+                    ></div>
                   </div>
                 </div>
               </div>
@@ -798,15 +901,24 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
           )}
 
           <div className="text-sm text-slate-600">
-            <p className="mb-2">
-              <strong>Class:</strong> {classTeacherInfo.className}-{classTeacherInfo.section}
-            </p>
-            <p className="mb-2">
-              <strong>Current Week:</strong> {currentWeek}
-            </p>
-            <p>
-              <strong>Note:</strong> As class teacher, you can track submissions and download weekly PDFs.
-            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="mb-2">
+                  <strong>Class:</strong> {classTeacherInfo.className}-{classTeacherInfo.section}
+                </p>
+                <p className="mb-2">
+                  <strong>Current Week:</strong> {currentWeek}
+                </p>
+              </div>
+              <div>
+                <p className="mb-2">
+                  <strong>Status:</strong> {classTeachersStatus.filter(s => s.submitted).length} of {classTeachersStatus.length} teachers submitted
+                </p>
+                <p>
+                  <strong>Note:</strong> As class teacher, you can track submissions, send reminders, and download weekly PDFs.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}
