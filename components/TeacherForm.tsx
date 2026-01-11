@@ -139,7 +139,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacher, history, onRefresh, 
     startOfWeek.setDate(diff);
     
     const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    endOfWeek.setDate(endOfWeek.getDate() + 5);
     
     const formatDate = (date: Date) => {
       const day = date.getDate().toString().padStart(2, '0');
