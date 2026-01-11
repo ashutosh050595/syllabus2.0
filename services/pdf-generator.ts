@@ -102,7 +102,7 @@ export class PDFGenerator {
       "सत्र": "l=",
       
       // Full Phrases with Fixed Brackets
-      "(गृह कार्य नहीं दिया गया)": "¼x`g dk;Z ugha fn;k x;k½", // Uses ¼ ½ for brackets
+      "(गृह कार्य नहीं दिया गया)": "x`g dk;Z ugha fn;k x;k", // Uses ¼ ½ for brackets
       
       "Not Submitted": "Not Submitted" // Keep English as is
     };
