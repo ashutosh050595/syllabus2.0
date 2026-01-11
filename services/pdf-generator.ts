@@ -483,52 +483,71 @@ export class PDFGenerator {
         doc.text('(Lesson Plan Not Submitted)', 25, summaryY + 32);
       }
 
-      // =========== SIGNATURES ===========
+// =========== SUMMARY & SIGNATURES ===========
+    const finalY = (doc as any).lastAutoTable?.finalY || 200;
+    
+    if (finalY < 250) {
+      const summaryY = finalY + 15;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('Summary:', 20, summaryY);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(`• Total Teachers: ${assignedTeachers.length}`, 25, summaryY + 8);
+      doc.text(`• Submitted: ${submittedTeachers.length}`, 25, summaryY + 16);
+      
+      if (missingTeachers.length > 0) {
+        doc.setTextColor(220, 0, 0);
+        doc.text(`• Missing: ${missingTeachers.length}`, 25, summaryY + 24);
+        doc.setFont('helvetica', 'italic');
+        doc.text('(Lesson Plan Not Submitted)', 25, summaryY + 32);
+      }
+
+      // --- SIGNATURE SECTION ---
       const sigY = Math.min(finalY + 65, 270);
-      doc.setTextColor(0, 0, 0); // Black
-
-
-     // Print specific teacher name under the line
-      doc.setDrawColor(0, 0, 0);
-      doc.setLineWidth(0.3);
-      doc.line(30, sigY + 8, 80, sigY + 8);
+      doc.setTextColor(0, 0, 0);
       
-      // Auto-print Name in Brackets
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(9);
-      doc.text(`(${classTeacherName})`, 30, sigY + 13); // Specific Teacher Name
-      
-      // Class Teacher
+      // 1. CLASS TEACHER SIGNATURE
       doc.setFont('helvetica', 'normal');
       doc.text('Signature of Class Teacher:', 30, sigY);
       
-      // Hindi Signature (Fixed: No colon)
       doc.setFont(hindiFontName, 'normal');
-      doc.text(this.toKrutiDev('कक्षा अध्यापक के हस्ताक्षर'), 30, sigY + 6); 
+      doc.text(this.toKrutiDev('कक्षा अध्यापक के हस्ताक्षर'), 30, sigY + 6);
       
+      // Line
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.3);
       doc.line(30, sigY + 8, 80, sigY + 8);
-   
       
-      // Principal
+      // Teacher Name (Dynamic)
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.text(`(${classTeacherName})`, 30, sigY + 13); 
+
+      // 2. PRINCIPAL SIGNATURE
       doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
       doc.text('Signature of Principal:', 120, sigY);
       
-      // Hindi Signature (Fixed: No colon)
       doc.setFont(hindiFontName, 'normal');
-      doc.text(this.toKrutiDev('प्राचार्य के हस्ताक्षर'), 120, sigY + 6); 
+      doc.text(this.toKrutiDev('प्राचार्य के हस्ताक्षर'), 120, sigY + 6);
       
+      // Line
       doc.line(120, sigY + 8, 170, sigY + 8);
-
-      doc.line(120, sigY + 8, 170, sigY + 8);
-      // Optional: Add Principal's name if you want
-      doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.text('(Pramod Kumar Sharma)', 120, sigY + 13);
       
-      // Generation Date
+      // Principal Name (Fixed)
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.text('(Pramod Kumar Sharma)', 120, sigY + 13);
+      
+      // DATE
       doc.setFont('helvetica', 'normal');
-      doc.text(`Date: ${new Date().toLocaleDateString('en-IN')}`, 30, sigY + 20);
-    }
+      doc.setFontSize(10);
+      doc.text(`Date: ${new Date().toLocaleDateString('en-IN')}`, 30, sigY + 25);
+    }      
+    
 
     // =========== FOOTER ===========
     
