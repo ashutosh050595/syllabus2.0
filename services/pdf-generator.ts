@@ -1,71 +1,90 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// ==========================================
+// CONFIGURATION
+// ==========================================
+// यह फाइल public/fonts फोल्डर में होनी चाहिए
+const HINDI_FONT_URL = '/fonts/NotoSansDevanagari-Regular.ttf'; 
+
 export class PDFGenerator {
   
-  // Check if text contains Devanagari
-  private static isDevanagari(text: string): boolean {
-    if (!text || typeof text !== 'string') return false;
-    return /[\u0900-\u097F\uA8E0-\uA8FF\u1CD0-\u1CFF]/.test(text);
-  }
+  // 1. ASYNC FONT LOADER: यह हिंदी फॉन्ट को लोड और एम्बेड करता है
+  private static async addHindiFontToDoc(doc: jsPDF): Promise<string> {
+    try {
+      const response = await fetch(HINDI_FONT_URL);
+      if (!response.ok) {
+        throw new Error(`Font file not found at ${HINDI_FONT_URL}`);
+      }
+      const buffer = await response.arrayBuffer();
+      
+      // Convert ArrayBuffer to Binary String
+      let binary = '';
+      const bytes = new Uint8Array(buffer);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      // Convert to Base64
+      const base64Font = window.btoa(binary);
 
-  // Set appropriate font - using standard fonts that support Unicode
-  private static setFont(doc: jsPDF, text: string, style: 'normal' | 'bold' = 'normal'): void {
-    if (this.isDevanagari(text)) {
-      // Use standard fonts that support Unicode Hindi
-      // "Times" font in jsPDF supports Devanagari characters
-      doc.setFont('times', style);
-    } else {
-      doc.setFont('helvetica', style);
+      const fontFileName = 'HindiFont-Regular.ttf';
+      const fontName = 'HindiFont';
+
+      // jsPDF VFS में जोड़ें
+      doc.addFileToVFS(fontFileName, base64Font);
+      doc.addFont(fontFileName, fontName, 'normal');
+      
+      console.log('✅ Hindi Font Loaded Successfully');
+      return fontName;
+    } catch (error) {
+      console.error('❌ Failed to load Hindi font. Using fallback.', error);
+      return 'helvetica'; // Fallback
     }
   }
 
-  // Main PDF generation function
-  static generatePDFFromLessonPlans(
+  // 2. MAIN PDF GENERATION FUNCTION (Now Async)
+  static async generatePDFFromLessonPlans(
     className: string,
     section: string,
     weekRange: string,
     classTeacherName: string,
     allLessonPlans: any[],
     allTeachers: any[]
-  ): string {
+  ): Promise<string> {
     console.log(`📊 Generating PDF for ${className}-${section}, Week: ${weekRange}`);
 
-    // Create PDF document
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
 
+    // फॉन्ट लोड होने का इंतजार करें
+    const fontName = await this.addHindiFontToDoc(doc);
+
     // =========== PAGE 1: HEADER ===========
     
     // School Name (English)
     doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(fontName, 'normal'); // पूरे डॉक्यूमेंट में यही फॉन्ट चलेगा
     doc.setTextColor(0, 51, 102);
     doc.text('SACRED HEART SCHOOL', 105, 20, { align: 'center' });
 
-    // School Name (Hindi) - Use Unicode-compatible font
+    // School Name (Hindi)
     doc.setFontSize(16);
-    this.setFont(doc, 'सैक्रेड हार्ट स्कूल', 'bold');
     doc.text('सैक्रेड हार्ट स्कूल', 105, 28, { align: 'center' });
 
     // CBSE Affiliation
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
     doc.text('(Affiliated to CBSE, New Delhi, upto +2 Level)', 105, 36, { align: 'center' });
 
-    // Weekly Syllabus Title (English)
+    // Weekly Syllabus Title (English & Hindi)
     doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
     doc.setTextColor(139, 0, 0);
     doc.text('WEEKLY SYLLABUS', 105, 48, { align: 'center' });
-
-    // Weekly Syllabus Title (Hindi)
     doc.setFontSize(14);
-    this.setFont(doc, 'साप्ताहिक पाठ्यक्रम', 'bold');
     doc.text('साप्ताहिक पाठ्यक्रम', 105, 56, { align: 'center' });
 
     // Underline
@@ -77,27 +96,21 @@ export class PDFGenerator {
     
     const infoY = 70;
     doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
 
     // Date
     doc.text('Date:', 20, infoY);
-    doc.setFont('helvetica', 'bold');
     doc.text(`${weekRange}`, 40, infoY);
 
     // Class & Section
-    doc.setFont('helvetica', 'normal');
     doc.text('Class & Section:', 20, infoY + 8);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${className} - ${section}`, 55, infoY + 8);
+    doc.text(`${className} - ${section}`, 60, infoY + 8);
 
     // Class Teacher
-    doc.setFont('helvetica', 'normal');
     doc.text('Class Teacher:', 20, infoY + 16);
-    this.setFont(doc, classTeacherName, 'bold');
-    doc.text(classTeacherName, 50, infoY + 16);
+    doc.text(classTeacherName, 60, infoY + 16);
 
-    // =========== GET ALL TEACHERS FOR THIS CLASS ===========
+    // =========== DATA PROCESSING ===========
     
     const assignedTeachers = allTeachers.filter(teacher => {
       if (!teacher.assignments) return false;
@@ -122,7 +135,7 @@ export class PDFGenerator {
 
     console.log(`👨‍🏫 Total: ${assignedTeachers.length}, Submitted: ${submittedTeachers.length}, Missing: ${missingTeachers.length}`);
 
-    // =========== PREPARE TABLE DATA ===========
+    // =========== TABLE DATA PREPARATION ===========
     
     const tableColumns = [
       { header: 'Subject\nविषय', width: 30 },
@@ -136,22 +149,18 @@ export class PDFGenerator {
     
     // Sort teachers alphabetically
     const sortedTeachers = [...assignedTeachers].sort((a, b) => 
-      a.name.localeCompare(b.name, 'hi')
+      a.name.localeCompare(b.name)
     );
 
     sortedTeachers.forEach(teacher => {
-      // Find teacher's subject
       const assignment = teacher.assignments?.find((a: any) => 
         a.className === className && a.sections?.includes(section)
       );
       
       const subject = assignment?.subject || '---';
-
-      // Check if submitted
       const isSubmitted = submittedTeachers.some(st => st.email === teacher.email);
 
       if (isSubmitted) {
-        // Get lesson plan
         const lessonPlan = allLessonPlans.find(plan => 
           plan.teacherId === teacher.email && 
           plan.className === className && 
@@ -167,7 +176,6 @@ export class PDFGenerator {
           lessonPlan?.assessment?.substring(0, 50) || '---'
         ]);
       } else {
-        // Missing submission
         tableRows.push([
           subject,
           teacher.name,
@@ -186,30 +194,30 @@ export class PDFGenerator {
         head: [tableColumns.map(col => col.header)],
         body: tableRows,
         theme: 'grid',
-        headStyles: {
-          fillColor: [41, 128, 185],
-          textColor: 255,
-          fontStyle: 'bold',
-          fontSize: 10,
-          font: 'helvetica',
-          halign: 'center',
-          valign: 'middle',
-          minCellHeight: 12
-        },
-        bodyStyles: {
+        styles: {
+          font: fontName,       // Hindi Font Applied Here
+          fontStyle: 'normal',
           fontSize: 9,
           cellPadding: 4,
           textColor: [0, 0, 0],
-          lineWidth: 0.1,
-          lineColor: [200, 200, 200],
           overflow: 'linebreak',
           cellWidth: 'wrap'
+        },
+        headStyles: {
+          fillColor: [41, 128, 185],
+          textColor: 255,
+          font: fontName,       // Hindi Font in Header
+          fontStyle: 'normal',
+          fontSize: 10,
+          halign: 'center',
+          valign: 'middle',
+          minCellHeight: 12
         },
         alternateRowStyles: {
           fillColor: [248, 248, 248]
         },
         columnStyles: {
-          0: { cellWidth: 30, halign: 'center', fontStyle: 'bold' },
+          0: { cellWidth: 30, halign: 'center' },
           1: { cellWidth: 35, halign: 'center' },
           2: { cellWidth: 35, halign: 'center' },
           3: { cellWidth: 50, halign: 'left' },
@@ -217,26 +225,16 @@ export class PDFGenerator {
         },
         margin: { left: 10, right: 10 },
         didParseCell: (data: any) => {
-          // Apply Unicode-compatible font for Hindi text
-          if (data.row.index > 0) {
-            const cellText = data.cell.text[0] || '';
-            if (this.isDevanagari(cellText)) {
-              // Use "times" font for Hindi text (built-in Unicode support)
-              data.cell.styles.font = 'times';
-            }
-          }
-
           // Color coding for missing homework
           if (data.column.index === 4 && data.cell.text[0]?.includes('Not Submitted')) {
             data.cell.styles.textColor = [220, 0, 0];
-            data.cell.styles.fontStyle = 'italic';
           }
         },
         didDrawPage: (data: any) => {
           // Page number
           const pageCount = doc.internal.getNumberOfPages();
           doc.setFontSize(9);
-          doc.setFont('helvetica', 'italic');
+          doc.setFont(fontName, 'normal');
           doc.setTextColor(150, 150, 150);
           doc.text(
             `Page ${data.pageNumber} of ${pageCount}`,
@@ -245,10 +243,11 @@ export class PDFGenerator {
           );
         }
       });
-      
-      console.log('✅ Table generated successfully');
+      console.log('✅ Table generated successfully with Hindi support');
     } catch (error: any) {
       console.error('❌ AutoTable error:', error.message);
+      // Fallback
+      this.generateSimpleTableFallback(doc, tableColumns, tableRows, infoY + 30, fontName);
     }
 
     // =========== SUMMARY SECTION ===========
@@ -256,13 +255,11 @@ export class PDFGenerator {
     const finalY = (doc as any).lastAutoTable?.finalY || 200;
     
     if (finalY < 250) {
-      // Summary
       doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(fontName, 'normal');
       doc.setTextColor(0, 0, 0);
       doc.text('Summary:', 20, finalY + 15);
       
-      doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
       doc.text(`• Total Teachers: ${assignedTeachers.length}`, 25, finalY + 25);
       doc.text(`• Submitted: ${submittedTeachers.length}`, 25, finalY + 33);
@@ -270,44 +267,38 @@ export class PDFGenerator {
       if (missingTeachers.length > 0) {
         doc.setTextColor(220, 0, 0);
         doc.text(`• Missing: ${missingTeachers.length}`, 25, finalY + 41);
-        doc.setFont('helvetica', 'italic');
         doc.text('(Homework Not Submitted)', 25, finalY + 49);
       }
 
       // Signatures
       const signatureY = Math.min(finalY + 60, 260);
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
       doc.setTextColor(0, 0, 0);
       
       // Class Teacher
       doc.text('Signature of Class Teacher:', 30, signatureY);
-      this.setFont(doc, 'कक्षा अध्यापक के हस्ताक्षर', 'normal');
       doc.text('कक्षा अध्यापक के हस्ताक्षर:', 30, signatureY + 6);
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.3);
       doc.line(30, signatureY + 8, 80, signatureY + 8);
       
       // Principal
-      doc.setFont('helvetica', 'normal');
       doc.text('Signature of Principal:', 120, signatureY);
-      this.setFont(doc, 'प्राचार्य के हस्ताक्षर', 'normal');
       doc.text('प्राचार्य के हस्ताक्षर:', 120, signatureY + 6);
       doc.line(120, signatureY + 8, 170, signatureY + 8);
       
       // Date
-      doc.setFont('helvetica', 'normal');
       doc.text(`Date: ${new Date().toLocaleDateString('en-IN')}`, 30, signatureY + 20);
     }
 
     // =========== FOOTER ===========
     
     doc.setFontSize(8);
-    doc.setFont('helvetica', 'italic');
+    doc.setFont(fontName, 'normal');
     doc.setTextColor(100, 100, 100);
     
     doc.text(
-      'Generated by Sacred Heart School Management System • Unicode Hindi Support',
+      'Generated by Sacred Heart School Management System • Hindi Supported',
       105,
       doc.internal.pageSize.height - 10,
       { align: 'center' }
@@ -326,15 +317,15 @@ export class PDFGenerator {
     }
   }
 
-  // Simple table fallback if autoTable fails
+  // 3. FALLBACK TABLE GENERATOR (Preserved & Updated)
   private static generateSimpleTableFallback(
     doc: jsPDF,
     columns: any[],
     rows: any[][],
-    startY: number
+    startY: number,
+    fontName: string
   ) {
     console.log('📋 Using simple table fallback');
-    
     let y = startY;
     const startX = 15;
     
@@ -344,7 +335,7 @@ export class PDFGenerator {
     doc.rect(startX, y, totalWidth, 10, 'F');
     
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(fontName, 'normal');
     doc.setTextColor(255, 255, 255);
     
     let x = startX + 5;
@@ -352,53 +343,27 @@ export class PDFGenerator {
       doc.text(col.header.split('\n')[0], x, y + 7);
       x += col.width;
     });
-    
     y += 12;
     
     // Draw rows
     doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
     
     rows.forEach((row, rowIndex) => {
       if (y > 270) {
         doc.addPage();
         y = 20;
-        // Redraw headers
-        doc.setFillColor(41, 128, 185);
-        doc.rect(startX, y, totalWidth, 10, 'F');
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(255, 255, 255);
-        x = startX + 5;
-        columns.forEach(col => {
-          doc.text(col.header.split('\n')[0], x, y + 7);
-          x += col.width;
-        });
-        y += 12;
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(0, 0, 0);
       }
       
-      // Alternate row color
       if (rowIndex % 2 === 0) {
         doc.setFillColor(248, 248, 248);
         doc.rect(startX, y, totalWidth, 10, 'F');
       }
       
-      // Draw cell content
       x = startX + 5;
       row.forEach((cell, cellIndex) => {
-        // Use appropriate font for Hindi text
-        if (this.isDevanagari(cell.toString())) {
-          this.setFont(doc, cell.toString(), 'normal');
-        }
-        
-        // Color for missing homework
         if (cellIndex === 4 && cell.toString().includes('Not Submitted')) {
           doc.setTextColor(220, 0, 0);
-          doc.setFont('helvetica', 'italic');
         }
         
         const lines = cell.toString().split('\n');
@@ -406,29 +371,25 @@ export class PDFGenerator {
           doc.text(line.substring(0, 40), x, y + 5 + (lineIndex * 4));
         });
         
-        // Reset
-        doc.setTextColor(0, 0, 0);
-        doc.setFont('helvetica', 'normal');
-        
+        doc.setTextColor(0, 0, 0); // Reset
         x += columns[cellIndex].width;
       });
-      
       y += 12;
     });
   }
 
-  // Generate PDFs for all classes
-  static generatePDFsForAllClasses(
+  // 4. BATCH GENERATOR (Preserved & Updated to Async)
+  static async generatePDFsForAllClasses(
     weekRange: string,
     teachers: any[],
     lessonPlans: any[]
-  ): Array<{
+  ): Promise<Array<{
     className: string;
     section: string;
     pdfBase64: string;
     teacherName: string;
     teacherEmail: string;
-  }> {
+  }>> {
     const classTeachers = teachers.filter(t => t.isClassTeacher);
     const results = [];
     
@@ -436,16 +397,11 @@ export class PDFGenerator {
     
     for (const teacher of classTeachers) {
       try {
-        if (!teacher.classTeacherOf) {
-          console.warn(`⚠️ ${teacher.name} has no class assignment`);
-          continue;
-        }
-        
+        if (!teacher.classTeacherOf) continue;
         const { className, section } = teacher.classTeacherOf;
         
-        console.log(`📄 Processing ${className}-${section} for ${teacher.name}`);
-        
-        const pdfBase64 = this.generatePDFFromLessonPlans(
+        // AWAIT here is crucial
+        const pdfBase64 = await this.generatePDFFromLessonPlans(
           className,
           section,
           weekRange,
@@ -461,17 +417,14 @@ export class PDFGenerator {
           teacherName: teacher.name,
           teacherEmail: teacher.email
         });
-        
-        console.log(`✅ PDF generated for ${className}-${section}`);
       } catch (error: any) {
         console.error(`❌ Failed for ${teacher.name}:`, error.message);
       }
     }
-    
     return results;
   }
 
-  // Helper: Get week range from date
+  // 5. HELPERS (Preserved)
   static getWeekRangeFromDate(date: Date = new Date()): string {
     const start = new Date(date);
     const day = start.getDay();
@@ -488,11 +441,9 @@ export class PDFGenerator {
         year: 'numeric'
       });
     };
-    
     return `${format(start)} to ${format(end)}`;
   }
 
-  // Download helper
   static downloadPDF(base64String: string, fileName: string = 'Weekly_Syllabus.pdf'): void {
     try {
       const link = document.createElement('a');
@@ -506,8 +457,8 @@ export class PDFGenerator {
     }
   }
 
-  // Simple PDF generation with minimal parameters
-  static generateSimplePDF(data: {
+  // 6. SIMPLE PDF WRAPPER (Preserved & Updated to Async)
+  static async generateSimplePDF(data: {
     className: string;
     section: string;
     weekRange: string;
@@ -520,10 +471,8 @@ export class PDFGenerator {
       homework: string;
       submitted: boolean;
     }>;
-  }): string {
-    console.log('Generating simple PDF...');
+  }): Promise<string> {
     
-    // Convert data format
     const allTeachers = data.subjects.map(subject => ({
       name: subject.teacher,
       email: `${subject.subject.toLowerCase().replace(/\s+/g, '_')}@school.com`,
@@ -545,7 +494,7 @@ export class PDFGenerator {
         assessment: subject.homework
       }));
 
-    return this.generatePDFFromLessonPlans(
+    return await this.generatePDFFromLessonPlans(
       data.className,
       data.section,
       data.weekRange,
