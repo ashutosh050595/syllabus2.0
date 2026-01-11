@@ -486,6 +486,17 @@ export class PDFGenerator {
       // =========== SIGNATURES ===========
       const sigY = Math.min(finalY + 65, 270);
       doc.setTextColor(0, 0, 0); // Black
+
+
+     // Print specific teacher name under the line
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.3);
+      doc.line(30, sigY + 8, 80, sigY + 8);
+      
+      // Auto-print Name in Brackets
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.text(`(${classTeacherName})`, 30, sigY + 13); // Specific Teacher Name
       
       // Class Teacher
       doc.setFont('helvetica', 'normal');
@@ -498,16 +509,7 @@ export class PDFGenerator {
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.3);
       doc.line(30, sigY + 8, 80, sigY + 8);
-      // Print specific teacher name under the line
-      doc.setDrawColor(0, 0, 0);
-      doc.setLineWidth(0.3);
-      doc.line(30, sigY + 8, 80, sigY + 8);
-      
-      // Auto-print Name in Brackets
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(9);
-      doc.text(`(${classTeacherName})`, 30, sigY + 13); // Specific Teacher Name
-
+   
       
       // Principal
       doc.setFont('helvetica', 'normal');
@@ -521,7 +523,7 @@ export class PDFGenerator {
 
       doc.line(120, sigY + 8, 170, sigY + 8);
       // Optional: Add Principal's name if you want
-      // doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.text('(Pramod Kumar Sharma)', 120, sigY + 13);
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.text('(Pramod Kumar Sharma)', 120, sigY + 13);
       
       // Generation Date
       doc.setFont('helvetica', 'normal');
