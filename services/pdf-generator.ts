@@ -65,12 +65,13 @@ export class PDFGenerator {
   /**
    * Converts Unicode Hindi text to Kruti Dev encoding.
    * Essential for rendering 'Matras' and 'Half-characters' correctly.
-   * Includes specific fixes for: Grih Karya, Brackets, Signatures.
+   * Includes specific fixes for: Adhyapak, Vishay, Home Assignment, Brackets.
    */
   private static toKrutiDev(text: string): string {
     if (!text) return '';
     
-    // 1. DIRECT DICTIONARY MAPPING (Corrected Strings based on PDF feedback)
+    // 1. EXACT DICTIONARY MAPPING
+    // This ensures specific words are rendered perfectly
     const dictionary: { [key: string]: string } = {
       // Headers
       "साप्ताहिक": "lkIrkfgd",
@@ -83,12 +84,10 @@ export class PDFGenerator {
       // FIXED: Grih Karya using Backtick (`) for Ri Matra
       "गृह कार्य": "x`g dk;Z", 
       
-      // Signatures - Removing colons from Hindi translation to avoid 'Ru' symbol
+      // Signatures - Explicitly removing colons from the value
       "हस्ताक्षर": "gLrk{kj",
       "कक्षा अध्यापक के हस्ताक्षर": "d{kk v/;kid ds gLrk{kj",
-      "कक्षा अध्यापक के हस्ताक्षर:": "d{kk v/;kid ds gLrk{kj", // Strip colon
       "प्राचार्य के हस्ताक्षर": "izkpk;Z ds gLrk{kj",
-      "प्राचार्य के हस्ताक्षर:": "izkpk;Z ds gLrk{kj", // Strip colon
 
       // Common Words
       "प्राचार्य": "izkpk;Z",
@@ -112,7 +111,7 @@ export class PDFGenerator {
     
     // Apply Dictionary replacements
     for (const [word, replacement] of Object.entries(dictionary)) {
-      // Escape regex special characters to be safe
+      // Escape regex special characters
       const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       processed = processed.replace(new RegExp(escapedWord, 'g'), replacement);
     }
@@ -120,12 +119,12 @@ export class PDFGenerator {
     // If fully handled by dictionary or no Hindi left, return
     if (!this.hasHindi(processed)) return processed;
 
-    // 2. CHARACTER MAPPING (Fallback for dynamic names)
+    // 2. CHARACTER MAPPING (Fallback)
     const mapping: { [key: string]: string } = {
       // Matras
       '‘': '^', '’': '*', '“': 'Þ', '”': 'ß',
       'ा': 'k', 'ि': 'f', 'ी': 'h', 'ु': 'q', 'ू': 'w', 
-      'ृ': "`", // Backtick for Ri Matra (Important Fix)
+      'ृ': "`", // Backtick for Ri Matra
       'े': 's', 'ै': 'S', 'ो': 'ks', 'ौ': 'kS', 'ं': 'a', 'ँ': '¡', 'ः': '%',
       '्': '~', 
       
@@ -143,10 +142,10 @@ export class PDFGenerator {
       'श': "'k", 'ष': '"k', 'स': 'l', 'ह': 'g',
       'क्ष': '{k', 'त्र': '=', 'ज्ञ': 'K', 'श्र': 'J',
       
-      // Symbols Fixes
-      '(': '¼', // Open Bracket map
-      ')': '½', // Close Bracket map
-      ':': ''   // Remove colon to prevent garbage
+      // Symbols & Brackets Fix
+      '(': '¼', 
+      ')': '½',
+      ':': '' // Remove colon to prevent 'Ru' symbol
     };
 
     let result = '';
@@ -272,7 +271,6 @@ export class PDFGenerator {
     // =========== TABLE DATA PREPARATION ===========
     
     // IMPORTANT: We use '|||' to separate English (Top) and Hindi (Bottom)
-    // The dictionary now contains corrected spellings
     const tableColumns = [
       { header: 'Subject|||' + this.toKrutiDev('विषय'), dataKey: 'subject', width: 30 },
       { header: 'Teacher|||' + this.toKrutiDev('अध्यापक'), dataKey: 'teacher', width: 35 },
@@ -322,8 +320,7 @@ export class PDFGenerator {
         ]);
       } else {
         // Missing Submission Row - MIXED TEXT
-        // "Lesson Plan Not Submitted" is English only
-        // "Homework Not Submitted" has Hindi translation
+        // "Homework Not Submitted" has Hindi translation with fixed brackets
         tableRows.push([
           subject, // English
           tName,
@@ -402,12 +399,12 @@ export class PDFGenerator {
                 if (parts[0]) {
                     doc.setFont('helvetica', data.section === 'head' ? 'bold' : 'normal');
                     
-                    // Set color (Red if missing, White if header, else Black)
+                    // Set color
                     if (parts[0].includes('Not Submitted')) doc.setTextColor(220, 0, 0);
                     else if (data.section === 'head') doc.setTextColor(255, 255, 255);
                     else doc.setTextColor(0, 0, 0);
                     
-                    // Center align for headers, else left
+                    // Draw English text
                     doc.text(parts[0], x + (data.section === 'head' ? (cell.width/2 - cell.padding('left')) : 0), y, {
                         align: data.section === 'head' ? 'center' : 'left'
                     });
@@ -418,11 +415,13 @@ export class PDFGenerator {
                 if (parts[1]) {
                     doc.setFont(hindiFontName, 'normal');
                     
+                    // Set color
                     if (parts[1].includes('Not Submitted') || (parts[0] && parts[0].includes('Not Submitted'))) 
                          doc.setTextColor(220, 0, 0);
                     else if (data.section === 'head') doc.setTextColor(255, 255, 255);
                     else doc.setTextColor(0, 0, 0);
 
+                    // Draw Hindi text
                     doc.text(parts[1], x + (data.section === 'head' ? (cell.width/2 - cell.padding('left')) : 0), y, {
                         align: data.section === 'head' ? 'center' : 'left'
                     });
@@ -484,9 +483,11 @@ export class PDFGenerator {
       // Class Teacher
       doc.setFont('helvetica', 'normal');
       doc.text('Signature of Class Teacher:', 30, sigY);
+      
+      // Hindi Signature (Fixed: No colon)
       doc.setFont(hindiFontName, 'normal');
-      // Fixed: Full phrase mapping avoids colon issue
-      doc.text(this.toKrutiDev('कक्षा अध्यापक के हस्ताक्षर:'), 30, sigY + 6); 
+      doc.text(this.toKrutiDev('कक्षा अध्यापक के हस्ताक्षर'), 30, sigY + 6); 
+      
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.3);
       doc.line(30, sigY + 8, 80, sigY + 8);
@@ -494,9 +495,11 @@ export class PDFGenerator {
       // Principal
       doc.setFont('helvetica', 'normal');
       doc.text('Signature of Principal:', 120, sigY);
+      
+      // Hindi Signature (Fixed: No colon)
       doc.setFont(hindiFontName, 'normal');
-      // Fixed: Full phrase mapping
-      doc.text(this.toKrutiDev('प्राचार्य के हस्ताक्षर:'), 120, sigY + 6); 
+      doc.text(this.toKrutiDev('प्राचार्य के हस्ताक्षर'), 120, sigY + 6); 
+      
       doc.line(120, sigY + 8, 170, sigY + 8);
       
       // Generation Date
