@@ -2,11 +2,23 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 // ==========================================
-// CONFIGURATION
-// Ensure 'Kruti_Dev_010.ttf' is in your public/fonts/ folder
+// CONFIGURATION & CONSTANTS
 // ==========================================
+// Ensure 'Kruti_Dev_010.ttf' is located in your project's public/fonts/ folder.
+// This font is critical for rendering Hindi text correctly.
 const HINDI_FONT_URL = '/fonts/Kruti_Dev_010.ttf'; 
 
+/**
+ * PDFGenerator Class
+ * Handles generation of Weekly Syllabus PDFs with mixed English and Hindi text support.
+ * Features:
+ * - Custom Font Loading (Kruti Dev)
+ * - Unicode to Kruti Dev Conversion
+ * - Mixed Language Table Rendering
+ * - Layout Management (Headers, Info, Tables, Signatures)
+ * - Fallback for Table Generation
+ * - Batch Processing for Multiple Teachers
+ */
 export class PDFGenerator {
   
   // ==========================================
@@ -14,9 +26,11 @@ export class PDFGenerator {
   // ==========================================
 
   /**
-   * Loads the Kruti Dev font asynchronously and registers it with jsPDF.
-   * Handles large file sizes by processing in chunks to avoid stack overflow.
-   * This is crucial for ensuring the custom font works in the browser.
+   * Loads the Kruti Dev font asynchronously and registers it with the jsPDF instance.
+   * This method fetches the font file as an ArrayBuffer, converts it to a binary string
+   * in chunks (to prevent stack overflow on large files), and adds it to the VFS.
+   * * @param doc The jsPDF instance
+   * @returns The name of the registered font ('KrutiDev') or fallback ('helvetica')
    */
   private static async addHindiFontToDoc(doc: jsPDF): Promise<string> {
     try {
@@ -30,12 +44,12 @@ export class PDFGenerator {
       const buffer = await response.arrayBuffer();
       
       // Convert ArrayBuffer to Binary String carefully using chunks
+      // This is necessary because String.fromCharCode.apply fails on very large arrays
       let binary = '';
       const bytes = new Uint8Array(buffer);
       const len = bytes.byteLength;
-      const CHUNK_SIZE = 8192;
+      const CHUNK_SIZE = 8192; // Safe chunk size
       
-      // Process in chunks to avoid stack overflow errors on large fonts
       for (let i = 0; i < len; i += CHUNK_SIZE) {
         binary += String.fromCharCode.apply(
           null, 
@@ -45,56 +59,66 @@ export class PDFGenerator {
       
       const base64Font = window.btoa(binary);
       
-      // Register font in jsPDF VFS (Virtual File System)
+      // Register font in jsPDF VFS (Virtual File System) with a specific filename
       doc.addFileToVFS('Kruti_Dev_010.ttf', base64Font);
       doc.addFont('Kruti_Dev_010.ttf', 'KrutiDev', 'normal');
       
+      // console.log('✅ Hindi Font Loaded & Registered');
       return 'KrutiDev';
     } catch (error) {
-      console.warn('⚠️ Could not load Kruti Dev font, using fallback to Helvetica', error);
+      console.warn('⚠️ Could not load Kruti Dev font, using fallback to Helvetica. Ensure the file exists in /public/fonts/.', error);
       return 'helvetica';
     }
   }
 
   /**
    * Checks if a string contains Hindi (Devanagari) characters.
-   * Used to decide when to switch fonts between Helvetica and Kruti Dev.
+   * Used to determine which font to apply for a specific text segment.
+   * * @param text The string to check
+   * @returns True if Devanagari characters are found
    */
   private static hasHindi(text: string): boolean {
     if (!text || typeof text !== 'string') return false;
+    // Unicode range for Devanagari: 0900–097F
     return /[\u0900-\u097F]/.test(text);
   }
 
   /**
    * Converts Unicode Hindi text to Kruti Dev encoding.
-   * Essential for rendering 'Matras' and 'Half-characters' correctly.
-   * Includes specific fixes for: Adhyapak, Vishay, Home Assignment, Brackets, Sacred.
+   * This function handles:
+   * 1. Direct dictionary mapping for common phrases and headers.
+   * 2. Character-by-character mapping for dynamic text.
+   * 3. Specific fixes for matras (like 'Ri') and conjuncts (like 'Kra').
+   * * @param text The Unicode Hindi string
+   * @returns The encoded string for Kruti Dev font
    */
   private static toKrutiDev(text: string): string {
     if (!text) return '';
     
-    // 1. EXACT DICTIONARY MAPPING
-    // Using Hex Codes to ensure absolute correctness irrespective of file encoding
+    // --- 1. EXACT DICTIONARY MAPPING ---
+    // Contains pre-calculated encodings for perfect rendering of static text
     const dictionary: { [key: string]: string } = {
-      // Headers
+      // Table Headers
       "साप्ताहिक": "lkIrkfgd",
-      "पाठ्यक्रम": "ikB~;\xD8e", // Fixed: Uses Ø (\xD8) for Kra
-      "विषय-वस्तु": "fo\"k; oLrq", // Double quote for 'Sha'
-      "विषय": "fo\"k;",           // Double quote for 'Sha'
-      "अध्यापक": "v/;kid",        // 'i' for 'pa'
+      "पाठ्यक्रम": "ikB~;\xD8e", // Fixed: Uses Ø (\xD8) for 'Kra' (as in kram)
+      "विषय-वस्तु": "fo\"k; oLrq", // Fixed: Double quote for 'Sha'
+      "विषय": "fo\"k;",           // Fixed: Double quote for 'Sha'
+      "अध्यापक": "v/;kid",        // Fixed: 'i' for 'pa'
       "अध्याय": "v/;k;",
       
-      // FIXED: Grih Karya using Backtick (\x60) for Ri Matra
+      // FIXED: Grih Karya using Backtick (\x60) for 'Ri' Matra
       "गृह कार्य": "x\x60g dk;Z", 
       
-      // FIXED: Sacred Heart School using Ø (\xD8) for Kra
+      // FIXED: Sacred Heart School using Ø (\xD8) for 'Kra'
       "सैक्रेड हार्ट स्कूल": "lS\xD8sM gkVZ Ldwy", 
       "सैक्रेड": "lS\xD8sM",
 
-      // Signatures - Explicitly removing colons from the value to prevent 'Ru'
+      // Signatures - Removing colons from Hindi to prevent 'Ru' symbol garbage
       "हस्ताक्षर": "gLrk{kj",
       "कक्षा अध्यापक के हस्ताक्षर": "d{kk v/;kid ds gLrk{kj",
+      "कक्षा अध्यापक के हस्ताक्षर:": "d{kk v/;kid ds gLrk{kj", 
       "प्राचार्य के हस्ताक्षर": "izkpk;Z ds gLrk{kj",
+      "प्राचार्य के हस्ताक्षर:": "izkpk;Z ds gLrk{kj",
 
       // Common Words
       "प्राचार्य": "izkpk;Z",
@@ -107,8 +131,8 @@ export class PDFGenerator {
       "दिनांक": "fnukad",
       "सत्र": "l=",
       
-      // Full Phrases with Fixed Brackets using Hex \xBC (¼) and \xBD (½)
-      "(गृह कार्य नहीं दिया गया)": "\xBCx\x60g dk;Z ugha fn;k x;k\xBD", 
+      // FIXED: Brackets mapped to standard parenthesis
+      "(गृह कार्य नहीं दिया गया)": "(x\x60g dk;Z ugha fn;k x;k)", 
       
       "Not Submitted": "Not Submitted" // Keep English as is
     };
@@ -117,17 +141,18 @@ export class PDFGenerator {
     
     // Apply Dictionary replacements
     for (const [word, replacement] of Object.entries(dictionary)) {
-      // Escape regex special characters
+      // Escape regex special characters to prevent errors
       const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       processed = processed.replace(new RegExp(escapedWord, 'g'), replacement);
     }
 
-    // If fully handled by dictionary or no Hindi left, return
+    // If text is fully converted or was English, return it
     if (!this.hasHindi(processed)) return processed;
 
-    // 2. CHARACTER MAPPING (Fallback for dynamic names)
+    // --- 2. CHARACTER MAPPING (FALLBACK) ---
+    // For dynamic names or words not in the dictionary
     const mapping: { [key: string]: string } = {
-      // Matras
+      // Matras & Special Chars
       '‘': '^', '’': '*', '“': 'Þ', '”': 'ß',
       'ा': 'k', 'ि': 'f', 'ी': 'h', 'ु': 'q', 'ू': 'w', 
       'ृ': "\x60", // Backtick for Ri Matra
@@ -149,9 +174,9 @@ export class PDFGenerator {
       'क्ष': '{k', 'त्र': '=', 'ज्ञ': 'K', 'श्र': 'J',
       
       // Symbols & Brackets Fix
-      '(': '\xBC', // Hex for Open Bracket (¼)
-      ')': '\xBD', // Hex for Close Bracket (½)
-      ':': ''      // Remove colon to prevent garbage
+      '(': '(', // Map to standard open bracket
+      ')': ')', // Map to standard close bracket
+      ':': ''   // Remove colon to prevent garbage characters like 'Ru'
     };
 
     let result = '';
@@ -166,6 +191,10 @@ export class PDFGenerator {
   // SECTION 2: MAIN PDF GENERATION LOGIC
   // ==========================================
 
+  /**
+   * Generates a single PDF for a specific class section.
+   * Handles layout, fonts, table generation, and signatures.
+   */
   static async generatePDFFromLessonPlans(
     className: string,
     section: string,
@@ -182,7 +211,7 @@ export class PDFGenerator {
       format: 'a4'
     });
 
-    // Load fonts first
+    // 1. Load Custom Font
     const hindiFontName = await this.addHindiFontToDoc(doc);
     
     // =========== HEADER SECTION ===========
@@ -228,7 +257,7 @@ export class PDFGenerator {
     doc.setFontSize(12);
     doc.setTextColor(0, 0, 0);
 
-    // Helper to draw Label (Eng) + Value (Eng/Hindi)
+    // Helper to draw Label (Eng) + Value (Eng/Hindi) with mixed fonts
     const drawField = (label: string, value: string, x: number, y: number) => {
       // Label in English
       doc.setFont('helvetica', 'normal');
@@ -246,6 +275,7 @@ export class PDFGenerator {
 
     drawField('Date:', weekRange, 40, infoY);
     drawField('Class & Section:', `${className} - ${section}`, 60, infoY + 8);
+    // Display Class Teacher Name here
     drawField('Class Teacher:', classTeacherName, 60, infoY + 16);
 
     // =========== DATA PROCESSING ===========
@@ -424,11 +454,13 @@ export class PDFGenerator {
                 if (parts[1]) {
                     doc.setFont(hindiFontName, 'normal');
                     
+                    // Set color
                     if (parts[1].includes('Not Submitted') || (parts[0] && parts[0].includes('Not Submitted'))) 
                          doc.setTextColor(220, 0, 0);
                     else if (data.section === 'head') doc.setTextColor(255, 255, 255);
                     else doc.setTextColor(0, 0, 0);
 
+                    // Draw Hindi text
                     doc.text(parts[1], x + (data.section === 'head' ? (cell.width/2 - cell.padding('left')) : 0), y, {
                         align: data.section === 'head' ? 'center' : 'left'
                     });
@@ -457,33 +489,7 @@ export class PDFGenerator {
       this.generateSimpleTableFallback(doc, tableColumns, tableRows, infoY + 30, hindiFontName);
     }
 
-    // =========== SUMMARY SECTION ===========
-    
-    const finalY = (doc as any).lastAutoTable?.finalY || 200;
-    
-    if (finalY < 250) {
-      const summaryY = finalY + 15;
-      
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('Summary:', 20, summaryY);
-      
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.text(`• Total Teachers: ${assignedTeachers.length}`, 25, summaryY + 8);
-      doc.text(`• Submitted: ${submittedTeachers.length}`, 25, summaryY + 16);
-      
-      if (missingTeachers.length > 0) {
-        doc.setTextColor(220, 0, 0); // Red
-        doc.text(`• Missing: ${missingTeachers.length}`, 25, summaryY + 24);
-        
-        // "Lesson Plan Not Submitted" is English
-        doc.setFont('helvetica', 'italic');
-        doc.text('(Lesson Plan Not Submitted)', 25, summaryY + 32);
-      }
-
-// =========== SUMMARY & SIGNATURES ===========
+    // =========== SUMMARY & SIGNATURES ===========
     const finalY = (doc as any).lastAutoTable?.finalY || 200;
     
     if (finalY < 250) {
@@ -505,56 +511,57 @@ export class PDFGenerator {
         doc.text('(Lesson Plan Not Submitted)', 25, summaryY + 32);
       }
 
-      // --- SIGNATURE SECTION ---
-      const sigY = Math.min(finalY + 65, 270);
+      // --- NEW SIGNATURE LAYOUT (Line & Name ABOVE Text) ---
+      // Moving base down slightly to prevent overlap
+      const sigY = Math.min(finalY + 65, 260);
       doc.setTextColor(0, 0, 0);
       
-      // 1. CLASS TEACHER SIGNATURE
-      doc.setFont('helvetica', 'normal');
-      doc.text('Signature of Class Teacher:', 30, sigY);
+      // 1. CLASS TEACHER BLOCK
+      // Name ABOVE the line (looks like a signature placeholder)
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.text(`(${classTeacherName})`, 35, sigY - 2); 
       
-      doc.setFont(hindiFontName, 'normal');
-      doc.text(this.toKrutiDev('कक्षा अध्यापक के हस्ताक्षर'), 30, sigY + 6);
-      
-      // Line
+      // The Line
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.3);
-      doc.line(30, sigY + 8, 80, sigY + 8);
+      doc.line(30, sigY, 80, sigY);                    
       
-      // Teacher Name (Dynamic)
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(9);
-      doc.text(`(${classTeacherName})`, 30, sigY - 2 ); 
-
-      // 2. PRINCIPAL SIGNATURE
+      // Text Labels (BELOW the line)
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
-      doc.text('Signature of Principal:', 120, sigY);
+      doc.text('Signature of Class Teacher:', 30, sigY + 5);
       
+      // Hindi Text (BELOW English Text)
       doc.setFont(hindiFontName, 'normal');
-      doc.text(this.toKrutiDev('प्राचार्य के हस्ताक्षर'), 120, sigY + 6);
-      
-      // Line
-      doc.line(120, sigY + 8, 170, sigY + 8);
-      
-      // Principal Name (Fixed)
+      doc.text(this.toKrutiDev('कक्षा अध्यापक के हस्ताक्षर'), 30, sigY + 10);
+
+      // 2. PRINCIPAL BLOCK
+      // Name ABOVE the line
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(9);
-      doc.text('(Pramod Kumar Sharma)', 120, sigY - 2);
+      doc.text('(Pramod Kumar Sharma)', 125, sigY - 2); 
       
-      // DATE
+      // The Line
+      doc.line(120, sigY, 170, sigY);                   
+      
+      // Text Labels (BELOW the line)
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
+      doc.text('Signature of Principal:', 120, sigY + 5);
+      
+      // Hindi Text
+      doc.setFont(hindiFontName, 'normal');
+      doc.text(this.toKrutiDev('प्राचार्य के हस्ताक्षर'), 120, sigY + 10);
+      
+      // DATE (At bottom)
+      doc.setFont('helvetica', 'normal');
       doc.text(`Date: ${new Date().toLocaleDateString('en-IN')}`, 30, sigY + 25);
-    }      
-    
+    }
 
-    // =========== FOOTER ===========
-    
     doc.setFontSize(8);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(100, 100, 100);
-    
     doc.text(
       'Generated by Sacred Heart School Management System • Hindi Supported',
       105,
@@ -760,7 +767,7 @@ export class PDFGenerator {
     start.setDate(diff);
     
     const end = new Date(start);
-    end.setDate(end.getDate() + 6);
+    end.setDate(end.getDate() + 5);
     
     const format = (d: Date) => {
       return d.toLocaleDateString('en-IN', {
