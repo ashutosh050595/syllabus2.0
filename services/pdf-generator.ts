@@ -10,10 +10,13 @@ const HINDI_FONT_URL = '/fonts/Kruti_Dev_010.ttf';
 export class PDFGenerator {
   
   // ==========================================
-  // 1. FONT HANDLING & CONVERSION UTILITIES
+  // 1. FONT & TEXT UTILITIES
   // ==========================================
 
-  // Load Kruti Dev Font asynchronously
+  /**
+   * Loads the Kruti Dev font asynchronously and registers it with jsPDF.
+   * Handles large file sizes by processing in chunks.
+   */
   private static async addHindiFontToDoc(doc: jsPDF): Promise<string> {
     try {
       // console.log(`📥 Fetching font from: ${HINDI_FONT_URL}`);
@@ -25,13 +28,13 @@ export class PDFGenerator {
       
       const buffer = await response.arrayBuffer();
       
-      // Convert to binary string manually to avoid stack overflow on large fonts
+      // Convert ArrayBuffer to Binary String carefully
       let binary = '';
       const bytes = new Uint8Array(buffer);
       const len = bytes.byteLength;
       const CHUNK_SIZE = 8192;
       
-      // Process in chunks to handle large files safely
+      // Process in chunks to avoid stack overflow errors on large fonts
       for (let i = 0; i < len; i += CHUNK_SIZE) {
         binary += String.fromCharCode.apply(
           null, 
@@ -45,7 +48,6 @@ export class PDFGenerator {
       doc.addFileToVFS('Kruti_Dev_010.ttf', base64Font);
       doc.addFont('Kruti_Dev_010.ttf', 'KrutiDev', 'normal');
       
-      // console.log('✅ Hindi Font Loaded & Registered');
       return 'KrutiDev';
     } catch (error) {
       console.warn('⚠️ Could not load Kruti Dev font, using fallback to Helvetica', error);
@@ -53,18 +55,22 @@ export class PDFGenerator {
     }
   }
 
-  // Check if text contains Hindi (Devanagari Unicode)
+  /**
+   * Checks if a string contains Hindi (Devanagari) characters.
+   */
   private static hasHindi(text: string): boolean {
     if (!text || typeof text !== 'string') return false;
     return /[\u0900-\u097F]/.test(text);
   }
 
-  // Convert Unicode Hindi to Kruti Dev encoding
-  // This solves the "Matra" and "Half-Character" (Halant) issues
+  /**
+   * Converts Unicode Hindi text to Kruti Dev encoding.
+   * Essential for rendering 'Matras' and 'Half-characters' correctly.
+   */
   private static toKrutiDev(text: string): string {
     if (!text) return '';
     
-    // 1. DIRECT DICTIONARY MAPPING (For perfect headers)
+    // 1. DIRECT DICTIONARY MAPPING (For perfect headers & common terms)
     const dictionary: { [key: string]: string } = {
       "साप्ताहिक": "lkIrkfgd",
       "पाठ्यक्रम": "ikB~;Øe",
@@ -120,7 +126,7 @@ export class PDFGenerator {
   }
 
   // ==========================================
-  // 2. CORE PDF GENERATION LOGIC
+  // 2. MAIN GENERATION LOGIC
   // ==========================================
 
   static async generatePDFFromLessonPlans(
@@ -233,12 +239,14 @@ export class PDFGenerator {
 
     // =========== TABLE DATA PREPARATION ===========
     
+    // IMPORTANT: We use '|||' to separate English (Top line) and Hindi (Bottom line)
+    // This allows us to use different fonts for each part in the same cell.
     const tableColumns = [
-      { header: 'Subject\n' + this.toKrutiDev('विषय'), dataKey: 'subject', width: 30 },
-      { header: 'Teacher\n' + this.toKrutiDev('अध्यापक'), dataKey: 'teacher', width: 35 },
-      { header: 'Chapter\n' + this.toKrutiDev('अध्याय'), dataKey: 'chapter', width: 35 },
-      { header: 'Topics\n' + this.toKrutiDev('विषय-वस्तु'), dataKey: 'topics', width: 50 },
-      { header: 'Home Assignment\n' + this.toKrutiDev('गृह कार्य'), dataKey: 'homework', width: 40 }
+      { header: 'Subject|||' + this.toKrutiDev('विषय'), dataKey: 'subject', width: 30 },
+      { header: 'Teacher|||' + this.toKrutiDev('अध्यापक'), dataKey: 'teacher', width: 35 },
+      { header: 'Chapter|||' + this.toKrutiDev('अध्याय'), dataKey: 'chapter', width: 35 },
+      { header: 'Topics|||' + this.toKrutiDev('विषय-वस्तु'), dataKey: 'topics', width: 50 },
+      { header: 'Home Assignment|||' + this.toKrutiDev('गृह कार्य'), dataKey: 'homework', width: 40 }
     ];
 
     const tableRows: any[][] = [];
@@ -256,6 +264,12 @@ export class PDFGenerator {
       const subject = assignment?.subject || '---';
       const isSubmitted = submittedTeachers.some(st => st.email === teacher.email);
 
+      // Handle Teacher Name (If Hindi, mark with |||)
+      let tName = teacher.name;
+      if (this.hasHindi(tName)) {
+        tName = '|||' + this.toKrutiDev(tName);
+      }
+
       if (isSubmitted) {
         const lessonPlan = allLessonPlans.find(plan => 
           plan.teacherId === teacher.email && 
@@ -264,21 +278,26 @@ export class PDFGenerator {
           plan.weekRange === weekRange
         );
 
+        // Check each field for Hindi
+        const check = (txt: string) => this.hasHindi(txt) ? '|||' + this.toKrutiDev(txt) : txt;
+
         tableRows.push([
-          subject,
-          teacher.name,
-          lessonPlan?.topics?.split('\n')[0]?.substring(0, 30) || '---',
-          lessonPlan?.topics?.substring(0, 50) || '---',
-          lessonPlan?.assessment?.substring(0, 50) || '---'
+          check(subject),
+          tName,
+          check(lessonPlan?.topics?.split('\n')[0]?.substring(0, 30) || '---'),
+          check(lessonPlan?.topics?.substring(0, 50) || '---'),
+          check(lessonPlan?.assessment?.substring(0, 50) || '---')
         ]);
       } else {
-        // Missing Submission Row - RED TEXT Logic happens in didParseCell
+        // Missing Submission Row - MIXED TEXT
+        // "Lesson Plan Not Submitted" is English only
+        // "Homework Not Submitted" has Hindi translation
         tableRows.push([
-          subject,
-          teacher.name,
+          subject, // English
+          tName,
           'Lesson Plan Not Submitted',
           'Lesson Plan Not Submitted',
-          'Homework Not Submitted\n' + this.toKrutiDev('(गृह कार्य नहीं दिया गया)')
+          'Homework Not Submitted|||' + this.toKrutiDev('(गृह कार्य नहीं दिया गया)')
         ]);
       }
     });
@@ -292,25 +311,21 @@ export class PDFGenerator {
         body: tableRows,
         theme: 'grid',
         
-        // Default Styles (English/Helvetica)
+        // Default Styles
         styles: {
-          font: 'helvetica', 
-          fontStyle: 'normal',
           fontSize: 9,
-          cellPadding: 4,
+          cellPadding: 3,
           textColor: [0, 0, 0],
-          overflow: 'linebreak',
-          cellWidth: 'wrap',
-          valign: 'top'
+          valign: 'top',
+          lineColor: [200, 200, 200],
+          lineWidth: 0.1,
+          overflow: 'linebreak'
         },
         
-        // Header Styles (Special Font Handling)
+        // Header Styles
         headStyles: {
           fillColor: [41, 128, 185],
           textColor: 255,
-          font: hindiFontName, // Use Kruti Dev for Headers (Supports Eng chars too)
-          fontStyle: 'normal',
-          fontSize: 10,
           halign: 'center',
           valign: 'middle',
           minCellHeight: 12
@@ -325,34 +340,64 @@ export class PDFGenerator {
           4: { cellWidth: 40, halign: 'left' }
         },
 
-        // CELL PARSING HOOK: The Brain of Mixed Fonts & Colors
+        // 1. PRE-PROCESS CELL: Hide default text if mixed, prepare for Manual Draw
         didParseCell: (data: any) => {
-          const rawText = data.cell.raw ? String(data.cell.raw) : '';
+          const raw = String(data.cell.raw || '');
           
-          // 1. FONT SELECTION: If Hindi is detected, switch to Kruti Dev
-          if (this.hasHindi(rawText)) {
-            // We must set the text to the Converted string
-            // AutoTable splits by lines, so rawText might be just one line or full string
-            // But our toKrutiDev handles the full string nicely.
-            const krutiText = this.toKrutiDev(rawText);
-            data.cell.text = krutiText.split('\n'); // Split explicitly for multiline
-            data.cell.styles.font = hindiFontName;
-          } 
-          // Else: It stays 'helvetica' (default)
-
-          // 2. MISSING SUBMISSION HIGHLIGHT (Red Color)
-          const isMissing = rawText.includes('Not Submitted') || 
-                            rawText.includes('Lesson Plan Not Submitted');
+          // Split parts if ||| exists
+          if (raw.includes('|||')) {
+             const parts = raw.split('|||');
+             (data.cell as any)._rawParts = parts; // Store parts for drawing
+             data.cell.text = parts.map(() => ''); // Clear default text so we can draw manually
+          }
           
-          if (isMissing) {
-             data.cell.styles.textColor = [220, 0, 0]; // RED
-             // Make italic if English, normal if Kruti (Kruti doesn't always support italic map)
-             if (!this.hasHindi(rawText)) {
-                data.cell.styles.fontStyle = 'italic';
-             }
+          // Color logic for Missing Submissions
+          if (raw.includes('Not Submitted')) {
+             data.cell.styles.textColor = [220, 0, 0]; // Red
           }
         },
-        
+
+        // 2. MANUAL DRAW: The Magic Fix for Mixed Fonts
+        didDrawCell: (data: any) => {
+            const parts = (data.cell as any)._rawParts;
+            if (parts) {
+                const cell = data.cell;
+                const x = cell.x + cell.padding('left');
+                let y = cell.y + cell.padding('top') + 3; // +3 approx for baseline
+                const lineHeight = 4;
+
+                // Part 0: English Text (Top) -> Use Helvetica
+                if (parts[0]) {
+                    doc.setFont('helvetica', data.section === 'head' ? 'bold' : 'normal');
+                    
+                    // Set color (Red if missing, White if header, else Black)
+                    if (parts[0].includes('Not Submitted')) doc.setTextColor(220, 0, 0);
+                    else if (data.section === 'head') doc.setTextColor(255, 255, 255);
+                    else doc.setTextColor(0, 0, 0);
+                    
+                    // Center align for headers, else left
+                    doc.text(parts[0], x + (data.section === 'head' ? (cell.width/2 - cell.padding('left')) : 0), y, {
+                        align: data.section === 'head' ? 'center' : 'left'
+                    });
+                    y += lineHeight; 
+                }
+
+                // Part 1: Hindi Text (Bottom) -> Use Kruti Dev
+                if (parts[1]) {
+                    doc.setFont(hindiFontName, 'normal');
+                    
+                    if (parts[1].includes('Not Submitted') || (parts[0] && parts[0].includes('Not Submitted'))) 
+                         doc.setTextColor(220, 0, 0);
+                    else if (data.section === 'head') doc.setTextColor(255, 255, 255);
+                    else doc.setTextColor(0, 0, 0);
+
+                    doc.text(parts[1], x + (data.section === 'head' ? (cell.width/2 - cell.padding('left')) : 0), y, {
+                        align: data.section === 'head' ? 'center' : 'left'
+                    });
+                }
+            }
+        },
+
         // Footer Page Numbers
         didDrawPage: (data: any) => {
           const pageCount = doc.internal.getNumberOfPages();
@@ -452,7 +497,7 @@ export class PDFGenerator {
 
   // ==========================================
   // 3. FALLBACK TABLE GENERATOR (Manual Drawing)
-  // This is used if autoTable crashes
+  // This is used if autoTable crashes - Full Implementation
   // ==========================================
   private static generateSimpleTableFallback(
     doc: jsPDF,
@@ -465,23 +510,33 @@ export class PDFGenerator {
     
     let y = startY;
     const startX = 15;
-    const rowHeight = 12;
     
     // Draw Headers
     doc.setFillColor(41, 128, 185);
     const totalWidth = columns.reduce((sum, col) => sum + col.width, 0);
     doc.rect(startX, y, totalWidth, 10, 'F');
     
-    doc.setFontSize(10);
-    doc.setFont(fontName, 'normal'); // Use Kruti for headers (it covers Eng too usually)
-    doc.setTextColor(255, 255, 255);
-    
     let x = startX + 5;
     columns.forEach(col => {
-      // Split header to handle newlines
-      const lines = col.header.split('\n');
-      doc.text(lines[0], x, y + 4);
-      if (lines[1]) doc.text(lines[1], x, y + 8);
+      // Split header by |||
+      const parts = col.header.split('|||');
+      
+      // English Part
+      if (parts[0]) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
+        doc.text(parts[0], x, y + 4);
+      }
+      
+      // Hindi Part
+      if (parts[1]) {
+        doc.setFont(fontName, 'normal');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
+        doc.text(parts[1], x, y + 8);
+      }
+      
       x += col.width;
     });
     
@@ -499,11 +554,20 @@ export class PDFGenerator {
         // Redraw Header
         doc.setFillColor(41, 128, 185);
         doc.rect(startX, y, totalWidth, 10, 'F');
-        doc.setTextColor(255, 255, 255);
         x = startX + 5;
         columns.forEach(col => {
-          doc.text(col.header.split('\n')[0], x, y + 7);
-          x += col.width;
+           const parts = col.header.split('|||');
+           if(parts[0]) {
+               doc.setFont('helvetica', 'bold');
+               doc.setTextColor(255,255,255);
+               doc.text(parts[0], x, y+4);
+           }
+           if(parts[1]) {
+               doc.setFont(fontName, 'normal');
+               doc.setTextColor(255,255,255);
+               doc.text(parts[1], x, y+8);
+           }
+           x += col.width;
         });
         doc.setTextColor(0, 0, 0);
         y += 12;
@@ -518,28 +582,36 @@ export class PDFGenerator {
       x = startX + 5;
       row.forEach((cell, cellIndex) => {
         const rawText = String(cell);
+        const parts = rawText.includes('|||') ? rawText.split('|||') : [rawText];
         
-        // Font Selection
-        if (this.hasHindi(rawText)) {
-          doc.setFont(fontName, 'normal');
-          doc.text(this.toKrutiDev(rawText), x, y + 6);
-        } else {
-          doc.setFont('helvetica', 'normal');
-          // Color Logic
-          if (rawText.includes('Not Submitted')) {
-             doc.setTextColor(220, 0, 0);
-          } else {
-             doc.setTextColor(0, 0, 0);
-          }
-          doc.text(rawText.substring(0, 25), x, y + 6);
-        }
+        let localY = y + 5;
         
-        // Reset Color
-        doc.setTextColor(0, 0, 0);
+        // Draw Parts
+        parts.forEach((part, pIdx) => {
+            if (!part) return;
+            
+            // Check font
+            if (this.hasHindi(part) || pIdx === 1) { // Usually 2nd part is Hindi
+                doc.setFont(fontName, 'normal');
+            } else {
+                doc.setFont('helvetica', 'normal');
+            }
+            
+            // Color Logic
+            if (part.includes('Not Submitted')) {
+                doc.setTextColor(220, 0, 0);
+            } else {
+                doc.setTextColor(0, 0, 0);
+            }
+            
+            doc.text(part.substring(0, 25), x, localY);
+            localY += 4;
+        });
+        
         x += columns[cellIndex].width;
       });
       
-      y += rowHeight;
+      y += 12; // Row Height
     });
   }
 
