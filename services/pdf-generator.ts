@@ -335,7 +335,7 @@ export class PDFGenerator {
           tName,
           'Lesson Plan Not Submitted',
           'Lesson Plan Not Submitted',
-          'Homework Not Submitted|||' + this.toKrutiDev('(गृह कार्य नहीं दिया गया)')
+          'Homework Not Submitted|||' + this.toKrutiDev('गृह कार्य नहीं दिया गया')
         ]);
       }
     });
