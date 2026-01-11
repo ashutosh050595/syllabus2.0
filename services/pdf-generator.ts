@@ -524,7 +524,7 @@ export class PDFGenerator {
       // Teacher Name (Dynamic)
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(9);
-      doc.text(`(${classTeacherName})`, 30, sigY + 13); 
+      doc.text(`(${classTeacherName})`, 30, sigY - 2 ); 
 
       // 2. PRINCIPAL SIGNATURE
       doc.setFont('helvetica', 'normal');
@@ -540,7 +540,7 @@ export class PDFGenerator {
       // Principal Name (Fixed)
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(9);
-      doc.text('(Pramod Kumar Sharma)', 120, sigY + 13);
+      doc.text('(Pramod Kumar Sharma)', 120, sigY - 2);
       
       // DATE
       doc.setFont('helvetica', 'normal');
