@@ -16,17 +16,20 @@ export class PDFGenerator {
   /**
    * Loads the Kruti Dev font asynchronously and registers it with jsPDF.
    * Handles large file sizes by processing in chunks to avoid stack overflow.
+   * This is crucial for ensuring the custom font works in the browser.
    */
   private static async addHindiFontToDoc(doc: jsPDF): Promise<string> {
     try {
+      // console.log(`📥 Fetching font from: ${HINDI_FONT_URL}`);
       const response = await fetch(HINDI_FONT_URL);
+      
       if (!response.ok) {
         throw new Error(`Font fetch failed: ${response.statusText}`);
       }
       
       const buffer = await response.arrayBuffer();
       
-      // Convert ArrayBuffer to Binary String carefully
+      // Convert ArrayBuffer to Binary String carefully using chunks
       let binary = '';
       const bytes = new Uint8Array(buffer);
       const len = bytes.byteLength;
@@ -55,7 +58,7 @@ export class PDFGenerator {
 
   /**
    * Checks if a string contains Hindi (Devanagari) characters.
-   * Used to decide when to switch fonts.
+   * Used to decide when to switch fonts between Helvetica and Kruti Dev.
    */
   private static hasHindi(text: string): boolean {
     if (!text || typeof text !== 'string') return false;
@@ -65,26 +68,30 @@ export class PDFGenerator {
   /**
    * Converts Unicode Hindi text to Kruti Dev encoding.
    * Essential for rendering 'Matras' and 'Half-characters' correctly.
-   * Includes specific fixes for: Adhyapak, Vishay, Home Assignment, Brackets.
+   * Includes specific fixes for: Adhyapak, Vishay, Home Assignment, Brackets, Sacred.
    */
   private static toKrutiDev(text: string): string {
     if (!text) return '';
     
     // 1. EXACT DICTIONARY MAPPING
-    // This ensures specific words are rendered perfectly
+    // Using Hex Codes to ensure absolute correctness irrespective of file encoding
     const dictionary: { [key: string]: string } = {
       // Headers
       "साप्ताहिक": "lkIrkfgd",
-      "पाठ्यक्रम": "ikB~;Øe",
+      "पाठ्यक्रम": "ikB~;\xD8e", // Fixed: Uses Ø (\xD8) for Kra
       "विषय-वस्तु": "fo\"k; oLrq", // Double quote for 'Sha'
       "विषय": "fo\"k;",           // Double quote for 'Sha'
       "अध्यापक": "v/;kid",        // 'i' for 'pa'
       "अध्याय": "v/;k;",
       
-      // FIXED: Grih Karya using Backtick (`) for Ri Matra
-      "गृह कार्य": "x`g dk;Z", 
+      // FIXED: Grih Karya using Backtick (\x60) for Ri Matra
+      "गृह कार्य": "x\x60g dk;Z", 
       
-      // Signatures - Explicitly removing colons from the value
+      // FIXED: Sacred Heart School using Ø (\xD8) for Kra
+      "सैक्रेड हार्ट स्कूल": "lS\xD8sM gkVZ Ldwy", 
+      "सैक्रेड": "lS\xD8sM",
+
+      // Signatures - Explicitly removing colons from the value to prevent 'Ru'
       "हस्ताक्षर": "gLrk{kj",
       "कक्षा अध्यापक के हस्ताक्षर": "d{kk v/;kid ds gLrk{kj",
       "प्राचार्य के हस्ताक्षर": "izkpk;Z ds gLrk{kj",
@@ -92,7 +99,6 @@ export class PDFGenerator {
       // Common Words
       "प्राचार्य": "izkpk;Z",
       "कक्षा": "d{kk",
-      "सैक्रेड": "lSdZSM",
       "हार्ट": "gkVZ",
       "स्कूल": "Ldwy",
       "नहीं": "ugha",
@@ -101,8 +107,8 @@ export class PDFGenerator {
       "दिनांक": "fnukad",
       "सत्र": "l=",
       
-      // Full Phrases with Fixed Brackets
-      "गृह कार्य नहीं दिया गय)": "x`g dk;Z ugha fn;k x;k", // Uses ¼ ½ for brackets
+      // Full Phrases with Fixed Brackets using Hex \xBC (¼) and \xBD (½)
+      "(गृह कार्य नहीं दिया गया)": "\xBCx\x60g dk;Z ugha fn;k x;k\xBD", 
       
       "Not Submitted": "Not Submitted" // Keep English as is
     };
@@ -119,12 +125,12 @@ export class PDFGenerator {
     // If fully handled by dictionary or no Hindi left, return
     if (!this.hasHindi(processed)) return processed;
 
-    // 2. CHARACTER MAPPING (Fallback)
+    // 2. CHARACTER MAPPING (Fallback for dynamic names)
     const mapping: { [key: string]: string } = {
       // Matras
       '‘': '^', '’': '*', '“': 'Þ', '”': 'ß',
       'ा': 'k', 'ि': 'f', 'ी': 'h', 'ु': 'q', 'ू': 'w', 
-      'ृ': "`", // Backtick for Ri Matra
+      'ृ': "\x60", // Backtick for Ri Matra
       'े': 's', 'ै': 'S', 'ो': 'ks', 'ौ': 'kS', 'ं': 'a', 'ँ': '¡', 'ः': '%',
       '्': '~', 
       
@@ -143,9 +149,9 @@ export class PDFGenerator {
       'क्ष': '{k', 'त्र': '=', 'ज्ञ': 'K', 'श्र': 'J',
       
       // Symbols & Brackets Fix
-      '(': '¼', 
-      ')': '½',
-      ':': '' // Remove colon to prevent 'Ru' symbol
+      '(': '\xBC', // Hex for Open Bracket (¼)
+      ')': '\xBD', // Hex for Close Bracket (½)
+      ':': ''      // Remove colon to prevent garbage
     };
 
     let result = '';
@@ -190,6 +196,7 @@ export class PDFGenerator {
     // School Name (Hindi)
     doc.setFontSize(16);
     doc.setFont(hindiFontName, 'normal'); // Switch to Kruti Dev
+    // Using corrected mapping for Sacred (lS\xD8sM)
     doc.text(this.toKrutiDev('सैक्रेड हार्ट स्कूल'), 105, 28, { align: 'center' });
 
     // Affiliation (English)
@@ -207,6 +214,7 @@ export class PDFGenerator {
     // Title (Hindi)
     doc.setFontSize(14);
     doc.setFont(hindiFontName, 'normal');
+    // Using corrected mapping for Pathyakram
     doc.text(this.toKrutiDev('साप्ताहिक पाठ्यक्रम'), 105, 56, { align: 'center' });
 
     // Separator Line
@@ -271,6 +279,7 @@ export class PDFGenerator {
     // =========== TABLE DATA PREPARATION ===========
     
     // IMPORTANT: We use '|||' to separate English (Top) and Hindi (Bottom)
+    // The dictionary now contains completely corrected spellings
     const tableColumns = [
       { header: 'Subject|||' + this.toKrutiDev('विषय'), dataKey: 'subject', width: 30 },
       { header: 'Teacher|||' + this.toKrutiDev('अध्यापक'), dataKey: 'teacher', width: 35 },
@@ -308,7 +317,7 @@ export class PDFGenerator {
           plan.weekRange === weekRange
         );
 
-        // Helper to check/convert
+        // Helper to check/convert each field
         const check = (txt: string) => this.hasHindi(txt) ? '|||' + this.toKrutiDev(txt) : txt;
 
         tableRows.push([
@@ -399,12 +408,12 @@ export class PDFGenerator {
                 if (parts[0]) {
                     doc.setFont('helvetica', data.section === 'head' ? 'bold' : 'normal');
                     
-                    // Set color
+                    // Set color (Red if missing, White if header, else Black)
                     if (parts[0].includes('Not Submitted')) doc.setTextColor(220, 0, 0);
                     else if (data.section === 'head') doc.setTextColor(255, 255, 255);
                     else doc.setTextColor(0, 0, 0);
                     
-                    // Draw English text
+                    // Center align for headers, else left
                     doc.text(parts[0], x + (data.section === 'head' ? (cell.width/2 - cell.padding('left')) : 0), y, {
                         align: data.section === 'head' ? 'center' : 'left'
                     });
@@ -415,13 +424,11 @@ export class PDFGenerator {
                 if (parts[1]) {
                     doc.setFont(hindiFontName, 'normal');
                     
-                    // Set color
                     if (parts[1].includes('Not Submitted') || (parts[0] && parts[0].includes('Not Submitted'))) 
                          doc.setTextColor(220, 0, 0);
                     else if (data.section === 'head') doc.setTextColor(255, 255, 255);
                     else doc.setTextColor(0, 0, 0);
 
-                    // Draw Hindi text
                     doc.text(parts[1], x + (data.section === 'head' ? (cell.width/2 - cell.padding('left')) : 0), y, {
                         align: data.section === 'head' ? 'center' : 'left'
                     });
